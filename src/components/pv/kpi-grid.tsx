@@ -1,0 +1,73 @@
+import { BatteryFull, Home, PiggyBank, Sun } from "lucide-react";
+import { StatCard } from "@/components/pv/stat-card";
+import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
+import type { PvSnapshot } from "@/lib/pv-data";
+import type { DataSource, GridSource } from "@/lib/pv-source";
+
+function formatSignedKwh(value: number): string {
+  const rounded = value.toFixed(1);
+  return value > 0 ? `+${rounded}` : rounded;
+}
+
+export function KpiGrid({
+  snapshot,
+  source,
+  gridSource,
+}: {
+  snapshot: PvSnapshot;
+  source: DataSource;
+  gridSource: GridSource;
+}) {
+  const pvSimulated = isPvSimulated(source);
+  const gridSimulated = isGridSimulated(gridSource);
+  const stromkontoNegative =
+    snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
+  const stromkontoChangeNegative =
+    snapshot.stromkontoChangeTodayKwh != null && snapshot.stromkontoChangeTodayKwh < 0;
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatCard
+        label="Heute erzeugt"
+        value={snapshot.todayYieldKwh.toFixed(1)}
+        unit="kWh"
+        icon={<Sun className="size-5" />}
+        accent="green"
+        simulated={pvSimulated}
+      />
+      <StatCard
+        label="Heute verbraucht"
+        value={snapshot.todayConsumptionKwh != null ? snapshot.todayConsumptionKwh.toFixed(1) : "–"}
+        unit={snapshot.todayConsumptionKwh != null ? "kWh" : undefined}
+        hint={snapshot.todayConsumptionKwh == null ? "keine Verbrauchsdaten verfügbar" : undefined}
+        icon={<Home className="size-5" />}
+        accent="rose"
+        simulated={pvSimulated}
+      />
+      <StatCard
+        label="Stromkonto heute"
+        value={
+          snapshot.stromkontoChangeTodayKwh != null
+            ? formatSignedKwh(snapshot.stromkontoChangeTodayKwh)
+            : "–"
+        }
+        unit={snapshot.stromkontoChangeTodayKwh != null ? "kWh" : undefined}
+        icon={<PiggyBank className="size-5" />}
+        accent={stromkontoChangeNegative ? "rose" : "green"}
+        simulated={gridSimulated}
+      />
+      <StatCard
+        label="Stand Stromkonto"
+        value={
+          snapshot.stromkontoBalanceKwh != null
+            ? snapshot.stromkontoBalanceKwh.toFixed(1)
+            : "–"
+        }
+        unit={snapshot.stromkontoBalanceKwh != null ? "kWh" : undefined}
+        icon={<BatteryFull className="size-5 -rotate-90" />}
+        accent={stromkontoNegative ? "rose" : "green"}
+        simulated={gridSimulated}
+      />
+    </div>
+  );
+}

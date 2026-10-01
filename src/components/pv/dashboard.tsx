@@ -1,0 +1,136 @@
+"use client";
+
+import { useEffect, useSyncExternalStore } from "react";
+import { RefreshCcw } from "lucide-react";
+import { DashboardHeader } from "@/components/pv/header";
+import { KpiGrid } from "@/components/pv/kpi-grid";
+import { EnergyFlow } from "@/components/pv/energy-flow";
+import { MetricsCard } from "@/components/pv/metrics-card";
+import { SunTimesCard } from "@/components/pv/sun-times-card";
+import { ChartsSection } from "@/components/pv/charts-section";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { pvStore } from "@/lib/pv-store";
+import { checkYieldNotification } from "@/lib/notifications";
+import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
+
+export function Dashboard({ plantName }: { plantName: string }) {
+  const { data, error, source, gridSource, warning, lastFetchedAt } = useSyncExternalStore(
+    pvStore.subscribe,
+    pvStore.getSnapshot,
+    pvStore.getServerSnapshot,
+  );
+  const lastUpdated = lastFetchedAt != null ? new Date(lastFetchedAt) : null;
+  const dataSource = source ?? "simulation";
+
+  useEffect(() => {
+    if (!data) return;
+    checkYieldNotification(data.snapshot.todayYieldKwh, data.snapshot.timestamp);
+  }, [data]);
+
+  return (
+    <div className="relative flex min-h-dvh flex-col bg-background">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] bg-[radial-gradient(60%_50%_at_50%_-10%,color-mix(in_oklch,var(--color-primary)_16%,transparent),transparent_70%)]"
+      />
+
+      <DashboardHeader
+        lastUpdated={lastUpdated}
+        plantName={plantName}
+        source={source}
+        gridSource={gridSource}
+      />
+
+      <main className="safe-x safe-bottom mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6">
+        {error ? (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <span>{error}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-destructive/40 text-destructive hover:bg-destructive/10"
+              onClick={pvStore.refresh}
+            >
+              <RefreshCcw className="size-3.5" />
+              Erneut versuchen
+            </Button>
+          </div>
+        ) : null}
+
+        {!error && warning ? (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            {warning}
+          </div>
+        ) : null}
+
+        {!data ? (
+          <DashboardSkeleton />
+        ) : (
+          <>
+            <SunTimesCard
+              date={new Date(data.snapshot.timestamp)}
+              weather={data.snapshot.weather}
+              source={dataSource}
+            />
+
+            <KpiGrid snapshot={data.snapshot} source={dataSource} gridSource={gridSource} />
+
+            <div className="grid grid-cols-1 gap-4 landscape:grid-cols-2 lg:grid-cols-2">
+              <EnergyFlow
+                snapshot={data.snapshot}
+                source={dataSource}
+                gridSource={gridSource}
+              />
+              <MetricsCard
+                snapshot={data.snapshot}
+                source={dataSource}
+                month={data.month}
+                year={data.year}
+              />
+            </div>
+
+            <ChartsSection
+              today={data.today}
+              week={data.week}
+              month={data.month}
+              year={data.year}
+              lifetime={data.lifetime}
+              source={dataSource}
+            />
+          </>
+        )}
+      </main>
+
+      <footer className="safe-x safe-bottom mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 pb-4 text-xs text-muted-foreground sm:px-6">
+        <span className="min-w-0 truncate">
+          {source === "fusionsolar"
+            ? "Live-Daten von FusionSolar"
+            : "Simulierte Anlagendaten"}
+          {gridSource === "whatwatt" ? " · Netzwerte von whatwatt Go" : ""}
+        </span>
+        <span className="shrink-0 tabular-nums">
+          {APP_NAME} {APP_VERSION_LABEL}
+        </span>
+      </footer>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Skeleton className="h-[76px] rounded-2xl" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-[96px] rounded-2xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-4 landscape:grid-cols-2 lg:grid-cols-2">
+        <Skeleton className="h-56 rounded-2xl" />
+        <Skeleton className="h-56 rounded-2xl" />
+      </div>
+      <Skeleton className="h-80 rounded-2xl" />
+    </div>
+  );
+}
