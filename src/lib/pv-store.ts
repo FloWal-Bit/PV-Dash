@@ -5,6 +5,7 @@ export type PvStoreState = {
   error: string | null;
   source: DataSource | null;
   gridSource: GridSource;
+  forecastedTodayYieldKwh: number | null;
   warning: string | null;
   /** Client-Zeitpunkt des letzten erfolgreichen API-Abrufs (für „Aktualisiert“). */
   lastFetchedAt: number | null;
@@ -16,6 +17,7 @@ const INITIAL_STATE: PvStoreState = {
   error: null,
   source: null,
   gridSource: null,
+  forecastedTodayYieldKwh: null,
   warning: null,
   lastFetchedAt: null,
 };
@@ -42,6 +44,7 @@ class PvStore {
         source: DataSource;
         gridSource: GridSource;
         data: DashboardData;
+        forecastedTodayYieldKwh: number | null;
         warning: string | null;
       };
       this.state = {
@@ -49,6 +52,7 @@ class PvStore {
         error: null,
         source: payload.source,
         gridSource: payload.gridSource,
+        forecastedTodayYieldKwh: payload.forecastedTodayYieldKwh ?? null,
         warning: payload.warning,
         lastFetchedAt: Date.now(),
       };

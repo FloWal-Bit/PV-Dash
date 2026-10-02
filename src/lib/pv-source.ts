@@ -20,6 +20,8 @@ import { isFusionSolarConfigured } from "@/lib/fusionsolar/config";
 import { getFusionSolarDashboardData } from "@/lib/fusionsolar/service";
 import { applyStromkontoToSnapshot } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
+import { resolveForecastSolarPeakKwp } from "@/lib/forecast-solar/config";
+import { getForecastedTodayYieldKwh } from "@/lib/forecast-solar/service";
 import { getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
 
 export type DashboardData = {
@@ -62,6 +64,8 @@ export type DashboardPayload = {
   /** Ist ein whatwatt Go konfiguriert und erreichbar, überschreibt es die Netzwerte der Hauptquelle. */
   gridSource: GridSource;
   data: DashboardData;
+  /** Prognostizierter Tagesertrag (kWh), Summe forecast.solar-Stundenwerte für heute. */
+  forecastedTodayYieldKwh: number | null;
   /** Nutzerfreundliche Meldung, z. B. wenn FusionSolar konfiguriert, aber gerade nicht erreichbar ist. */
   warning: string | null;
 };
@@ -154,10 +158,16 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
     fromWhatWatt: overlay.gridSource === "whatwatt",
   });
 
+  const forecastedTodayYieldKwh = await getForecastedTodayYieldKwh(
+    resolveForecastSolarPeakKwp(),
+    new Date(snapshot.timestamp),
+  );
+
   return {
     source: base.source,
     gridSource: overlay.gridSource,
     data: { ...overlay.data, snapshot },
+    forecastedTodayYieldKwh,
     // Eine bereits vorhandene FusionSolar-Warnung hat Vorrang, damit nicht
     // zwei Warnbanner gleichzeitig um Aufmerksamkeit konkurrieren.
     warning: base.warning ?? overlay.warning,

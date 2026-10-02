@@ -6,9 +6,9 @@ import { Progress } from "@/components/ui/progress";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
 import type { DailyEnergyPoint, PvSnapshot } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
-import { siteLocationStore } from "@/lib/site-location";
+import { formatSwissNumber, formatYieldKwh } from "@/lib/format";
 import { estimateForecastedYieldKwh, getSunInfo } from "@/lib/sun";
-import { formatYieldKwh } from "@/lib/format";
+import { siteLocationStore } from "@/lib/site-location";
 import { cn } from "@/lib/utils";
 
 function sumYieldKwh(points: DailyEnergyPoint[]): number {
@@ -20,11 +20,13 @@ export function MetricsCard({
   source,
   month,
   year,
+  forecastedTodayYieldKwh,
 }: {
   snapshot: PvSnapshot;
   source: DataSource;
   month: DailyEnergyPoint[];
   year: DailyEnergyPoint[];
+  forecastedTodayYieldKwh: number | null;
 }) {
   const pvSimulated = isPvSimulated(source);
   const { location } = useSyncExternalStore(
@@ -33,10 +35,12 @@ export function MetricsCard({
     siteLocationStore.getServerSnapshot,
   );
   const sunInfo = getSunInfo(new Date(snapshot.timestamp), location);
-  const forecastedTodayYieldKwh = estimateForecastedYieldKwh(snapshot.systemPeakKwp, sunInfo);
+  const forecastKwh =
+    forecastedTodayYieldKwh ??
+    estimateForecastedYieldKwh(snapshot.systemPeakKwp, sunInfo);
   const forecastProgress =
-    forecastedTodayYieldKwh > 0
-      ? Math.min(100, Math.round((snapshot.todayYieldKwh / forecastedTodayYieldKwh) * 100))
+    forecastKwh > 0
+      ? Math.min(100, Math.round((snapshot.todayYieldKwh / forecastKwh) * 100))
       : 0;
 
   return (
@@ -67,7 +71,8 @@ export function MetricsCard({
           <div className="flex items-center justify-between text-sm">
             <span>Prognostizierter Tagesertrag</span>
             <span className="font-medium tabular-nums">
-              {snapshot.todayYieldKwh.toFixed(1)} / {forecastedTodayYieldKwh.toFixed(1)} kWh
+              {formatSwissNumber(snapshot.todayYieldKwh, 1)} /{" "}
+              {formatSwissNumber(forecastKwh, 1)} kWh
             </span>
           </div>
           <Progress

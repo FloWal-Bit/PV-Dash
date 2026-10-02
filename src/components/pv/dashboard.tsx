@@ -15,11 +15,12 @@ import { checkYieldNotification } from "@/lib/notifications";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 
 export function Dashboard({ plantName }: { plantName: string }) {
-  const { data, error, source, gridSource, warning, lastFetchedAt } = useSyncExternalStore(
-    pvStore.subscribe,
-    pvStore.getSnapshot,
-    pvStore.getServerSnapshot,
-  );
+  const { data, error, source, gridSource, forecastedTodayYieldKwh, warning, lastFetchedAt } =
+    useSyncExternalStore(
+      pvStore.subscribe,
+      pvStore.getSnapshot,
+      pvStore.getServerSnapshot,
+    );
   const lastUpdated = lastFetchedAt != null ? new Date(lastFetchedAt) : null;
   const dataSource = source ?? "simulation";
 
@@ -87,6 +88,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
                 source={dataSource}
                 month={data.month}
                 year={data.year}
+                forecastedTodayYieldKwh={forecastedTodayYieldKwh}
               />
             </div>
 
