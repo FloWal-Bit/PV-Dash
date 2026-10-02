@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { Clock, Clock3, CloudDrizzle, Cloudy, Sun, Sunrise, Sunset, SunDim } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { formatSwissNumber } from "@/lib/format";
 import { getSunInfo } from "@/lib/sun";
 import { siteLocationStore } from "@/lib/site-location";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
@@ -146,7 +147,7 @@ export function SunTimesCard({
         <SunStat
           icon={<Clock3 className="size-4" />}
           label="Sonnenstunden"
-          value={`${sun.forecastedSunHours.toFixed(1)} h`}
+          value={`${formatSwissNumber(sun.forecastedSunHours, 1)} h`}
           accent="slate"
         />
       </CardContent>

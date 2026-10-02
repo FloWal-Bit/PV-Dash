@@ -1,10 +1,17 @@
+/**
+ * Feste forecast.solar-Anfrage (Anlage Kronenmattweg):
+ * https://api.forecast.solar/estimate/47.13/7.54/11/0/30.34
+ */
+export const FORECAST_SOLAR_LATITUDE = 47.13;
+export const FORECAST_SOLAR_LONGITUDE = 7.54;
+
 /** Neigung der Module in Grad (forecast.solar: declination). */
 export const FORECAST_SOLAR_DECLINATION_DEG = 11;
 
-/** Azimut in Grad (forecast.solar: 180 = Süden). */
-export const FORECAST_SOLAR_AZIMUTH_DEG = 180;
+/** Azimut in Grad (forecast.solar). */
+export const FORECAST_SOLAR_AZIMUTH_DEG = 0;
 
-/** Standard-kWp für die forecast.solar-URL (Anlage Kronenmattweg). */
+/** Standard-kWp für die forecast.solar-URL. */
 export const DEFAULT_FORECAST_SOLAR_PEAK_KWP = 30.34;
 
 export function resolveForecastSolarPeakKwp(): number {

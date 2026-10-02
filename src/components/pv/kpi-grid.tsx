@@ -1,13 +1,9 @@
 import { BatteryFull, Home, PiggyBank, Sun } from "lucide-react";
 import { StatCard } from "@/components/pv/stat-card";
 import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
+import { formatSignedSwissNumber, formatSwissNumber } from "@/lib/format";
 import type { PvSnapshot } from "@/lib/pv-data";
 import type { DataSource, GridSource } from "@/lib/pv-source";
-
-function formatSignedKwh(value: number): string {
-  const rounded = value.toFixed(1);
-  return value > 0 ? `+${rounded}` : rounded;
-}
 
 export function KpiGrid({
   snapshot,
@@ -29,7 +25,7 @@ export function KpiGrid({
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <StatCard
         label="Heute erzeugt"
-        value={snapshot.todayYieldKwh.toFixed(1)}
+        value={formatSwissNumber(snapshot.todayYieldKwh, 1)}
         unit="kWh"
         icon={<Sun className="size-5" />}
         accent="green"
@@ -37,7 +33,11 @@ export function KpiGrid({
       />
       <StatCard
         label="Heute verbraucht"
-        value={snapshot.todayConsumptionKwh != null ? snapshot.todayConsumptionKwh.toFixed(1) : "–"}
+        value={
+          snapshot.todayConsumptionKwh != null
+            ? formatSwissNumber(snapshot.todayConsumptionKwh, 1)
+            : "–"
+        }
         unit={snapshot.todayConsumptionKwh != null ? "kWh" : undefined}
         hint={snapshot.todayConsumptionKwh == null ? "keine Verbrauchsdaten verfügbar" : undefined}
         icon={<Home className="size-5" />}
@@ -48,7 +48,7 @@ export function KpiGrid({
         label="Stromkonto heute"
         value={
           snapshot.stromkontoChangeTodayKwh != null
-            ? formatSignedKwh(snapshot.stromkontoChangeTodayKwh)
+            ? formatSignedSwissNumber(snapshot.stromkontoChangeTodayKwh, 1)
             : "–"
         }
         unit={snapshot.stromkontoChangeTodayKwh != null ? "kWh" : undefined}
@@ -60,7 +60,7 @@ export function KpiGrid({
         label="Stand Stromkonto"
         value={
           snapshot.stromkontoBalanceKwh != null
-            ? snapshot.stromkontoBalanceKwh.toFixed(1)
+            ? formatSwissNumber(snapshot.stromkontoBalanceKwh, 1)
             : "–"
         }
         unit={snapshot.stromkontoBalanceKwh != null ? "kWh" : undefined}

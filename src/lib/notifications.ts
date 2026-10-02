@@ -1,3 +1,5 @@
+import { formatYieldKwh } from "@/lib/format";
+
 /**
  * Push-Benachrichtigungen bei Ertrags-Meilensteinen.
  *
@@ -116,7 +118,7 @@ function showYieldNotification(todayYieldKwh: number): void {
   if (!isSupported()) return;
   try {
     new Notification("PV Dash", {
-      body: `Deine Anlage hat heute bereits ${todayYieldKwh.toFixed(1)} kWh erzeugt.`,
+      body: `Deine Anlage hat heute bereits ${formatYieldKwh(todayYieldKwh, 1)} erzeugt.`,
       icon: "/icon.svg",
       tag: "pv-yield-threshold",
     });

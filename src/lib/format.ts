@@ -11,3 +11,18 @@ export function formatSwissNumber(value: number, fractionDigits = 0): string {
 export function formatYieldKwh(value: number, fractionDigits: number): string {
   return `${formatSwissNumber(value, fractionDigits)} kWh`;
 }
+
+export function formatKw(value: number, fractionDigits = 1): string {
+  return `${formatSwissNumber(value, fractionDigits)} kW`;
+}
+
+/** z. B. +1'234.5 oder -12.3 (ohne Einheit). */
+export function formatSignedSwissNumber(value: number, fractionDigits = 1): string {
+  if (value > 0) return `+${formatSwissNumber(value, fractionDigits)}`;
+  if (value < 0) return formatSwissNumber(value, fractionDigits);
+  return formatSwissNumber(0, fractionDigits);
+}
+
+export function formatSignedKwh(value: number, fractionDigits = 1): string {
+  return `${formatSignedSwissNumber(value, fractionDigits)} kWh`;
+}

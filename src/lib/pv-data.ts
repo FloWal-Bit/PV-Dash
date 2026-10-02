@@ -58,7 +58,7 @@ export type PvSnapshot = {
   stromkontoChangeTodayKwh: number | null;
   /** Eigenverbrauchsquote in %. `null`, wenn Verbrauchsdaten fehlen. */
   selfConsumptionRate: number | null;
-  /** Autarkiegrad in %. `null`, wenn Verbrauchsdaten fehlen. */
+  /** Physischer Autarkiegrad (Momentanleistung) in %. `null`, wenn Verbrauch fehlt. */
   autarkyRate: number | null;
   /** Peak-Leistung der Anlage in kWp */
   systemPeakKwp: number;

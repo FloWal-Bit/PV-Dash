@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
+import { formatKw } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { PvSnapshot } from "@/lib/pv-data";
 import type { DataSource, GridSource } from "@/lib/pv-source";
@@ -369,7 +370,7 @@ export function EnergyFlow({ snapshot, source, gridSource }: EnergyFlowProps) {
               pvCircleRef.current = el;
             }}
             icon={<Sun className="size-5" />}
-            value={`${snapshot.productionKw.toFixed(1)} kW`}
+            value={formatKw(snapshot.productionKw, 1)}
             label="PV"
             accent="green"
             muted={!isProducing}
@@ -383,7 +384,7 @@ export function EnergyFlow({ snapshot, source, gridSource }: EnergyFlowProps) {
             }}
             icon={<Home className="size-5" />}
             value={
-              snapshot.consumptionKw != null ? `${snapshot.consumptionKw.toFixed(1)} kW` : "–"
+              snapshot.consumptionKw != null ? formatKw(snapshot.consumptionKw, 1) : "–"
             }
             label="Verbrauch"
             accent="rose"
@@ -397,7 +398,7 @@ export function EnergyFlow({ snapshot, source, gridSource }: EnergyFlowProps) {
               stromkontoCircleRef.current = el;
             }}
             icon={<BatteryFull className="size-5 -rotate-90" />}
-            value={stromkontoKw != null ? `${stromkontoKw.toFixed(1)} kW` : "–"}
+            value={stromkontoKw != null ? formatKw(stromkontoKw, 1) : "–"}
             label="Stromkonto"
             accent={stromkontoAccent}
             muted={!isGridImport && !isGridExport}

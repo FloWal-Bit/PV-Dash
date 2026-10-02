@@ -5,7 +5,7 @@ import { RefreshCcw } from "lucide-react";
 import { DashboardHeader } from "@/components/pv/header";
 import { KpiGrid } from "@/components/pv/kpi-grid";
 import { EnergyFlow } from "@/components/pv/energy-flow";
-import { MetricsCard } from "@/components/pv/metrics-card";
+import { TodayOverviewCard } from "@/components/pv/today-overview-card";
 import { SunTimesCard } from "@/components/pv/sun-times-card";
 import { ChartsSection } from "@/components/pv/charts-section";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -83,16 +83,15 @@ export function Dashboard({ plantName }: { plantName: string }) {
                 source={dataSource}
                 gridSource={gridSource}
               />
-              <MetricsCard
+              <TodayOverviewCard
                 snapshot={data.snapshot}
                 source={dataSource}
-                month={data.month}
-                year={data.year}
                 forecastedTodayYieldKwh={forecastedTodayYieldKwh}
               />
             </div>
 
             <ChartsSection
+              snapshot={data.snapshot}
               today={data.today}
               week={data.week}
               month={data.month}
@@ -132,7 +131,7 @@ function DashboardSkeleton() {
         <Skeleton className="h-56 rounded-2xl" />
         <Skeleton className="h-56 rounded-2xl" />
       </div>
-      <Skeleton className="h-80 rounded-2xl" />
+      <Skeleton className="h-96 rounded-2xl" />
     </div>
   );
 }

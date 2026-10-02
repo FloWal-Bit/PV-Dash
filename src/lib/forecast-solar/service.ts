@@ -6,8 +6,9 @@
 import {
   FORECAST_SOLAR_AZIMUTH_DEG,
   FORECAST_SOLAR_DECLINATION_DEG,
+  FORECAST_SOLAR_LATITUDE,
+  FORECAST_SOLAR_LONGITUDE,
 } from "@/lib/forecast-solar/config";
-import { getSiteLocation } from "@/lib/sun";
 
 const API_BASE = "https://api.forecast.solar/estimate";
 const CACHE_TTL_MS = 45 * 60 * 1000; // API: 12 req/h/IP — nicht öfter pollen
@@ -66,7 +67,8 @@ export async function getForecastedTodayYieldKwh(
 ): Promise<number | null> {
   if (!Number.isFinite(peakKwp) || peakKwp <= 0) return null;
 
-  const { latitude, longitude } = getSiteLocation();
+  const latitude = FORECAST_SOLAR_LATITUDE;
+  const longitude = FORECAST_SOLAR_LONGITUDE;
   const dateKey = todayDateKeyInZurich(date);
   const key = `${formatCoord(latitude)}:${formatCoord(longitude)}:${peakKwp}:${dateKey}`;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Bell, MapPin, PiggyBank, Settings2 } from "lucide-react";
+import { Bell, Info, MapPin, PiggyBank, Settings2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,7 @@ import {
   DEFAULT_STROMKONTO_BALANCE_KWH,
   parseStromkontoBalanceInput,
 } from "@/lib/stromkonto-shared";
+import { formatYieldKwh } from "@/lib/format";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
@@ -230,7 +231,7 @@ function StromkontoEditor() {
       <p className="text-xs leading-relaxed text-muted-foreground">
         Dein aktueller Basiskontostand in kWh. {APP_NAME} addiert oder subtrahiert
         laufende Netto-Veränderungen (Einspeisung minus Bezug) aus whatwatt Go.
-        Standard: {DEFAULT_STROMKONTO_BALANCE_KWH} kWh.
+        Standard: {formatYieldKwh(DEFAULT_STROMKONTO_BALANCE_KWH, 0)}.
       </p>
 
       <div className="flex flex-col gap-1.5">
@@ -335,7 +336,7 @@ export function SettingsDialog() {
                 <Label htmlFor="push-notifications">Push-Benachrichtigungen</Label>
                 <span className="text-xs leading-relaxed text-muted-foreground">
                   Meldung, sobald die Anlage heute mehr als{" "}
-                  {YIELD_NOTIFICATION_THRESHOLD_KWH.toLocaleString("de-CH")} kWh erzeugt hat.
+                  {formatYieldKwh(YIELD_NOTIFICATION_THRESHOLD_KWH, 0)} erzeugt hat.
                 </span>
               </div>
               <Switch
@@ -367,6 +368,18 @@ export function SettingsDialog() {
             >
               Testbenachrichtigung senden
             </Button>
+          </SettingsSection>
+
+          <SettingsSection
+            icon={<Info className="size-4" />}
+            iconClassName="bg-muted text-foreground/70"
+            title="Impressum"
+          >
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Entstanden in Zusammenarbeit mit Koffein, Cursor und der Musik von Paul
+              Kalkbrenner.
+            </p>
+            <p className="text-xs text-muted-foreground">Herbst 2026</p>
           </SettingsSection>
         </div>
 

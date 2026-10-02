@@ -16,11 +16,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
-import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
+import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
+import { formatKw, formatSwissNumber, formatYieldKwh } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ChartsSectionProps = {
+  snapshot: PvSnapshot;
   today: HistoryPoint[];
   week: DailyEnergyPoint[];
   month: DailyEnergyPoint[];
@@ -28,6 +30,10 @@ type ChartsSectionProps = {
   lifetime: DailyEnergyPoint[];
   source: DataSource;
 };
+
+function sumYieldKwh(points: DailyEnergyPoint[]): number {
+  return points.reduce((sum, point) => sum + point.yieldKwh, 0);
+}
 
 type Range = "heute" | "woche" | "monat" | "jahr" | "lebensdauer";
 
@@ -177,6 +183,7 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
           axisLine={false}
           width={40}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+          tickFormatter={(v) => formatSwissNumber(Number(v), 1)}
           label={{
             value: "kW",
             position: "insideTopLeft",
@@ -194,7 +201,7 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
                 : name === "consumptionKw"
                   ? "Leistungsaufnahme"
                   : "Verbraucht von PV";
-            return [`${Number(value).toFixed(2)} kW`, label];
+            return [formatKw(Number(value), 2), label];
           }}
           contentStyle={{
             background: "var(--popover)",
@@ -289,8 +296,9 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={34}
+          width={40}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+          tickFormatter={(v) => formatSwissNumber(Number(v), 0)}
         />
         <Tooltip
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
@@ -301,7 +309,7 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
                 : name === "directSolarKwh"
                   ? "Direkt von PV"
                   : "Aus Speicher";
-            return [`${Number(value).toFixed(1)} kWh`, label];
+            return [formatYieldKwh(Number(value), 1), label];
           }}
           contentStyle={{
             background: "var(--popover)",
@@ -331,7 +339,15 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
   );
 }
 
-export function ChartsSection({ today, week, month, year, lifetime, source }: ChartsSectionProps) {
+export function ChartsSection({
+  snapshot,
+  today,
+  week,
+  month,
+  year,
+  lifetime,
+  source,
+}: ChartsSectionProps) {
   const [range, setRange] = useState<Range>("heute");
   const pvSimulated = isPvSimulated(source);
 
@@ -365,14 +381,14 @@ export function ChartsSection({ today, week, month, year, lifetime, source }: Ch
         (sum, point) => sum + (point.productionKw ?? 0) * hours,
         0,
       );
-      return `${kwh.toFixed(1)} kWh heute`;
+      return `${formatYieldKwh(kwh, 1)} heute`;
     }
     const points =
       range === "woche" ? week : range === "monat" ? month : range === "jahr" ? year : lifetime;
     const kwh = points.reduce((sum, p) => sum + p.yieldKwh, 0);
     return range === "lebensdauer"
-      ? `${kwh.toFixed(0)} kWh seit Inbetriebnahme`
-      : `${kwh.toFixed(0)} kWh im Zeitraum`;
+      ? `${formatYieldKwh(kwh, 0)} seit Inbetriebnahme`
+      : `${formatYieldKwh(kwh, 0)} im Zeitraum`;
   }, [range, today, todayChartData, week, month, year, lifetime]);
 
   return (
@@ -454,6 +470,32 @@ export function ChartsSection({ today, week, month, year, lifetime, source }: Ch
               </span>
             </>
           )}
+        </div>
+
+        <div
+          className={cn(
+            "mt-4 flex flex-col gap-2.5 border-t border-border/60 pt-4 transition-opacity",
+            pvSimulated && SIMULATED_OPACITY_CLASS,
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Ertrag dieser Monat</span>
+            <span className="text-sm font-semibold tabular-nums">
+              {month.length ? formatYieldKwh(sumYieldKwh(month), 1) : "–"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Ertrag dieses Jahr</span>
+            <span className="text-sm font-semibold tabular-nums">
+              {year.length ? formatYieldKwh(sumYieldKwh(year), 0) : "–"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Ertrag seit Inbetriebnahme</span>
+            <span className="text-sm font-semibold tabular-nums">
+              {formatYieldKwh(snapshot.totalYieldKwh, 0)}
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>
