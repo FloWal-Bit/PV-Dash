@@ -376,12 +376,12 @@ export function SettingsDialog() {
             title="Impressum"
           >
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Entstanden in Zusammenarbeit mit Koffein, Cursor und der Musik von Paul
-              Kalkbrenner.
+              Entstanden mit Koffein, Cursor und der Musik von Paul Kalkbrenner. Herbst
+              2026
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Externe Datenquellen (ohne Gewähr, jeweils gemäss Anbieter): Wetter,
-              Sonnenauf- und -untergang sowie Sonnenstunden von{" "}
+              Externe Datenquellen:
+              <br />
               <a
                 href="https://wetteralarm.ch/"
                 target="_blank"
@@ -390,7 +390,8 @@ export function SettingsDialog() {
               >
                 Wetter-Alarm
               </a>
-              ; solare Ertragsprognose aus{" "}
+              : Wetterdaten
+              <br />
               <a
                 href="https://open-meteo.com/"
                 target="_blank"
@@ -398,10 +399,14 @@ export function SettingsDialog() {
                 className="underline underline-offset-2 hover:text-foreground"
               >
                 Open-Meteo
-              </a>{" "}
-              (GTI, PR 0,78).
+              </a>
+              : Solare Ertragsprognose (GTI, PR 0,78).
             </p>
-            <p className="text-xs text-muted-foreground">Herbst 2026</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Die Applikation wird in den Schweizer Rechenzentren von Infomaniak mit
+              Hauptsitz in Genf gehostet. Der unabhängige Cloud-Anbieter betreibt seine
+              gesamte Infrastruktur zu 100&nbsp;% mit erneuerbarer Energie.
+            </p>
           </SettingsSection>
         </div>
 

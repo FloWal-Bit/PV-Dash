@@ -4,7 +4,7 @@ Eine schlichte, intuitive Web-App zur Anzeige von PV-Daten (Photovoltaik):
 aktuelle Erzeugung, Verbrauch, Netzbezug/-einspeisung, Speicherstand,
 Tagesertrag, Gesamtertrag, Eigenverbrauchsquote und Autarkiegrad – live
 aktualisiert, ergänzt um Wetter-Alarm (Sonnenzeiten, Sonnenstunden) und eine
-**solare Tagesertrags-Prognose** (Open-Meteo). Aktuelle Version: **1.2.0**
+**solare Tagesertrags-Prognose** (Open-Meteo). Aktuelle Version: **1.2.1**
 (siehe Fußzeile im Dashboard und [`src/lib/version.ts`](src/lib/version.ts)).
 
 Die App ist als responsive Progressive-Web-App (PWA) gebaut und läuft im
@@ -340,6 +340,13 @@ erfordern. Im Einstellungen-Dialog gibt es zum Testen einen Button
 Beispielmeldung auslöst.
 
 ## Änderungsprotokoll
+
+### 1.2.1
+
+- **UI:** Ertrag & Verbrauch — drei Säulen (Ertrag, Verbrauch, Eigenverbrauch),
+  kompakte Legenden, Zeitraum „Laufzeit“, Summenzeile „Diese Woche, … kWh“;
+  redundante Ertragsliste unter dem Chart entfernt.
+- **Impressum:** Datenquellen, Hosting bei Infomaniak (CH, erneuerbare Energie).
 
 ### 1.2.0
 

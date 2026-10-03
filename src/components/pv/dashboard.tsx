@@ -128,7 +128,6 @@ export function Dashboard({ plantName }: { plantName: string }) {
             </div>
 
             <ChartsSection
-              snapshot={data.snapshot}
               today={data.today}
               week={data.week}
               month={data.month}

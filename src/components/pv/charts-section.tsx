@@ -16,13 +16,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
-import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
+import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
 import { formatKw, formatSwissNumber, formatYieldKwh } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ChartsSectionProps = {
-  snapshot: PvSnapshot;
   today: HistoryPoint[];
   week: DailyEnergyPoint[];
   month: DailyEnergyPoint[];
@@ -31,14 +30,10 @@ type ChartsSectionProps = {
   source: DataSource;
 };
 
-function sumYieldKwh(points: DailyEnergyPoint[]): number {
-  return points.reduce((sum, point) => sum + point.yieldKwh, 0);
-}
-
 type Range = "heute" | "woche" | "monat" | "jahr" | "lebensdauer";
 
 const RANGE_ORDER: Range[] = ["heute", "woche", "monat", "jahr", "lebensdauer"];
-const RANGE_LABELS = ["Heute", "Woche", "Monat", "Jahr", "Lebensdauer"];
+const RANGE_LABELS = ["Heute", "Woche", "Monat", "Jahr", "Laufzeit"];
 
 type TodayChartPoint = {
   time: string;
@@ -200,9 +195,9 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
             if (name === "crossY") return null;
             const label =
               name === "productionKw"
-                ? "PV-Ausgabe"
+                ? "PV"
                 : name === "consumptionKw"
-                  ? "Leistungsaufnahme"
+                  ? "Verbrauch"
                   : "Verbraucht von PV";
             return [formatKw(Number(value), 2), label];
           }}
@@ -263,27 +258,30 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
   );
 }
 
-/**
- * Zwei Säulen pro Tag: links der Gesamtertrag, rechts eine gestapelte Säule,
- * die zeigt, woraus sich der Verbrauch zusammensetzt (direkt von PV oder aus
- * dem Speicher entladen). Angelehnt an die Verlaufsansicht der Huawei Solar
- * App.
- */
+/** Drei Säulen pro Tag: Ertrag, Verbrauch, Eigenverbrauch (PV + Speicheranteil). */
 function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
+  const chartData = useMemo(
+    () =>
+      data.map((point) => ({
+        ...point,
+        eigenverbrauchKwh: point.directSolarKwh + point.batteryKwh,
+      })),
+    [data],
+  );
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} barGap={4}>
+      <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} barGap={2}>
         <defs>
           <linearGradient id="bar-yield" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={1} />
             <stop offset="100%" stopColor="var(--chart-3)" stopOpacity={0.55} />
           </linearGradient>
-          <linearGradient id="bar-direct" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="bar-consumption" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-5)" stopOpacity={1} />
             <stop offset="100%" stopColor="var(--chart-5)" stopOpacity={0.55} />
           </linearGradient>
-          <linearGradient id="bar-battery-share" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="bar-eigenverbrauch" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={1} />
             <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.55} />
           </linearGradient>
@@ -309,9 +307,11 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
             const label =
               name === "yieldKwh"
                 ? "Ertrag"
-                : name === "directSolarKwh"
-                  ? "Direkt von PV"
-                  : "Aus Speicher";
+                : name === "consumptionKwh"
+                  ? "Verbrauch"
+                  : name === "eigenverbrauchKwh"
+                    ? "Eigenverbrauch"
+                    : String(name);
             return [formatYieldKwh(Number(value), 1), label];
           }}
           contentStyle={{
@@ -322,20 +322,18 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
             color: "var(--popover-foreground)",
           }}
         />
-        <Bar dataKey="yieldKwh" fill="url(#bar-yield)" radius={[6, 6, 6, 6]} maxBarSize={22} />
+        <Bar dataKey="yieldKwh" fill="url(#bar-yield)" radius={[6, 6, 6, 6]} maxBarSize={16} />
         <Bar
-          dataKey="directSolarKwh"
-          stackId="verbrauch"
-          fill="url(#bar-direct)"
-          radius={[0, 0, 6, 6]}
-          maxBarSize={22}
+          dataKey="consumptionKwh"
+          fill="url(#bar-consumption)"
+          radius={[6, 6, 6, 6]}
+          maxBarSize={16}
         />
         <Bar
-          dataKey="batteryKwh"
-          stackId="verbrauch"
-          fill="url(#bar-battery-share)"
-          radius={[6, 6, 0, 0]}
-          maxBarSize={22}
+          dataKey="eigenverbrauchKwh"
+          fill="url(#bar-eigenverbrauch)"
+          radius={[6, 6, 6, 6]}
+          maxBarSize={16}
         />
       </BarChart>
     </ResponsiveContainer>
@@ -357,22 +355,21 @@ function formatRangeTotal(
       (sum, point) => sum + (point.productionKw ?? 0) * hours,
       0,
     );
-    return `${formatYieldKwh(kwh, 1)} heute`;
+    return `Heute, ${formatYieldKwh(kwh, 1)}`;
   }
   const points =
     range === "woche" ? week : range === "monat" ? month : range === "jahr" ? year : lifetime;
   const kwh = points.reduce((sum, p) => sum + p.yieldKwh, 0);
   const periodLabel: Record<Exclude<Range, "heute">, string> = {
-    woche: "Woche",
-    monat: "Monat",
-    jahr: "Jahr",
-    lebensdauer: "Lebensdauer",
+    woche: "Diese Woche",
+    monat: "Dieser Monat",
+    jahr: "Dieses Jahr",
+    lebensdauer: "Laufzeit",
   };
-  return `${formatYieldKwh(kwh, 0)} ${periodLabel[range as Exclude<Range, "heute">]}`;
+  return `${periodLabel[range as Exclude<Range, "heute">]}, ${formatYieldKwh(kwh, 0)}`;
 }
 
 export function ChartsSection({
-  snapshot,
   today,
   week,
   month,
@@ -456,11 +453,11 @@ export function ChartsSection({
               <>
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-chart-3" />
-                  PV-Ausgabe
+                  PV
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-chart-1" />
-                  Leistungsaufnahme
+                  Verbrauch
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full border border-chart-3 bg-chart-3/40" />
@@ -475,42 +472,16 @@ export function ChartsSection({
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-chart-5" />
-                  Direkt von PV
+                  Verbrauch
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-chart-1" />
-                  Aus Speicher
+                  Eigenverbrauch
                 </span>
               </>
             )}
           </div>
         </SwipePageSurface>
-
-        <div
-          className={cn(
-            "mt-4 flex flex-col gap-2.5 border-t border-border/60 pt-4 transition-opacity",
-            pvSimulated && SIMULATED_OPACITY_CLASS,
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Ertrag dieser Monat</span>
-            <span className="text-sm font-semibold tabular-nums">
-              {month.length ? formatYieldKwh(sumYieldKwh(month), 1) : "–"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Ertrag dieses Jahr</span>
-            <span className="text-sm font-semibold tabular-nums">
-              {year.length ? formatYieldKwh(sumYieldKwh(year), 0) : "–"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Ertrag seit Inbetriebnahme</span>
-            <span className="text-sm font-semibold tabular-nums">
-              {formatYieldKwh(snapshot.totalYieldKwh, 0)}
-            </span>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
