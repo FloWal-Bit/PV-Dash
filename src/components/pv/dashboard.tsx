@@ -23,6 +23,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
     source,
     gridSource,
     forecastedTodayYieldKwh,
+    forecastedTomorrowYieldKwh,
     forecastSolarError,
     warning,
     lastFetchedAt,
@@ -109,7 +110,11 @@ export function Dashboard({ plantName }: { plantName: string }) {
           <DashboardSkeleton />
         ) : (
           <>
-            <SunTimesCard date={new Date(data.snapshot.timestamp)} />
+            <SunTimesCard
+              referenceDate={new Date(data.snapshot.timestamp)}
+              forecastedTodayYieldKwh={forecastedTodayYieldKwh}
+              forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
+            />
 
             <KpiGrid snapshot={data.snapshot} source={dataSource} gridSource={gridSource} />
 
@@ -119,11 +124,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
                 source={dataSource}
                 gridSource={gridSource}
               />
-              <TodayOverviewCard
-                snapshot={data.snapshot}
-                source={dataSource}
-                forecastedTodayYieldKwh={forecastedTodayYieldKwh}
-              />
+              <TodayOverviewCard snapshot={data.snapshot} source={dataSource} />
             </div>
 
             <ChartsSection

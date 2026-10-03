@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
 import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
@@ -36,6 +36,9 @@ function sumYieldKwh(points: DailyEnergyPoint[]): number {
 }
 
 type Range = "heute" | "woche" | "monat" | "jahr" | "lebensdauer";
+
+const RANGE_ORDER: Range[] = ["heute", "woche", "monat", "jahr", "lebensdauer"];
+const RANGE_LABELS = ["Heute", "Woche", "Monat", "Jahr", "Lebensdauer"];
 
 type TodayChartPoint = {
   time: string;
@@ -339,6 +342,35 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
   );
 }
 
+function formatRangeTotal(
+  range: Range,
+  today: HistoryPoint[],
+  todayChartData: TodayChartPoint[],
+  week: DailyEnergyPoint[],
+  month: DailyEnergyPoint[],
+  year: DailyEnergyPoint[],
+  lifetime: DailyEnergyPoint[],
+): string {
+  if (range === "heute") {
+    const hours = sampleIntervalHours(today);
+    const kwh = todayChartData.reduce(
+      (sum, point) => sum + (point.productionKw ?? 0) * hours,
+      0,
+    );
+    return `${formatYieldKwh(kwh, 1)} heute`;
+  }
+  const points =
+    range === "woche" ? week : range === "monat" ? month : range === "jahr" ? year : lifetime;
+  const kwh = points.reduce((sum, p) => sum + p.yieldKwh, 0);
+  const periodLabel: Record<Exclude<Range, "heute">, string> = {
+    woche: "Woche",
+    monat: "Monat",
+    jahr: "Jahr",
+    lebensdauer: "Lebensdauer",
+  };
+  return `${formatYieldKwh(kwh, 0)} ${periodLabel[range as Exclude<Range, "heute">]}`;
+}
+
 export function ChartsSection({
   snapshot,
   today,
@@ -348,7 +380,8 @@ export function ChartsSection({
   lifetime,
   source,
 }: ChartsSectionProps) {
-  const [range, setRange] = useState<Range>("heute");
+  const [page, setPage] = useState(0);
+  const range = RANGE_ORDER[page] ?? "heute";
   const pvSimulated = isPvSimulated(source);
 
   const todayChartData = useMemo((): TodayChartPoint[] => {
@@ -374,22 +407,20 @@ export function ChartsSection({
     });
   }, [today]);
 
-  const total = useMemo(() => {
-    if (range === "heute") {
-      const hours = sampleIntervalHours(today);
-      const kwh = todayChartData.reduce(
-        (sum, point) => sum + (point.productionKw ?? 0) * hours,
-        0,
-      );
-      return `${formatYieldKwh(kwh, 1)} heute`;
-    }
-    const points =
-      range === "woche" ? week : range === "monat" ? month : range === "jahr" ? year : lifetime;
-    const kwh = points.reduce((sum, p) => sum + p.yieldKwh, 0);
-    return range === "lebensdauer"
-      ? `${formatYieldKwh(kwh, 0)} seit Inbetriebnahme`
-      : `${formatYieldKwh(kwh, 0)} im Zeitraum`;
-  }, [range, today, todayChartData, week, month, year, lifetime]);
+  const total = useMemo(
+    () =>
+      formatRangeTotal(range, today, todayChartData, week, month, year, lifetime),
+    [range, today, todayChartData, week, month, year, lifetime],
+  );
+
+  const barData =
+    range === "woche"
+      ? week
+      : range === "monat"
+        ? month
+        : range === "jahr"
+          ? year
+          : lifetime;
 
   return (
     <Card className="shadow-card rounded-2xl">
@@ -400,77 +431,60 @@ export function ChartsSection({
           </CardTitle>
           <span className="text-xs text-muted-foreground">{total}</span>
         </div>
-        <Tabs value={range} onValueChange={(v) => setRange(v as Range)}>
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="heute">Heute</TabsTrigger>
-            <TabsTrigger value="woche">Woche</TabsTrigger>
-            <TabsTrigger value="monat">Monat</TabsTrigger>
-            <TabsTrigger value="jahr">Jahr</TabsTrigger>
-            <TabsTrigger value="lebensdauer">Lebensdauer</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </CardHeader>
       <CardContent>
-        <div
-          className={cn(
-            "h-56 w-full landscape:h-64 sm:h-72 transition-opacity",
-            pvSimulated && SIMULATED_OPACITY_CLASS,
-          )}
-        >
-          {range === "heute" ? (
-            <TodayPowerChart data={todayChartData} />
-          ) : (
-            <YieldConsumptionChart
-              data={
-                range === "woche"
-                  ? week
-                  : range === "monat"
-                    ? month
-                    : range === "jahr"
-                      ? year
-                      : lifetime
-              }
-            />
-          )}
-        </div>
-        <div
-          className={cn(
-            "mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground transition-opacity",
-            pvSimulated && SIMULATED_OPACITY_CLASS,
-          )}
-        >
-          {range === "heute" ? (
-            <>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-chart-3" />
-                PV-Ausgabe
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-chart-1" />
-                Leistungsaufnahme
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full border border-chart-3 bg-chart-3/40" />
-                Verbraucht von PV
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-chart-3" />
-                Ertrag
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-chart-5" />
-                Direkt von PV
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-chart-1" />
-                Aus Speicher
-              </span>
-            </>
-          )}
-        </div>
+        <SwipePageSurface labels={RANGE_LABELS} page={page} onPageChange={setPage}>
+          <div
+            className={cn(
+              "h-56 w-full landscape:h-64 sm:h-72 transition-opacity",
+              pvSimulated && SIMULATED_OPACITY_CLASS,
+            )}
+          >
+            {range === "heute" ? (
+              <TodayPowerChart data={todayChartData} />
+            ) : (
+              <YieldConsumptionChart data={barData} />
+            )}
+          </div>
+          <div
+            className={cn(
+              "mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground transition-opacity",
+              pvSimulated && SIMULATED_OPACITY_CLASS,
+            )}
+          >
+            {range === "heute" ? (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-chart-3" />
+                  PV-Ausgabe
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-chart-1" />
+                  Leistungsaufnahme
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full border border-chart-3 bg-chart-3/40" />
+                  Verbraucht von PV
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-chart-3" />
+                  Ertrag
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-chart-5" />
+                  Direkt von PV
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-chart-1" />
+                  Aus Speicher
+                </span>
+              </>
+            )}
+          </div>
+        </SwipePageSurface>
 
         <div
           className={cn(

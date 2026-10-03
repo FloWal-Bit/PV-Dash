@@ -22,7 +22,7 @@ import { applyStromkontoToSnapshot } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
 import { resolveOpenMeteoPeakKwp } from "@/lib/open-meteo-yield/config";
 import {
-  getOpenMeteoForecastedTodayYieldKwh,
+  getOpenMeteoTodayAndTomorrowYieldKwh,
   type OpenMeteoYieldMeta,
 } from "@/lib/open-meteo-yield/service";
 import { getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
@@ -73,6 +73,8 @@ export type DashboardPayload = {
   forecastSolarError: string | null;
   /** Zur Verifikation: GTI-Summe, PR, Ideal-kWh (nur Open-Meteo). */
   forecastYieldMeta: OpenMeteoYieldMeta | null;
+  forecastedTomorrowYieldKwh: number | null;
+  forecastTomorrowYieldMeta: OpenMeteoYieldMeta | null;
   /** Nutzerfreundliche Meldung, z. B. wenn FusionSolar konfiguriert, aber gerade nicht erreichbar ist. */
   warning: string | null;
 };
@@ -165,7 +167,7 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
     fromWhatWatt: overlay.gridSource === "whatwatt",
   });
 
-  const yieldForecast = await getOpenMeteoForecastedTodayYieldKwh(
+  const yieldForecast = await getOpenMeteoTodayAndTomorrowYieldKwh(
     resolveOpenMeteoPeakKwp(),
     new Date(snapshot.timestamp),
   );
@@ -174,9 +176,11 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
     source: base.source,
     gridSource: overlay.gridSource,
     data: { ...overlay.data, snapshot },
-    forecastedTodayYieldKwh: yieldForecast.kwh,
-    forecastSolarError: yieldForecast.error,
-    forecastYieldMeta: yieldForecast.meta,
+    forecastedTodayYieldKwh: yieldForecast.today.kwh,
+    forecastSolarError: yieldForecast.today.error ?? yieldForecast.error,
+    forecastYieldMeta: yieldForecast.today.meta,
+    forecastedTomorrowYieldKwh: yieldForecast.tomorrow.kwh,
+    forecastTomorrowYieldMeta: yieldForecast.tomorrow.meta,
     // Eine bereits vorhandene FusionSolar-Warnung hat Vorrang, damit nicht
     // zwei Warnbanner gleichzeitig um Aufmerksamkeit konkurrieren.
     warning: base.warning ?? overlay.warning,

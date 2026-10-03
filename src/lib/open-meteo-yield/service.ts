@@ -32,9 +32,27 @@ export type OpenMeteoYieldResult = {
 const API_BASE = "https://api.open-meteo.com/v1/forecast";
 const CACHE_TTL_MS = 45 * 60 * 1000;
 
-type CacheEntry = { expiresAt: number; kwh: number; meta: OpenMeteoYieldMeta };
+type HourlyGti = { times: string[]; gti: (number | null)[] };
+
+type CacheEntry = {
+  expiresAt: number;
+  hourly: HourlyGti;
+  peakKwp: number;
+  performanceRatio: number;
+  refDateKey: string;
+};
+
 let cache: CacheEntry | null = null;
 let cacheKey = "";
+
+export function dateKeyInZurich(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: OPEN_METEO_TIMEZONE });
+}
+
+export function dateKeyPlusDaysInZurich(date: Date, days: number): string {
+  const shifted = new Date(date.getTime() + days * 86_400_000);
+  return dateKeyInZurich(shifted);
+}
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
@@ -87,64 +105,118 @@ function logVerification(meta: OpenMeteoYieldMeta, kwh: number): void {
   );
 }
 
+function yieldFromHourly(
+  hourly: HourlyGti,
+  dateKey: string,
+  peakKwp: number,
+  performanceRatio: number,
+): OpenMeteoYieldResult {
+  const gtiWhPerM2 = sumGtiWhPerM2ForDay(hourly.times, hourly.gti, dateKey);
+  if (!Number.isFinite(gtiWhPerM2) || gtiWhPerM2 <= 0) {
+    return { kwh: null, error: OPEN_METEO_YIELD_UNAVAILABLE, meta: null };
+  }
+
+  const idealKwh = round1((gtiWhPerM2 * peakKwp) / 1000);
+  const kwh = round1(idealKwh * performanceRatio);
+  const meta: OpenMeteoYieldMeta = {
+    source: "open-meteo",
+    dateKey,
+    gtiWhPerM2: round1(gtiWhPerM2),
+    idealKwh,
+    performanceRatio,
+    peakKwp,
+  };
+  return { kwh, error: null, meta };
+}
+
+async function loadForecastHourly(): Promise<HourlyGti | null> {
+  const url = buildForecastUrl();
+  const res = await fetch(url, {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) {
+    console.error("[open-meteo-yield] HTTP", res.status, url);
+    return null;
+  }
+  const body = (await res.json()) as OpenMeteoForecastResponse;
+  const times = body.hourly?.time;
+  const gti = body.hourly?.global_tilted_irradiance;
+  if (!times?.length || !gti?.length) {
+    console.error("[open-meteo-yield] missing hourly GTI");
+    return null;
+  }
+  return { times, gti };
+}
+
+export type OpenMeteoDayForecasts = {
+  today: OpenMeteoYieldResult;
+  tomorrow: OpenMeteoYieldResult;
+  error: string | null;
+};
+
+export async function getOpenMeteoTodayAndTomorrowYieldKwh(
+  peakKwp: number,
+  date = new Date(),
+): Promise<OpenMeteoDayForecasts> {
+  const empty: OpenMeteoDayForecasts = {
+    today: { kwh: null, error: null, meta: null },
+    tomorrow: { kwh: null, error: null, meta: null },
+    error: null,
+  };
+  if (!Number.isFinite(peakKwp) || peakKwp <= 0) {
+    return empty;
+  }
+
+  const todayKey = todayDateKeyInZurich(date);
+  const tomorrowKey = dateKeyPlusDaysInZurich(date, 1);
+  const performanceRatio = resolveOpenMeteoPerformanceRatio();
+  const key = `${todayKey}:${peakKwp}:${performanceRatio}`;
+
+  let hourly: HourlyGti | null = null;
+  if (cache && cacheKey === key && cache.expiresAt > Date.now()) {
+    hourly = cache.hourly;
+  } else {
+    try {
+      hourly = await loadForecastHourly();
+      if (!hourly) {
+        return {
+          ...empty,
+          error: OPEN_METEO_YIELD_UNAVAILABLE,
+        };
+      }
+      cache = {
+        hourly,
+        peakKwp,
+        performanceRatio,
+        refDateKey: todayKey,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      };
+      cacheKey = key;
+    } catch (err) {
+      console.error("[open-meteo-yield] fetch failed:", err);
+      return { ...empty, error: OPEN_METEO_YIELD_UNAVAILABLE };
+    }
+  }
+
+  const today = yieldFromHourly(hourly, todayKey, peakKwp, performanceRatio);
+  const tomorrow = yieldFromHourly(hourly, tomorrowKey, peakKwp, performanceRatio);
+  if (today.meta) logVerification(today.meta, today.kwh ?? 0);
+  if (tomorrow.meta) logVerification(tomorrow.meta, tomorrow.kwh ?? 0);
+
+  const error =
+    today.error && tomorrow.error ? OPEN_METEO_YIELD_UNAVAILABLE : null;
+
+  return { today, tomorrow, error };
+}
+
 export async function getOpenMeteoForecastedTodayYieldKwh(
   peakKwp: number,
   date = new Date(),
 ): Promise<OpenMeteoYieldResult> {
-  if (!Number.isFinite(peakKwp) || peakKwp <= 0) {
-    return { kwh: null, error: null, meta: null };
+  const { today, error } = await getOpenMeteoTodayAndTomorrowYieldKwh(peakKwp, date);
+  if (today.kwh == null && error) {
+    return { kwh: null, error, meta: null };
   }
-
-  const dateKey = todayDateKeyInZurich(date);
-  const performanceRatio = resolveOpenMeteoPerformanceRatio();
-  const key = `${dateKey}:${peakKwp}:${performanceRatio}`;
-
-  if (cache && cacheKey === key && cache.expiresAt > Date.now()) {
-    return { kwh: cache.kwh, error: null, meta: cache.meta };
-  }
-
-  const url = buildForecastUrl();
-
-  try {
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 0 },
-    });
-    if (!res.ok) {
-      console.error("[open-meteo-yield] HTTP", res.status, url);
-      return { kwh: null, error: OPEN_METEO_YIELD_UNAVAILABLE, meta: null };
-    }
-
-    const body = (await res.json()) as OpenMeteoForecastResponse;
-    const times = body.hourly?.time;
-    const gti = body.hourly?.global_tilted_irradiance;
-    if (!times?.length || !gti?.length) {
-      console.error("[open-meteo-yield] missing hourly GTI");
-      return { kwh: null, error: OPEN_METEO_YIELD_UNAVAILABLE, meta: null };
-    }
-
-    const gtiWhPerM2 = sumGtiWhPerM2ForDay(times, gti, dateKey);
-    if (!Number.isFinite(gtiWhPerM2) || gtiWhPerM2 <= 0) {
-      return { kwh: null, error: OPEN_METEO_YIELD_UNAVAILABLE, meta: null };
-    }
-
-    const idealKwh = round1((gtiWhPerM2 * peakKwp) / 1000);
-    const kwh = round1(idealKwh * performanceRatio);
-    const meta: OpenMeteoYieldMeta = {
-      source: "open-meteo",
-      dateKey,
-      gtiWhPerM2: round1(gtiWhPerM2),
-      idealKwh,
-      performanceRatio,
-      peakKwp,
-    };
-
-    logVerification(meta, kwh);
-    cache = { kwh, meta, expiresAt: Date.now() + CACHE_TTL_MS };
-    cacheKey = key;
-    return { kwh, error: null, meta };
-  } catch (err) {
-    console.error("[open-meteo-yield] fetch failed:", err);
-    return { kwh: null, error: OPEN_METEO_YIELD_UNAVAILABLE, meta: null };
-  }
+  return today;
 }

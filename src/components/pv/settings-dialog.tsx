@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Bell, Info, MapPin, PiggyBank, Settings2 } from "lucide-react";
+import { BatteryFull, Bell, Info, MapPin, Settings2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -224,7 +224,7 @@ function StromkontoEditor() {
 
   return (
     <SettingsSection
-      icon={<PiggyBank className="size-4" />}
+      icon={<BatteryFull className="size-4 -rotate-90" />}
       iconClassName="bg-chart-3/12 text-chart-3"
       title="Stromkonto"
     >

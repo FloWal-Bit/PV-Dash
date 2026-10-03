@@ -1,4 +1,4 @@
-import { BatteryFull, Home, PiggyBank, Sun } from "lucide-react";
+import { BatteryFull, Home, Sun } from "lucide-react";
 import { StatCard } from "@/components/pv/stat-card";
 import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { formatSignedSwissNumber, formatSwissNumber } from "@/lib/format";
@@ -61,7 +61,7 @@ export function KpiGrid({
             : "–"
         }
         unit={snapshot.stromkontoChangeTodayKwh != null ? "kWh" : undefined}
-        icon={<PiggyBank className="size-5" />}
+        icon={<BatteryFull className="size-5 -rotate-90" />}
         accent={stromkontoChangeNegative ? "rose" : "green"}
         simulated={gridSimulated}
       />

@@ -3,8 +3,9 @@
 Eine schlichte, intuitive Web-App zur Anzeige von PV-Daten (Photovoltaik):
 aktuelle Erzeugung, Verbrauch, Netzbezug/-einspeisung, Speicherstand,
 Tagesertrag, Gesamtertrag, Eigenverbrauchsquote und Autarkiegrad – live
-aktualisiert, ergänzt um Sonnenauf-/-untergang und die prognostizierten
-Sonnenstunden für den Standort.
+aktualisiert, ergänzt um Wetter-Alarm (Sonnenzeiten, Sonnenstunden) und eine
+**solare Tagesertrags-Prognose** (Open-Meteo). Aktuelle Version: **1.2.0**
+(siehe Fußzeile im Dashboard und [`src/lib/version.ts`](src/lib/version.ts)).
 
 Die App ist als responsive Progressive-Web-App (PWA) gebaut und läuft im
 Browser auf **Android und iOS** sowie auf Desktop, im Hoch- **und**
@@ -261,13 +262,18 @@ die Wetter-Alarm-Ortssuche (die nutzt den **Namen**).
 
 ### Solare Ertragsprognose (Open-Meteo)
 
-Die Kachel **Heute → „Prognostizierter Tagesertrag“** vergleicht den bisher
-erzielten Tagesertrag mit **Σ(GTI) × kWp × PR** aus der
-[Open-Meteo](https://open-meteo.com/)-Wetterprognose (`global_tilted_irradiance`,
-Neigung/Azimut wie an der Anlage). Implementierung:
+Die **Datums-Karte oben** (Wetter, Sonnenzeiten) zeigt rechts neben dem
+Sonnenuntergang **„Prog. Tagesertrag“** in kWh. Berechnung:
+**Σ(GTI) × kWp × PR** aus der [Open-Meteo](https://open-meteo.com/)-Prognose
+(`global_tilted_irradiance`, Neigung/Azimut wie an der Anlage). Implementierung:
 [`src/lib/open-meteo-yield/service.ts`](src/lib/open-meteo-yield/service.ts),
-Anbindung über [`/api/pv`](src/app/api/pv/route.ts) als Feld
-`forecastedTodayYieldKwh`; Details zur Verifikation in `forecastYieldMeta`.
+Anbindung über [`/api/pv`](src/app/api/pv/route.ts):
+
+| Feld | Bedeutung |
+|---|---|
+| `forecastedTodayYieldKwh` | Prognose für den laufenden Tag (Europe/Zurich) |
+| `forecastedTomorrowYieldKwh` | Prognose für den Folgetag (ein API-Abruf) |
+| `forecastYieldMeta` / `forecastTomorrowYieldMeta` | GTI-Summe, PR, Ideal-kWh (Verifikation) |
 
 Anlage Kronenmattweg: 47.13° N, 7.54° E, 11° Neigung, 0° Azimut; Standard-PR
 **0,78** (Kalibrierung Sep/Okt 2026). Optional:
@@ -277,16 +283,29 @@ Anlage Kronenmattweg: 47.13° N, 7.54° E, 11° Neigung, 0° Azimut; Standard-PR
 | `FORECAST_SOLAR_PEAK_KWP` | Anlagenleistung in kWp (weiterhin der Env-Name) |
 | `OPEN_METEO_YIELD_PR` | Performance Ratio für GTI → kWh (Standard `0.78`) |
 
-**Verifikation:** Morgens Prognose im Dashboard notieren (oder Server-Log
+**Verifikation:** Morgens Prognose in der Datums-Karte notieren (oder Server-Log
 `[open-meteo-yield] verify`), abends Tagesertrag FusionSolar vergleichen. Nach
 einigen Tagen PR bei Bedarf anpassen.
 
-Ist Open-Meteo nicht erreichbar, greift die UI-Fallback-Schätzung aus
-Sonnenstunden × kWp × 0,8 ([`estimateForecastedYieldKwh`](src/lib/sun.ts));
-Wetter-Alarm-Sonnenstunden fließen ein, wenn geladen.
+Ist Open-Meteo nicht erreichbar, erscheint eine Hinweisleiste; die Kachel zeigt
+„–“ (kein Fallback mehr in der Datums-Karte).
 
 Der ältere Anbindungspfad [`src/lib/forecast-solar/`](src/lib/forecast-solar/)
 bleibt im Repo, wird aber nicht mehr für die Dashboard-Prognose verwendet.
+
+### Wischen zwischen Tagesansichten (UI)
+
+Mehrere Bereiche nutzen **Wischgesten** (links/rechts) und **Punkte** unten
+statt Tabs – implementiert in
+[`src/components/pv/swipe-carousel.tsx`](src/components/pv/swipe-carousel.tsx):
+
+| Bereich | Swipe-Inhalte |
+|---|---|
+| **Datums-Karte** (`sun-times-card.tsx`) | **Heute** ↔ **Morgen** (Wetter-Alarm pro Tag via `/api/weather?date=…`, Open-Meteo-Prognose für heute/morgen; Live-Uhr nur bei Heute) |
+| **Ertrag & Verbrauch** (`charts-section.tsx`) | **Heute** (Leistungskurve) → **Woche** → **Monat** → **Jahr** → **Lebensdauer** (Balkendiagramme). Untertitel in Zeile 2: z. B. `… kWh heute` / `… kWh Woche` usw. |
+
+Die Kachel **Heute** (Autarkiegrade) unter dem Energiefluss ist **nicht**
+wischbar – sie bezieht sich immer auf den laufenden Tag.
 
 ### Backlog
 
@@ -295,14 +314,15 @@ Neue Punkte oben eintippen und mit Enter oder „Hinzufügen“ ablegen.
 Offene Einträge lassen sich als erledigt markieren oder löschen.
 Gespeichert wird serverseitig in `.data/backlog.json` (liegt nicht im Git).
 
-### Einstellungen (Standort & Benachrichtigungen)
+### Einstellungen (Standort, Stromkonto & Benachrichtigungen)
 
-Über das Zahnrad-Symbol im Header öffnet sich ein Einstellungen-Dialog mit
-zwei Gruppen:
+Über das Zahnrad-Symbol im Header öffnet sich ein Einstellungen-Dialog mit u. a.:
 
 - **Standort:** Bezeichnung, Breiten- und Längengrad für Sonnenauf-/-untergang
   und Sonnenstunden-Prognose. Standard ist Bätterkinden; per „Standard“-Button
   jederzeit zurücksetzbar (siehe [`src/lib/site-location.ts`](src/lib/site-location.ts)).
+- **Stromkonto:** Startstand in kWh (Anheftung an whatwatt-Zählerstände);
+  Batterie-Icon wie in den KPI-Kacheln „Stromkonto heute“ / „Stand Stromkonto“.
 - **Benachrichtigungen:** Push-Benachrichtigung
 aktivieren, die auslöst, sobald die Anlage an einem Tag mehr als
 `YIELD_NOTIFICATION_THRESHOLD_KWH` (Standard: 3 kWh) erzeugt hat – höchstens
@@ -318,6 +338,22 @@ Service Worker mit Push-Abo sowie einen Push-Server (z. B. via VAPID-Keys)
 erfordern. Im Einstellungen-Dialog gibt es zum Testen einen Button
 "Testbenachrichtigung senden", der unabhängig vom Schwellenwert sofort eine
 Beispielmeldung auslöst.
+
+## Änderungsprotokoll
+
+### 1.2.0
+
+- **Ertragsprognose:** Open-Meteo (GTI × kWp × PR 0,78) statt forecast.solar;
+  Anzeige in der Datums-Karte; Prognose für heute und morgen in `/api/pv`.
+- **UI:** Datums-Karte wischbar (Heute/Morgen); Verlaufs-Charts wischbar
+  (Heute/Woche/Monat/Jahr/Lebensdauer) ohne Tab-Leiste; Kachel „Heute“ nur
+  Autarkiegrade.
+- **UI:** Stromkonto-Icon (KPI + Einstellungen) einheitlich Batterie.
+- **Doku:** README und `.env.example` an die Prognose-Quelle angepasst.
+
+### 1.1.0
+
+- Wetter-Alarm, Design-Anpassungen KPI/Sonnenzeiten, forecast.solar (ersetzt in 1.2.0).
 
 ## Lokal starten
 
@@ -517,11 +553,12 @@ src/
       header.tsx         Kopfzeile mit Live-Status, Quellen-Badge, Backlog, Einstellungen & Theme-Toggle
       backlog-dialog.tsx   Ideen-Backlog (einkippen, erledigen, löschen)
       settings-dialog.tsx  Einstellungen-Dialog (Standort, Stromkonto, Benachrichtigungen)
-      kpi-grid.tsx        Kennzahlen-Kacheln (Erzeugung, Verbrauch, ...)
-      energy-flow.tsx     Visualisierung des Energieflusses
-      metrics-card.tsx    Eigenverbrauch/Autarkie mit Fortschrittsbalken
-      sun-times-card.tsx   Sonnenauf-/-untergang & prognostizierte Sonnenstunden
-      charts-section.tsx   Verlaufs-Diagramme (Heute/Woche/Monat/Lebensdauer)
+      kpi-grid.tsx           Kennzahlen-Kacheln (Erzeugung, Verbrauch, Stromkonto, …)
+      energy-flow.tsx        Visualisierung des Energieflusses
+      today-overview-card.tsx  Autarkiegrade (Heute)
+      sun-times-card.tsx     Wetter, Sonnenzeiten, Open-Meteo-Prognose (Swipe Heute/Morgen)
+      charts-section.tsx     Ertrag & Verbrauch (Swipe über Zeiträume)
+      swipe-carousel.tsx     Wischgesten + Punkt-Navigation (Carousel & Einzelansicht)
     ui/                 shadcn/ui Basis-Komponenten
   lib/
     pv-data.ts          Simulation der PV-Daten (Fallback)
