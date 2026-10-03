@@ -4,3 +4,6 @@ export const WETTER_ALARM_UNAVAILABLE =
 
 export const FORECAST_SOLAR_UNAVAILABLE =
   "forecast.solar ist derzeit nicht erreichbar. Die Ertragsprognose basiert auf einer Schätzung.";
+
+export const OPEN_METEO_YIELD_UNAVAILABLE =
+  "Open-Meteo ist derzeit nicht erreichbar. Die Ertragsprognose basiert auf einer Schätzung.";

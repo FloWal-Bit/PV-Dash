@@ -20,8 +20,11 @@ import { isFusionSolarConfigured } from "@/lib/fusionsolar/config";
 import { getFusionSolarDashboardData } from "@/lib/fusionsolar/service";
 import { applyStromkontoToSnapshot } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
-import { resolveForecastSolarPeakKwp } from "@/lib/forecast-solar/config";
-import { getForecastedTodayYieldKwh } from "@/lib/forecast-solar/service";
+import { resolveOpenMeteoPeakKwp } from "@/lib/open-meteo-yield/config";
+import {
+  getOpenMeteoForecastedTodayYieldKwh,
+  type OpenMeteoYieldMeta,
+} from "@/lib/open-meteo-yield/service";
 import { getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
 
 export type DashboardData = {
@@ -64,10 +67,12 @@ export type DashboardPayload = {
   /** Ist ein whatwatt Go konfiguriert und erreichbar, überschreibt es die Netzwerte der Hauptquelle. */
   gridSource: GridSource;
   data: DashboardData;
-  /** Prognostizierter Tagesertrag (kWh), Summe forecast.solar-Stundenwerte für heute. */
+  /** Prognostizierter Tagesertrag (kWh), Open-Meteo GTI × kWp × PR für heute. */
   forecastedTodayYieldKwh: number | null;
-  /** Gesetzt, wenn forecast.solar nicht erreichbar ist (Fallback-Schätzung in der UI). */
+  /** Gesetzt, wenn die Ertragsprognose (Open-Meteo) nicht erreichbar ist. */
   forecastSolarError: string | null;
+  /** Zur Verifikation: GTI-Summe, PR, Ideal-kWh (nur Open-Meteo). */
+  forecastYieldMeta: OpenMeteoYieldMeta | null;
   /** Nutzerfreundliche Meldung, z. B. wenn FusionSolar konfiguriert, aber gerade nicht erreichbar ist. */
   warning: string | null;
 };
@@ -160,8 +165,8 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
     fromWhatWatt: overlay.gridSource === "whatwatt",
   });
 
-  const forecastSolar = await getForecastedTodayYieldKwh(
-    resolveForecastSolarPeakKwp(),
+  const yieldForecast = await getOpenMeteoForecastedTodayYieldKwh(
+    resolveOpenMeteoPeakKwp(),
     new Date(snapshot.timestamp),
   );
 
@@ -169,8 +174,9 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
     source: base.source,
     gridSource: overlay.gridSource,
     data: { ...overlay.data, snapshot },
-    forecastedTodayYieldKwh: forecastSolar.kwh,
-    forecastSolarError: forecastSolar.error,
+    forecastedTodayYieldKwh: yieldForecast.kwh,
+    forecastSolarError: yieldForecast.error,
+    forecastYieldMeta: yieldForecast.meta,
     // Eine bereits vorhandene FusionSolar-Warnung hat Vorrang, damit nicht
     // zwei Warnbanner gleichzeitig um Aufmerksamkeit konkurrieren.
     warning: base.warning ?? overlay.warning,

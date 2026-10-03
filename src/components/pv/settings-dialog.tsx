@@ -390,16 +390,16 @@ export function SettingsDialog() {
               >
                 Wetter-Alarm
               </a>
-              ; solare Ertragsprognose von{" "}
+              ; solare Ertragsprognose aus{" "}
               <a
-                href="https://forecast.solar/"
+                href="https://open-meteo.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline underline-offset-2 hover:text-foreground"
               >
-                forecast.solar
-              </a>
-              .
+                Open-Meteo
+              </a>{" "}
+              (GTI, PR 0,78).
             </p>
             <p className="text-xs text-muted-foreground">Herbst 2026</p>
           </SettingsSection>

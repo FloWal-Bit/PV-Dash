@@ -259,27 +259,34 @@ Koordinaten in den Einstellungen bzw. `NEXT_PUBLIC_SITE_LATITUDE` /
 weiterhin als Fallback für `suncalc` und für andere Berechnungen, nicht für
 die Wetter-Alarm-Ortssuche (die nutzt den **Namen**).
 
-### Solare Ertragsprognose (forecast.solar)
+### Solare Ertragsprognose (Open-Meteo)
 
 Die Kachel **Heute → „Prognostizierter Tagesertrag“** vergleicht den bisher
-erzielten Tagesertrag mit einer Prognose von
-[forecast.solar](https://forecast.solar/) (Stundenwerte des Tages summiert,
-Wh → kWh). Implementierung:
-[`src/lib/forecast-solar/service.ts`](src/lib/forecast-solar/service.ts), Anbindung
-über [`/api/pv`](src/app/api/pv/route.ts) als Feld `forecastedTodayYieldKwh`.
+erzielten Tagesertrag mit **Σ(GTI) × kWp × PR** aus der
+[Open-Meteo](https://open-meteo.com/)-Wetterprognose (`global_tilted_irradiance`,
+Neigung/Azimut wie an der Anlage). Implementierung:
+[`src/lib/open-meteo-yield/service.ts`](src/lib/open-meteo-yield/service.ts),
+Anbindung über [`/api/pv`](src/app/api/pv/route.ts) als Feld
+`forecastedTodayYieldKwh`; Details zur Verifikation in `forecastYieldMeta`.
 
-Standard-URL entspricht der Anlage Kronenmattweg (47.13° N, 7.54° E, 11° Neigung,
-0° Azimut, 30.34 kWp) – siehe
-[`src/lib/forecast-solar/config.ts`](src/lib/forecast-solar/config.ts). Optional:
+Anlage Kronenmattweg: 47.13° N, 7.54° E, 11° Neigung, 0° Azimut; Standard-PR
+**0,78** (Kalibrierung Sep/Okt 2026). Optional:
 
 | Variable | Bedeutung |
 |---|---|
-| `FORECAST_SOLAR_PEAK_KWP` | Anlagenleistung in kWp für die forecast.solar-Anfrage |
+| `FORECAST_SOLAR_PEAK_KWP` | Anlagenleistung in kWp (weiterhin der Env-Name) |
+| `OPEN_METEO_YIELD_PR` | Performance Ratio für GTI → kWh (Standard `0.78`) |
 
-Ist forecast.solar nicht erreichbar oder liefert keine Daten, wird intern auf
-eine Schätzung aus Sonnenstunden × kWp × Performance Ratio zurückgegriffen
-([`estimateForecastedYieldKwh`](src/lib/sun.ts)); sind Wetter-Alarm-Daten
-geladen, fließen deren Sonnenstunden in diese Fallback-Schätzung ein.
+**Verifikation:** Morgens Prognose im Dashboard notieren (oder Server-Log
+`[open-meteo-yield] verify`), abends Tagesertrag FusionSolar vergleichen. Nach
+einigen Tagen PR bei Bedarf anpassen.
+
+Ist Open-Meteo nicht erreichbar, greift die UI-Fallback-Schätzung aus
+Sonnenstunden × kWp × 0,8 ([`estimateForecastedYieldKwh`](src/lib/sun.ts));
+Wetter-Alarm-Sonnenstunden fließen ein, wenn geladen.
+
+Der ältere Anbindungspfad [`src/lib/forecast-solar/`](src/lib/forecast-solar/)
+bleibt im Repo, wird aber nicht mehr für die Dashboard-Prognose verwendet.
 
 ### Backlog
 
@@ -523,7 +530,8 @@ src/
     sun.ts               Astronomischer Fallback (suncalc)
     weather-store.ts     Client-Polling für /api/weather
     wetteralarm/         Wetter-Alarm API (Suche, POI, Symbol-Texte)
-    forecast-solar/      Tagesertrags-Prognose (forecast.solar)
+    open-meteo-yield/    Tagesertrags-Prognose (Open-Meteo GTI × PR)
+    forecast-solar/      Legacy (nicht mehr für «Heute»-Prognose)
     backlog.ts           Serverseitiges Backlog (.data/backlog.json)
     backlog-store.ts     Client-Store für das Ideen-Backlog
     site-location.ts     Standort (Standard Bätterkinden, Einstellungen/localStorage)
