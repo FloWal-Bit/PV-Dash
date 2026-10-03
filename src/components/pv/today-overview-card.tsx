@@ -81,13 +81,13 @@ export function TodayOverviewCard({
           label="Physischer Autarkiegrad"
           value={snapshot.autarkyRate ?? 0}
           valueDisplay={
-            snapshot.autarkyRate != null ? `${snapshot.autarkyRate}%` : "–"
+            snapshot.autarkyRate != null ? `${snapshot.autarkyRate} %` : "–"
           }
         />
         <MetricRow
           label="Finanzieller Autarkiegrad"
           value={financialAutarky ?? 0}
-          valueDisplay={financialAutarky != null ? `${financialAutarky}%` : "–"}
+          valueDisplay={financialAutarky != null ? `${financialAutarky} %` : "–"}
         />
         <MetricRow
           label="Prognostizierter Tagesertrag"

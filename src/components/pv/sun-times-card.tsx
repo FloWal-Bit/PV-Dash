@@ -130,6 +130,16 @@ export function SunTimesCard({ date = new Date() }: { date?: Date }) {
           valueClassName="lowercase"
         />
         <SunStat
+          icon={<Clock3 className="size-4" />}
+          label="Sonnenstunden"
+          value={
+            waLoading && !waWeather
+              ? "…"
+              : `${formatSwissNumber(sunHoursDisplay, 1)} h`
+          }
+          accent="slate"
+        />
+        <SunStat
           icon={<Sunrise className="size-4" />}
           label="Sonnenaufgang"
           value={waLoading && !waWeather ? "…" : sunriseDisplay}
@@ -139,16 +149,6 @@ export function SunTimesCard({ date = new Date() }: { date?: Date }) {
           icon={<Sunset className="size-4" />}
           label="Sonnenuntergang"
           value={waLoading && !waWeather ? "…" : sunsetDisplay}
-          accent="slate"
-        />
-        <SunStat
-          icon={<Clock3 className="size-4" />}
-          label="Sonnenstunden"
-          value={
-            waLoading && !waWeather
-              ? "…"
-              : `${formatSwissNumber(sunHoursDisplay, 1)} h`
-          }
           accent="slate"
         />
       </CardContent>

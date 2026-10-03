@@ -24,7 +24,16 @@ export function KpiGrid({
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <StatCard
-        label="Heute erzeugt"
+        label={
+          <>
+            <span className="sm:hidden">
+              Heute
+              <br />
+              erzeugt
+            </span>
+            <span className="hidden sm:inline">Heute erzeugt</span>
+          </>
+        }
         value={formatSwissNumber(snapshot.todayYieldKwh, 1)}
         unit="kWh"
         icon={<Sun className="size-5" />}

@@ -4,7 +4,7 @@ import { SIMULATED_OPACITY_CLASS } from "@/lib/data-fidelity";
 import { cn } from "@/lib/utils";
 
 type StatCardProps = {
-  label: string;
+  label: ReactNode;
   value: string;
   unit?: string;
   hint?: string;
