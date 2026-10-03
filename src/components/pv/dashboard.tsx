@@ -11,18 +11,45 @@ import { ChartsSection } from "@/components/pv/charts-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { pvStore } from "@/lib/pv-store";
+import { siteLocationStore } from "@/lib/site-location";
+import { weatherStore } from "@/lib/weather-store";
 import { checkYieldNotification } from "@/lib/notifications";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 
 export function Dashboard({ plantName }: { plantName: string }) {
-  const { data, error, source, gridSource, forecastedTodayYieldKwh, warning, lastFetchedAt } =
-    useSyncExternalStore(
-      pvStore.subscribe,
-      pvStore.getSnapshot,
-      pvStore.getServerSnapshot,
-    );
+  const {
+    data,
+    error,
+    source,
+    gridSource,
+    forecastedTodayYieldKwh,
+    forecastSolarError,
+    warning,
+    lastFetchedAt,
+  } = useSyncExternalStore(pvStore.subscribe, pvStore.getSnapshot, pvStore.getServerSnapshot);
+  const { location } = useSyncExternalStore(
+    siteLocationStore.subscribe,
+    siteLocationStore.getSnapshot,
+    siteLocationStore.getServerSnapshot,
+  );
+  const {
+    error: weatherError,
+    loading: weatherLoading,
+  } = useSyncExternalStore(
+    weatherStore.subscribe,
+    weatherStore.getSnapshot,
+    weatherStore.getServerSnapshot,
+  );
   const lastUpdated = lastFetchedAt != null ? new Date(lastFetchedAt) : null;
   const dataSource = source ?? "simulation";
+  const externalServiceErrors = [
+    !weatherLoading && weatherError ? weatherError : null,
+    forecastSolarError,
+  ].filter((message): message is string => message != null);
+
+  useEffect(() => {
+    void weatherStore.refresh(location.name);
+  }, [location.name]);
 
   useEffect(() => {
     if (!data) return;
@@ -65,15 +92,24 @@ export function Dashboard({ plantName }: { plantName: string }) {
           </div>
         ) : null}
 
+        {externalServiceErrors.length > 0 ? (
+          <div
+            className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
+            role="status"
+          >
+            <ul className="flex list-disc flex-col gap-1 pl-4">
+              {externalServiceErrors.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {!data ? (
           <DashboardSkeleton />
         ) : (
           <>
-            <SunTimesCard
-              date={new Date(data.snapshot.timestamp)}
-              weather={data.snapshot.weather}
-              source={dataSource}
-            />
+            <SunTimesCard date={new Date(data.snapshot.timestamp)} />
 
             <KpiGrid snapshot={data.snapshot} source={dataSource} gridSource={gridSource} />
 

@@ -66,6 +66,8 @@ export type DashboardPayload = {
   data: DashboardData;
   /** Prognostizierter Tagesertrag (kWh), Summe forecast.solar-Stundenwerte für heute. */
   forecastedTodayYieldKwh: number | null;
+  /** Gesetzt, wenn forecast.solar nicht erreichbar ist (Fallback-Schätzung in der UI). */
+  forecastSolarError: string | null;
   /** Nutzerfreundliche Meldung, z. B. wenn FusionSolar konfiguriert, aber gerade nicht erreichbar ist. */
   warning: string | null;
 };
@@ -158,7 +160,7 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
     fromWhatWatt: overlay.gridSource === "whatwatt",
   });
 
-  const forecastedTodayYieldKwh = await getForecastedTodayYieldKwh(
+  const forecastSolar = await getForecastedTodayYieldKwh(
     resolveForecastSolarPeakKwp(),
     new Date(snapshot.timestamp),
   );
@@ -167,7 +169,8 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
     source: base.source,
     gridSource: overlay.gridSource,
     data: { ...overlay.data, snapshot },
-    forecastedTodayYieldKwh,
+    forecastedTodayYieldKwh: forecastSolar.kwh,
+    forecastSolarError: forecastSolar.error,
     // Eine bereits vorhandene FusionSolar-Warnung hat Vorrang, damit nicht
     // zwei Warnbanner gleichzeitig um Aufmerksamkeit konkurrieren.
     warning: base.warning ?? overlay.warning,

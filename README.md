@@ -224,29 +224,62 @@ schlägt dadurch nie fehl.
   ["Hosting auf Infomaniak Jelastic Cloud"](#hosting-auf-infomaniak-jelastic-cloud-empfohlen)
   unten für Anforderungen an die Hosting-Plattform.
 
-### Sonnenauf-/-untergang & Sonnenstunden
+### Wetter, Sonnenauf-/-untergang & Sonnenstunden (Wetter-Alarm)
 
-Unabhängig von der Datenquelle (FusionSolar oder Simulation) zeigt das
-Dashboard Sonnenaufgang, Sonnenuntergang und die für den Tag prognostizierten
-Sonnenstunden für einen Standort – berechnet rein astronomisch mit
-[`suncalc`](https://github.com/mourner/suncalc) (siehe
-[`src/lib/sun.ts`](src/lib/sun.ts)). Die "Sonnenstunden" sind dabei bewusst
-keine 1:1-Kopie der reinen Tageslänge, sondern werden um einen (für die Demo
-simulierten) Bewölkungsfaktor reduziert, damit der Wert eine plausible
-Sonnenschein-Prognose statt nur der astronomischen Tageslänge abbildet.
+Unabhängig von der PV-Datenquelle (FusionSolar oder Simulation) holt das
+Dashboard Wetterlage, Sonnenaufgang, Sonnenuntergang und die prognostizierten
+**Sonnenstunden** (Sonnenscheindauer) von
+[Wetter-Alarm](https://wetteralarm.ch/) – dieselben Werte wie auf der
+[Ortsprognose-Seite](https://wetteralarm.ch/wetter-schweiz.html?location=B%C3%A4tterkinden)
+(`wetterabfrage.js` auf wetteralarm.ch).
 
-Standardmäßig ist der Standort **Bätterkinden** (47.1316° N, 7.5382° E) –
-passend zur Anlage Kronenmatte 3. Für einen anderen Einsatzort entweder in den
-**Einstellungen** (Zahnrad → Standort) anpassen (wird im Browser gespeichert)
-oder beim Deployment optional `NEXT_PUBLIC_SITE_LATITUDE` und
-`NEXT_PUBLIC_SITE_LONGITUDE` setzen (siehe [`.env.example`](.env.example)).
+Ablauf serverseitig ([`src/lib/wetteralarm/service.ts`](src/lib/wetteralarm/service.ts),
+Proxy [`GET /api/weather`](src/app/api/weather/route.ts)):
 
-Aus den prognostizierten Sonnenstunden und der Anlagenleistung (kWp) leitet
-die App zusätzlich einen **prognostizierten Tagesertrag** ab (Sonnenstunden ×
-kWp × 80 % Performance Ratio, um reale Verluste abzubilden). Die Kachel
-"Kennzahlen" zeigt den bereits erzielten Ertrag im Vergleich dazu als
-Fortschrittsbalken (`estimateForecastedYieldKwh` in
-[`src/lib/sun.ts`](src/lib/sun.ts)).
+1. **Ortssuche:** `https://my.wetteralarm.ch/web/search.json?query=…&limit_to=PointOfInterest`
+2. **Tagesprognose:** `https://my.wetteralarm.ch/v9/pois/{id}.json` → u. a.
+   Wetter-Symbol (deutsche Beschreibung), `sunrise`/`sunset`, `insolation`
+   (Sonnenstunden)
+
+Der **Standortname** aus den Einstellungen (Zahnrad → Standort, Standard
+**Bätterkinden**) steuert die Suche. Optional kann die POI-ID fest vorgegeben
+werden, dann entfällt Schritt 1:
+
+| Variable | Bedeutung |
+|---|---|
+| `WETTERALARM_POI_ID` | Feste Wetter-Alarm-Orts-ID (z. B. `141687` für Bätterkinden) |
+
+Antworten werden ~30 Minuten im Server-Prozess gecacht. Schlägt der Abruf fehl,
+zeigt die Datums-Karte einen Hinweis und fällt auf astronomische Werte aus
+[`suncalc`](https://github.com/mourner/suncalc) zurück
+([`src/lib/sun.ts`](src/lib/sun.ts)).
+
+Koordinaten in den Einstellungen bzw. `NEXT_PUBLIC_SITE_LATITUDE` /
+`NEXT_PUBLIC_SITE_LONGITUDE` (siehe [`.env.example`](.env.example)) dienen
+weiterhin als Fallback für `suncalc` und für andere Berechnungen, nicht für
+die Wetter-Alarm-Ortssuche (die nutzt den **Namen**).
+
+### Solare Ertragsprognose (forecast.solar)
+
+Die Kachel **Heute → „Prognostizierter Tagesertrag“** vergleicht den bisher
+erzielten Tagesertrag mit einer Prognose von
+[forecast.solar](https://forecast.solar/) (Stundenwerte des Tages summiert,
+Wh → kWh). Implementierung:
+[`src/lib/forecast-solar/service.ts`](src/lib/forecast-solar/service.ts), Anbindung
+über [`/api/pv`](src/app/api/pv/route.ts) als Feld `forecastedTodayYieldKwh`.
+
+Standard-URL entspricht der Anlage Kronenmattweg (47.13° N, 7.54° E, 11° Neigung,
+0° Azimut, 30.34 kWp) – siehe
+[`src/lib/forecast-solar/config.ts`](src/lib/forecast-solar/config.ts). Optional:
+
+| Variable | Bedeutung |
+|---|---|
+| `FORECAST_SOLAR_PEAK_KWP` | Anlagenleistung in kWp für die forecast.solar-Anfrage |
+
+Ist forecast.solar nicht erreichbar oder liefert keine Daten, wird intern auf
+eine Schätzung aus Sonnenstunden × kWp × Performance Ratio zurückgegriffen
+([`estimateForecastedYieldKwh`](src/lib/sun.ts)); sind Wetter-Alarm-Daten
+geladen, fließen deren Sonnenstunden in diese Fallback-Schätzung ein.
 
 ### Backlog
 
@@ -469,6 +502,7 @@ src/
     page.tsx           Einstiegspunkt, rendert das Dashboard
     manifest.ts         PWA-Manifest (installierbar auf Android/iOS)
     api/pv/route.ts      Server-Endpunkt: FusionSolar oder Simulation, je nach Konfiguration
+    api/weather/route.ts Wetter-Alarm-Tageswetter (Proxy, gecacht)
     api/backlog/route.ts Ideen-Backlog (GET/POST/PATCH/DELETE)
   components/
     pv/                 Dashboard-spezifische Komponenten
@@ -486,7 +520,10 @@ src/
     pv-data.ts          Simulation der PV-Daten (Fallback)
     pv-source.ts         Wählt FusionSolar oder Simulation, serverseitig
     pv-store.ts          Client-Store, pollt /api/pv (5 s Takt)
-    sun.ts               Sonnenauf-/-untergang & Sonnenstunden-Prognose (suncalc)
+    sun.ts               Astronomischer Fallback (suncalc)
+    weather-store.ts     Client-Polling für /api/weather
+    wetteralarm/         Wetter-Alarm API (Suche, POI, Symbol-Texte)
+    forecast-solar/      Tagesertrags-Prognose (forecast.solar)
     backlog.ts           Serverseitiges Backlog (.data/backlog.json)
     backlog-store.ts     Client-Store für das Ideen-Backlog
     site-location.ts     Standort (Standard Bätterkinden, Einstellungen/localStorage)

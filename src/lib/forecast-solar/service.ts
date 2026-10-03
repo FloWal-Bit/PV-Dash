@@ -9,6 +9,12 @@ import {
   FORECAST_SOLAR_LATITUDE,
   FORECAST_SOLAR_LONGITUDE,
 } from "@/lib/forecast-solar/config";
+import { FORECAST_SOLAR_UNAVAILABLE } from "@/lib/service-unavailable-messages";
+
+export type ForecastSolarResult = {
+  kwh: number | null;
+  error: string | null;
+};
 
 const API_BASE = "https://api.forecast.solar/estimate";
 const CACHE_TTL_MS = 45 * 60 * 1000; // API: 12 req/h/IP — nicht öfter pollen
@@ -64,8 +70,10 @@ function buildEstimateUrl(latitude: number, longitude: number, peakKwp: number):
 export async function getForecastedTodayYieldKwh(
   peakKwp: number,
   date = new Date(),
-): Promise<number | null> {
-  if (!Number.isFinite(peakKwp) || peakKwp <= 0) return null;
+): Promise<ForecastSolarResult> {
+  if (!Number.isFinite(peakKwp) || peakKwp <= 0) {
+    return { kwh: null, error: null };
+  }
 
   const latitude = FORECAST_SOLAR_LATITUDE;
   const longitude = FORECAST_SOLAR_LONGITUDE;
@@ -73,7 +81,7 @@ export async function getForecastedTodayYieldKwh(
   const key = `${formatCoord(latitude)}:${formatCoord(longitude)}:${peakKwp}:${dateKey}`;
 
   if (cache && cacheKey === key && cache.expiresAt > Date.now()) {
-    return cache.kwh;
+    return { kwh: cache.kwh, error: null };
   }
 
   const url = buildEstimateUrl(latitude, longitude, peakKwp);
@@ -85,14 +93,14 @@ export async function getForecastedTodayYieldKwh(
     });
     if (!res.ok) {
       console.error("[forecast.solar] HTTP", res.status, url);
-      return null;
+      return { kwh: null, error: FORECAST_SOLAR_UNAVAILABLE };
     }
 
     const body = (await res.json()) as ForecastSolarResponse;
     const period = body.result?.watt_hours_period;
     if (!period || typeof period !== "object") {
       console.error("[forecast.solar] missing watt_hours_period");
-      return null;
+      return { kwh: null, error: FORECAST_SOLAR_UNAVAILABLE };
     }
 
     let wh = sumHourlyWhForDay(period, dateKey);
@@ -101,14 +109,16 @@ export async function getForecastedTodayYieldKwh(
       wh = Number(body.result.watt_hours_day[dateKey]);
     }
 
-    if (!Number.isFinite(wh) || wh <= 0) return null;
+    if (!Number.isFinite(wh) || wh <= 0) {
+      return { kwh: null, error: FORECAST_SOLAR_UNAVAILABLE };
+    }
 
     const kwh = round1(wh / 1000);
     cache = { kwh, expiresAt: Date.now() + CACHE_TTL_MS };
     cacheKey = key;
-    return kwh;
+    return { kwh, error: null };
   } catch (err) {
     console.error("[forecast.solar] fetch failed:", err);
-    return null;
+    return { kwh: null, error: FORECAST_SOLAR_UNAVAILABLE };
   }
 }

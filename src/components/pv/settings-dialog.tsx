@@ -98,9 +98,9 @@ function SiteLocationEditor({
       title="Standort"
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Für Sonnenauf-/-untergang und die prognostizierten Sonnenstunden. Standard ist{" "}
-        {DEFAULT_SITE_LOCATION.name} ({DEFAULT_SITE_LOCATION.latitude},{" "}
-        {DEFAULT_SITE_LOCATION.longitude}).
+        Bezeichnung für die Wetter-Alarm-Ortssuche; Koordinaten als Fallback für
+        astronomische Berechnungen. Standard ist {DEFAULT_SITE_LOCATION.name} (
+        {DEFAULT_SITE_LOCATION.latitude}, {DEFAULT_SITE_LOCATION.longitude}).
         {isCustom ? " Du verwendest einen angepassten Standort." : " Aktuell Standard."}
       </p>
 
@@ -378,6 +378,28 @@ export function SettingsDialog() {
             <p className="text-xs leading-relaxed text-muted-foreground">
               Entstanden in Zusammenarbeit mit Koffein, Cursor und der Musik von Paul
               Kalkbrenner.
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Externe Datenquellen (ohne Gewähr, jeweils gemäss Anbieter): Wetter,
+              Sonnenauf- und -untergang sowie Sonnenstunden von{" "}
+              <a
+                href="https://wetteralarm.ch/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Wetter-Alarm
+              </a>
+              ; solare Ertragsprognose von{" "}
+              <a
+                href="https://forecast.solar/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                forecast.solar
+              </a>
+              .
             </p>
             <p className="text-xs text-muted-foreground">Herbst 2026</p>
           </SettingsSection>

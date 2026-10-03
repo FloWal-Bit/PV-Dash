@@ -8,8 +8,9 @@ import { financialAutarkyRate } from "@/lib/autarky";
 import { formatSwissNumber } from "@/lib/format";
 import type { PvSnapshot } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
-import { estimateForecastedYieldKwh, getSunInfo } from "@/lib/sun";
+import { estimateForecastedYieldKwh, getSunInfo, type SunInfo } from "@/lib/sun";
 import { siteLocationStore } from "@/lib/site-location";
+import { weatherStore } from "@/lib/weather-store";
 import { cn } from "@/lib/utils";
 
 const GREEN_PROGRESS =
@@ -50,7 +51,15 @@ export function TodayOverviewCard({
     siteLocationStore.getSnapshot,
     siteLocationStore.getServerSnapshot,
   );
-  const sunInfo = getSunInfo(new Date(snapshot.timestamp), location);
+  const { data: waWeather } = useSyncExternalStore(
+    weatherStore.subscribe,
+    weatherStore.getSnapshot,
+    weatherStore.getServerSnapshot,
+  );
+  const baseSunInfo = getSunInfo(new Date(snapshot.timestamp), location);
+  const sunInfo: SunInfo = waWeather
+    ? { ...baseSunInfo, forecastedSunHours: waWeather.sunHours }
+    : baseSunInfo;
   const forecastKwh =
     forecastedTodayYieldKwh ??
     estimateForecastedYieldKwh(snapshot.systemPeakKwp, sunInfo);
