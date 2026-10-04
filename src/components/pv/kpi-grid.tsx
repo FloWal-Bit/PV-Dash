@@ -27,7 +27,7 @@ export function KpiGrid({
   const financialAutarky = financialAutarkyRate(snapshot);
 
   return (
-    <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-4", className)}>
+    <div className={cn("grid h-full grid-cols-2 gap-3 sm:grid-cols-4", className)}>
       <StatCard
         label={
           <>

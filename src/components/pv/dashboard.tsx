@@ -116,15 +116,15 @@ export function Dashboard({ plantName }: { plantName: string }) {
               forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
             />
 
-            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
               <EnergyFlow
-                className="min-w-0"
+                className="min-w-0 md:h-full"
                 snapshot={data.snapshot}
                 source={dataSource}
                 gridSource={gridSource}
               />
               <KpiGrid
-                className="min-w-0 md:grid-cols-2 md:content-start"
+                className="min-w-0 md:h-full md:grid-cols-2 md:grid-rows-3"
                 snapshot={data.snapshot}
                 source={dataSource}
                 gridSource={gridSource}
@@ -162,11 +162,11 @@ function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4">
       <Skeleton className="h-[120px] rounded-2xl" />
-      <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
-        <Skeleton className="h-52 rounded-2xl md:h-64" />
-        <div className="grid grid-cols-2 gap-3">
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
+        <Skeleton className="h-52 rounded-2xl md:h-full md:min-h-64" />
+        <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-[96px] rounded-2xl" />
+            <Skeleton key={i} className="h-[96px] rounded-2xl md:h-full" />
           ))}
         </div>
       </div>

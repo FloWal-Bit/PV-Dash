@@ -31,8 +31,8 @@ export function StatCard({
   className,
 }: StatCardProps) {
   return (
-    <Card className={cn("shadow-card gap-3 rounded-2xl py-4", className)}>
-      <CardContent className="flex items-start justify-between gap-3 px-4">
+    <Card className={cn("shadow-card h-full justify-center gap-3 rounded-2xl py-4", className)}>
+      <CardContent className="flex items-center justify-between gap-3 px-4">
         <div
           className={cn(
             "flex min-w-0 flex-col gap-1 transition-opacity",

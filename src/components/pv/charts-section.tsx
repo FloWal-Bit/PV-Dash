@@ -148,7 +148,8 @@ function sampleIntervalHours(points: HistoryPoint[]): number {
 
 /**
  * Tageskurve analog FusionSolar: PV-Ausgabe als Fläche, Leistungsaufnahme
- * als orangene Linie, der Anteil „Verbraucht von PV“ als zweite Fläche.
+ * als rote Linie (gleiche Farbe wie der Verbrauch in Woche und Monat),
+ * der Anteil „Verbraucht von PV“ als zweite Fläche.
  * Zukünftige Stunden bleiben leer (Kurve endet bei „jetzt“).
  */
 function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
@@ -236,7 +237,7 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
           type="linear"
           dataKey="consumptionKw"
           name="consumptionKw"
-          stroke="var(--chart-1)"
+          stroke="var(--chart-5)"
           strokeWidth={2}
           dot={false}
           activeDot={{ r: 3 }}
@@ -456,7 +457,7 @@ export function ChartsSection({
                   PV
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-chart-1" />
+                  <span className="size-2 rounded-full bg-chart-5" />
                   Verbrauch
                 </span>
                 <span className="flex items-center gap-1.5">
