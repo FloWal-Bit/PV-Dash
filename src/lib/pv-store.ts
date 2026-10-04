@@ -13,7 +13,7 @@ export type PvStoreState = {
   lastFetchedAt: number | null;
 };
 
-const REFRESH_INTERVAL_MS = 5000;
+const REFRESH_INTERVAL_MS = 10_000;
 const INITIAL_STATE: PvStoreState = {
   data: null,
   error: null,
@@ -29,11 +29,9 @@ const INITIAL_STATE: PvStoreState = {
 type Listener = () => void;
 
 /**
- * Externer Store für die PV-Live-Daten. Pollt `/api/pv` (das serverseitig
- * FusionSolar oder die Simulation bedient) und läuft über
- * `useSyncExternalStore`, damit der erste Client-Render exakt dem
- * Server-Snapshot entspricht (kein Hydration-Mismatch) und Aktualisierungen
- * danach als Store-Update statt als Effekt-`setState` ablaufen.
+ * Pollt `/api/pv` alle 10 Sekunden (tagsüber und nachts), damit Verbrauch,
+ * Netz und Stromkonto live bleiben. Serverseitiges FusionSolar-Caching
+ * begrenzt externe API-Last.
  */
 class PvStore {
   private listeners = new Set<Listener>();
@@ -71,8 +69,6 @@ class PvStore {
           "Live-Daten konnten nicht aktualisiert werden. Letzter bekannter Stand wird angezeigt.",
       };
     }
-    // Snapshot the listener set: a listener could unsubscribe (e.g. via
-    // Strict Mode's mount/unmount/mount dance) while we're iterating.
     for (const listener of [...this.listeners]) listener();
   };
 
@@ -82,17 +78,6 @@ class PvStore {
     this.intervalId = setInterval(this.tick, REFRESH_INTERVAL_MS);
   }
 
-  /**
-   * IMPORTANT: the listener must be registered *before* `ensureRunning()`
-   * kicks off its first `tick()`. `tick()` is async, but the listener set it
-   * reads when it eventually notifies is captured at call time, not at
-   * subscribe time — as long as `add()` below runs synchronously before any
-   * `await` inside that first `tick()` resolves, the new listener is already
-   * in the set when notification happens. Getting the order backwards is
-   * exactly what caused the original hydration bug: an empty listener set at
-   * notify-time means React never learns the store changed, and the UI gets
-   * stuck on the initial (null) snapshot forever.
-   */
   subscribe = (listener: Listener) => {
     this.listeners.add(listener);
     this.ensureRunning();

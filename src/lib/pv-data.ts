@@ -1,4 +1,3 @@
-import { getSiteLocation, getSunInfo } from "@/lib/sun";
 
 /**
  * Simulierte PV-Daten (Photovoltaik).
@@ -105,19 +104,22 @@ function weatherFactor(minuteOfDay: number): {
   return { factor: 1, weather: "sonnig" };
 }
 
+/** Näherung für Simulationsdaten (ohne Wetter-Alarm-Anbindung). */
+const SIM_SUNRISE_MINUTES = 7 * 60;
+const SIM_SUNSET_MINUTES = 20 * 60;
+
 /**
- * Glockenkurve für die Sonneneinstrahlung zwischen Sonnenaufgang (6:30) und
- * Sonnenuntergang (20:30), mit leichtem Rauschen für Realismus.
+ * Glockenkurve für die Sonneneinstrahlung zwischen Sonnenaufgang und
+ * Sonnenuntergang (Simulation), mit leichtem Rauschen für Realismus.
  */
 function solarCurve(date: Date): { productionKw: number; weather: PvSnapshot["weather"] } {
-  const sun = getSunInfo(date, getSiteLocation());
-  if (date.getTime() < sun.sunrise.getTime() || date.getTime() > sun.sunset.getTime()) {
+  const minuteOfDay = date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+  if (minuteOfDay < SIM_SUNRISE_MINUTES || minuteOfDay > SIM_SUNSET_MINUTES) {
     return { productionKw: 0, weather: "sonnig" };
   }
 
-  const minuteOfDay = date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
-  const sunrise = sun.sunrise.getHours() * 60 + sun.sunrise.getMinutes();
-  const sunset = sun.sunset.getHours() * 60 + sun.sunset.getMinutes();
+  const sunrise = SIM_SUNRISE_MINUTES;
+  const sunset = SIM_SUNSET_MINUTES;
   const dayLength = Math.max(1, sunset - sunrise);
   const t = (minuteOfDay - sunrise) / dayLength; // 0..1
   const base = Math.sin(Math.PI * t); // 0 -> 1 -> 0

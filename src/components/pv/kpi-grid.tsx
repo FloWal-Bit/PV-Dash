@@ -4,15 +4,18 @@ import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { formatSignedSwissNumber, formatSwissNumber } from "@/lib/format";
 import type { PvSnapshot } from "@/lib/pv-data";
 import type { DataSource, GridSource } from "@/lib/pv-source";
+import { cn } from "@/lib/utils";
 
 export function KpiGrid({
   snapshot,
   source,
   gridSource,
+  className,
 }: {
   snapshot: PvSnapshot;
   source: DataSource;
   gridSource: GridSource;
+  className?: string;
 }) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
@@ -22,7 +25,7 @@ export function KpiGrid({
     snapshot.stromkontoChangeTodayKwh != null && snapshot.stromkontoChangeTodayKwh < 0;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-4", className)}>
       <StatCard
         label={
           <>

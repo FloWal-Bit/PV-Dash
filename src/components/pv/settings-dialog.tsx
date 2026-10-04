@@ -18,11 +18,8 @@ import {
   sendTestNotification,
   YIELD_NOTIFICATION_THRESHOLD_KWH,
 } from "@/lib/notifications";
-import {
-  DEFAULT_SITE_LOCATION,
-  parseCoordinateInput,
-  siteLocationStore,
-} from "@/lib/site-location";
+import type { PlzLocality, PlzLookupResponse } from "@/lib/plz-types";
+import { DEFAULT_SITE_LOCATION, siteLocationStore } from "@/lib/site-location";
 import {
   DEFAULT_STROMKONTO_BALANCE_KWH,
   parseStromkontoBalanceInput,
@@ -67,22 +64,79 @@ function SiteLocationEditor({
   location,
   isCustom,
 }: {
-  location: { name: string; latitude: number; longitude: number };
+  location: { plz: string; name: string; latitude: number; longitude: number };
   isCustom: boolean;
 }) {
-  const [locationName, setLocationName] = useState(location.name);
-  const [latitudeInput, setLatitudeInput] = useState(String(location.latitude));
-  const [longitudeInput, setLongitudeInput] = useState(String(location.longitude));
+  const [plz, setPlz] = useState(location.plz || "");
+  const [localities, setLocalities] = useState<PlzLocality[]>([]);
+  const [selectedName, setSelectedName] = useState(location.name);
+  const [plzLoading, setPlzLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  function handleSaveLocation() {
-    const latitude = parseCoordinateInput(latitudeInput);
-    const longitude = parseCoordinateInput(longitudeInput);
-    if (latitude == null || longitude == null) {
-      setLocationError("Bitte gültige Koordinaten eingeben (Dezimalzahl, z. B. 47.1316).");
+  useEffect(() => {
+    if (plz.length !== 4) {
+      setLocalities([]);
       return;
     }
-    siteLocationStore.save({ name: locationName, latitude, longitude });
+
+    let cancelled = false;
+    setPlzLoading(true);
+    setLocationError(null);
+
+    void fetch(`/api/plz?zip=${encodeURIComponent(plz)}`, { cache: "no-store" })
+      .then(async (res) => {
+        const body: unknown = await res.json();
+        if (!res.ok) {
+          const message =
+            typeof body === "object" &&
+            body != null &&
+            "error" in body &&
+            typeof (body as { error: unknown }).error === "string"
+              ? (body as { error: string }).error
+              : "PLZ nicht gefunden";
+          throw new Error(message);
+        }
+        return body as PlzLookupResponse;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setLocalities(data.localities);
+        if (data.localities.some((entry) => entry.name === selectedName)) return;
+        const preferred = data.localities.find((entry) => entry.name === location.name);
+        setSelectedName(preferred?.name ?? data.localities[0]?.name ?? "");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLocalities([]);
+        setLocationError(
+          error instanceof Error ? error.message : "PLZ-Abfrage fehlgeschlagen.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setPlzLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [plz, location.name]);
+
+  function handleSaveLocation() {
+    if (!/^\d{4}$/.test(plz.trim())) {
+      setLocationError("Bitte eine gültige vierstellige Schweizer PLZ eingeben.");
+      return;
+    }
+    const entry = localities.find((item) => item.name === selectedName);
+    if (!entry) {
+      setLocationError("Bitte zuerst PLZ laden und einen Ort wählen.");
+      return;
+    }
+    siteLocationStore.save({
+      plz: plz.trim(),
+      name: entry.name,
+      latitude: entry.latitude,
+      longitude: entry.longitude,
+    });
     setLocationError(null);
   }
 
@@ -91,6 +145,8 @@ function SiteLocationEditor({
     setLocationError(null);
   }
 
+  const selectedLocality = localities.find((entry) => entry.name === selectedName);
+
   return (
     <SettingsSection
       icon={<MapPin className="size-4" />}
@@ -98,50 +154,54 @@ function SiteLocationEditor({
       title="Standort"
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Bezeichnung für die Wetter-Alarm-Ortssuche; Koordinaten als Fallback für
-        astronomische Berechnungen. Standard ist {DEFAULT_SITE_LOCATION.name} (
-        {DEFAULT_SITE_LOCATION.latitude}, {DEFAULT_SITE_LOCATION.longitude}).
+        Wetter und Sonnenzeiten kommen von Wetter-Alarm. Wähle PLZ und Ort aus dem
+        Schweizer PLZ-Verzeichnis. Standard: PLZ {DEFAULT_SITE_LOCATION.plz}{" "}
+        {DEFAULT_SITE_LOCATION.name}.
         {isCustom ? " Du verwendest einen angepassten Standort." : " Aktuell Standard."}
       </p>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="site-location-name">Bezeichnung</Label>
+        <Label htmlFor="site-plz">PLZ</Label>
         <input
-          id="site-location-name"
+          id="site-plz"
           type="text"
+          inputMode="numeric"
+          maxLength={4}
           className={inputClassName}
-          value={locationName}
-          onChange={(e) => setLocationName(e.target.value)}
-          placeholder="z. B. Bätterkinden"
+          value={plz}
+          onChange={(e) => setPlz(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          placeholder="3315"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {plz.length === 4 ? (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="site-latitude">Breitengrad</Label>
-          <input
-            id="site-latitude"
-            type="text"
-            inputMode="decimal"
-            className={inputClassName}
-            value={latitudeInput}
-            onChange={(e) => setLatitudeInput(e.target.value)}
-            placeholder="47.1316"
-          />
+          <Label htmlFor="site-locality">Ort</Label>
+          {localities.length > 1 ? (
+            <select
+              id="site-locality"
+              className={inputClassName}
+              value={selectedName}
+              onChange={(e) => setSelectedName(e.target.value)}
+              disabled={plzLoading || localities.length === 0}
+            >
+              {localities.map((entry) => (
+                <option key={entry.name} value={entry.name}>
+                  {entry.name} ({entry.canton})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-sm font-medium">
+              {plzLoading
+                ? "Orte werden geladen …"
+                : selectedLocality
+                  ? `${selectedLocality.name} (${selectedLocality.canton})`
+                  : "–"}
+            </p>
+          )}
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="site-longitude">Längengrad</Label>
-          <input
-            id="site-longitude"
-            type="text"
-            inputMode="decimal"
-            className={inputClassName}
-            value={longitudeInput}
-            onChange={(e) => setLongitudeInput(e.target.value)}
-            placeholder="7.5382"
-          />
-        </div>
-      </div>
+      ) : null}
 
       {locationError ? <p className="text-xs text-destructive">{locationError}</p> : null}
 
@@ -150,7 +210,7 @@ function SiteLocationEditor({
           Standort speichern
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={handleResetLocation}>
-          Standard ({DEFAULT_SITE_LOCATION.name})
+          Standard ({DEFAULT_SITE_LOCATION.plz} {DEFAULT_SITE_LOCATION.name})
         </Button>
       </div>
     </SettingsSection>
@@ -321,7 +381,7 @@ export function SettingsDialog() {
           <StromkontoEditor />
 
           <SiteLocationEditor
-            key={`${location.name}:${location.latitude}:${location.longitude}`}
+            key={`${location.plz}:${location.name}:${location.latitude}:${location.longitude}`}
             location={location}
             isCustom={isCustom}
           />

@@ -38,8 +38,12 @@ export type WetterAlarmDailyWeather = {
   locationName: string;
   date: string;
   weatherLabel: string;
+  /** Anzeige HH:mm (Ortszeit POI). */
   sunrise: string;
   sunset: string;
+  /** Rohwerte von Wetter-Alarm (ISO-8601) für Berechnungen. */
+  sunriseAt: string;
+  sunsetAt: string;
   sunHours: number;
   source: "wetteralarm";
 };

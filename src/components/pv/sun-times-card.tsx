@@ -16,14 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { cn } from "@/lib/utils";
 import { formatSwissNumber } from "@/lib/format";
-import { getSunInfo } from "@/lib/sun";
-import { siteLocationStore } from "@/lib/site-location";
-import { weatherStore } from "@/lib/weather-store";
+import { weatherDateKey, weatherStore } from "@/lib/weather-store";
 import type { PvSnapshot } from "@/lib/pv-data";
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-}
 
 function formatTimeWithSeconds(date: Date): string {
   return date.toLocaleTimeString("de-DE", {
@@ -92,10 +86,6 @@ function SunStat({
   );
 }
 
-function dateKeyForDate(date: Date): string {
-  return date.toLocaleDateString("en-CA", { timeZone: "Europe/Zurich" });
-}
-
 function SunTimesDayCard({
   date,
   forecastedYieldKwh,
@@ -105,49 +95,22 @@ function SunTimesDayCard({
   forecastedYieldKwh: number | null;
   showLiveClock: boolean;
 }) {
-  const { location } = useSyncExternalStore(
-    siteLocationStore.subscribe,
-    siteLocationStore.getSnapshot,
-    siteLocationStore.getServerSnapshot,
-  );
-  const { data: storeWeather, loading: storeLoading } = useSyncExternalStore(
+  const weatherState = useSyncExternalStore(
     weatherStore.subscribe,
     weatherStore.getSnapshot,
     weatherStore.getServerSnapshot,
   );
-  const [dayWeather, setDayWeather] = useState<typeof storeWeather>(null);
-  const [dayWeatherLoading, setDayWeatherLoading] = useState(false);
-  const sunFallback = getSunInfo(date, location);
   const currentTime = useCurrentTime();
-  const dateKey = dateKeyForDate(date);
+  const dateKey = weatherDateKey(date);
+  const dayWeather = weatherState.byDate[dateKey] ?? null;
 
-  useEffect(() => {
-    if (storeWeather?.date === dateKey) {
-      setDayWeather(storeWeather);
-      return;
-    }
-    let cancelled = false;
-    setDayWeatherLoading(true);
-    const params = new URLSearchParams({ location: location.name, date: dateKey });
-    void fetch(`/api/weather?${params}`, { cache: "no-store" })
-      .then(async (res) => (res.ok ? ((await res.json()) as typeof storeWeather) : null))
-      .then((payload) => {
-        if (!cancelled) setDayWeather(payload);
-      })
-      .finally(() => {
-        if (!cancelled) setDayWeatherLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dateKey, location.name, storeWeather]);
-
-  const waLoading = dayWeatherLoading || (storeLoading && dayWeather == null);
+  const waLoading = weatherState.loading && dayWeather == null;
   const weatherLabel = dayWeather?.weatherLabel ?? "–";
   const weatherCategory = dayWeather?.weatherCategory ?? "sonnig";
-  const sunriseDisplay = dayWeather?.sunrise ?? formatTime(sunFallback.sunrise);
-  const sunsetDisplay = dayWeather?.sunset ?? formatTime(sunFallback.sunset);
-  const sunHoursDisplay = dayWeather?.sunHours ?? sunFallback.forecastedSunHours;
+  const sunriseDisplay = dayWeather?.sunrise ?? "–";
+  const sunsetDisplay = dayWeather?.sunset ?? "–";
+  const sunHoursDisplay =
+    dayWeather?.sunHours != null ? dayWeather.sunHours : null;
 
   return (
     <Card className="shadow-card rounded-2xl">
@@ -174,7 +137,11 @@ function SunTimesDayCard({
           icon={<Clock3 className="size-4" />}
           label="Sonnenstunden"
           value={
-            waLoading && !dayWeather ? "…" : `${formatSwissNumber(sunHoursDisplay, 1)} h`
+            waLoading
+              ? "…"
+              : sunHoursDisplay != null
+                ? `${formatSwissNumber(sunHoursDisplay, 1)} h`
+                : "–"
           }
           accent="slate"
         />
@@ -209,21 +176,13 @@ export function SunTimesCard({
   referenceDate = new Date(),
   forecastedTodayYieldKwh = null,
   forecastedTomorrowYieldKwh = null,
+  className,
 }: {
   referenceDate?: Date;
   forecastedTodayYieldKwh?: number | null;
   forecastedTomorrowYieldKwh?: number | null;
+  className?: string;
 }) {
-  const { location } = useSyncExternalStore(
-    siteLocationStore.subscribe,
-    siteLocationStore.getSnapshot,
-    siteLocationStore.getServerSnapshot,
-  );
-
-  useEffect(() => {
-    void weatherStore.refresh(location.name);
-  }, [location.name]);
-
   const tomorrowDate = useMemo(() => {
     const d = new Date(referenceDate);
     d.setDate(d.getDate() + 1);
@@ -231,7 +190,7 @@ export function SunTimesCard({
   }, [referenceDate]);
 
   return (
-    <SwipeCarousel labels={["Heute", "Morgen"]} className="gap-1">
+    <SwipeCarousel labels={["Heute", "Morgen"]} className={cn("min-w-0 gap-1", className)}>
       <SunTimesDayCard
         date={referenceDate}
         forecastedYieldKwh={forecastedTodayYieldKwh}

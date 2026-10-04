@@ -4,7 +4,7 @@ Eine schlichte, intuitive Web-App zur Anzeige von PV-Daten (Photovoltaik):
 aktuelle Erzeugung, Verbrauch, Netzbezug/-einspeisung, Speicherstand,
 Tagesertrag, Gesamtertrag, Eigenverbrauchsquote und Autarkiegrad – live
 aktualisiert, ergänzt um Wetter-Alarm (Sonnenzeiten, Sonnenstunden) und eine
-**solare Tagesertrags-Prognose** (Open-Meteo). Aktuelle Version: **1.2.1**
+**solare Tagesertrags-Prognose** (Open-Meteo). Aktuelle Version: **1.3.0**
 (siehe Fußzeile im Dashboard und [`src/lib/version.ts`](src/lib/version.ts)).
 
 Die App ist als responsive Progressive-Web-App (PWA) gebaut und läuft im
@@ -100,8 +100,9 @@ davon, wie oft das Dashboard im Browser pollt. Der Server cacht deshalb selbst
 werden höchstens alle 6 Minuten neu von FusionSolar geholt, Stunden-/Tagesdaten
 höchstens einmal pro Stunde und die Jahresdaten für die "Lebensdauer"-Ansicht
 (`getKpiStationYear`) höchstens alle 6 Stunden, da sie sich innerhalb eines
-Tages ohnehin kaum ändern. Der Browser pollt trotzdem alle 5 Sekunden – er
-bekommt dabei aber meist den Server-Cache, nicht einen neuen FusionSolar-Call.
+Tages ohnehin kaum ändern. Der Browser pollt `/api/pv` durchgehend alle
+**10 Sekunden** (u. a. für Verbrauch und Netz auch nachts). Tagsüber kommt
+meist der Server-Cache, nicht ein neuer FusionSolar-Call.
 
 **Bekannte Einschränkungen:** FusionSolar liefert Momentanleistung nur pro
 Wechselrichter-Gerät (`active_power`, kW) und Ertrags-/Verbrauchssummen pro
@@ -242,23 +243,27 @@ Proxy [`GET /api/weather`](src/app/api/weather/route.ts)):
    Wetter-Symbol (deutsche Beschreibung), `sunrise`/`sunset`, `insolation`
    (Sonnenstunden)
 
-Der **Standortname** aus den Einstellungen (Zahnrad → Standort, Standard
-**Bätterkinden**) steuert die Suche. Optional kann die POI-ID fest vorgegeben
+Der **Ort** aus den Einstellungen (Zahnrad → Standort: **PLZ** + Ortswahl aus
+dem Schweizer PLZ-Verzeichnis, Standard **3315 Bätterkinden**) steuert die
+Suche bei Wetter-Alarm. Optional kann die POI-ID fest vorgegeben
 werden, dann entfällt Schritt 1:
 
 | Variable | Bedeutung |
 |---|---|
 | `WETTERALARM_POI_ID` | Feste Wetter-Alarm-Orts-ID (z. B. `141687` für Bätterkinden) |
 
-Antworten werden ~30 Minuten im Server-Prozess gecacht. Schlägt der Abruf fehl,
-zeigt die Datums-Karte einen Hinweis und fällt auf astronomische Werte aus
-[`suncalc`](https://github.com/mourner/suncalc) zurück
-([`src/lib/sun.ts`](src/lib/sun.ts)).
+Antworten werden **12 Stunden** im Server-Prozess gecacht. Im Browser werden
+**heute und morgen** höchstens **einmal pro Tag** (nach der 08:00-Marke
+Ortszeit `Europe/Zurich`) plus bei Standortwechsel oder fehlenden Tagen
+nachgeladen; dazwischen dient ein `localStorage`-Cache
+([`weather-store`](src/lib/weather-store.ts)). Schlägt der Abruf fehl, zeigt die
+Datums-Karte „–“ bzw. einen Hinweis – es gibt keinen astronomischen Fallback
+mehr.
 
-Koordinaten in den Einstellungen bzw. `NEXT_PUBLIC_SITE_LATITUDE` /
-`NEXT_PUBLIC_SITE_LONGITUDE` (siehe [`.env.example`](.env.example)) dienen
-weiterhin als Fallback für `suncalc` und für andere Berechnungen, nicht für
-die Wetter-Alarm-Ortssuche (die nutzt den **Namen**).
+Der **Standortname** steuert die Wetter-Alarm-Suche. Koordinaten in den
+Einstellungen bzw. `NEXT_PUBLIC_SITE_LATITUDE` / `NEXT_PUBLIC_SITE_LONGITUDE`
+(siehe [`.env.example`](.env.example)) betreffen andere Teile (z. B.
+Open-Meteo-Ertragsprognose über Env), nicht die Wetter-Alarm-Ortssuche.
 
 ### Solare Ertragsprognose (Open-Meteo)
 
@@ -340,6 +345,16 @@ erfordern. Im Einstellungen-Dialog gibt es zum Testen einen Button
 Beispielmeldung auslöst.
 
 ## Änderungsprotokoll
+
+### 1.3.0
+
+- **Standort:** PLZ + Ortswahl (Schweizer PLZ-Verzeichnis) für Wetter-Alarm;
+  `suncalc` entfernt, Sonnenzeiten nur noch von Wetter-Alarm (Cache heute/morgen,
+  Abruf ca. 1×/Tag nach 08:00).
+- **Designmodus:** Hell / Dunkel / ab Sonnenauf- & -untergang (Wetter-Alarm).
+- **UI:** Teilen-Button, Tablet-Layout (volle Breite, KPI neben Energiefluss),
+  PV-Polling 10 s (durchgehend für Verbrauch).
+- **Traffic:** längere Server-Caches Wetter-Alarm; weniger Client-Requests.
 
 ### 1.2.1
 
@@ -571,7 +586,7 @@ src/
     pv-data.ts          Simulation der PV-Daten (Fallback)
     pv-source.ts         Wählt FusionSolar oder Simulation, serverseitig
     pv-store.ts          Client-Store, pollt /api/pv (5 s Takt)
-    sun.ts               Astronomischer Fallback (suncalc)
+    weather-store.ts     Client-Cache Wetter-Alarm (heute/morgen)
     weather-store.ts     Client-Polling für /api/weather
     wetteralarm/         Wetter-Alarm API (Suche, POI, Symbol-Texte)
     open-meteo-yield/    Tagesertrags-Prognose (Open-Meteo GTI × PR)

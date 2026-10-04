@@ -1,6 +1,7 @@
 "use client";
 
 import { Radio, Sun } from "lucide-react";
+import { ShareDashboardButton } from "@/components/pv/share-dashboard-button";
 import { ThemeToggle } from "@/components/pv/theme-toggle";
 import { BacklogDialog } from "@/components/pv/backlog-dialog";
 import { SettingsDialog } from "@/components/pv/settings-dialog";
@@ -16,8 +17,8 @@ type HeaderProps = {
 
 export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: HeaderProps) {
   return (
-    <header className="safe-top safe-x sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md landscape:py-1.5">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <header className="safe-top sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md landscape:py-1.5">
+      <div className="dashboard-container flex items-center justify-between gap-3 py-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm shadow-primary/30">
             <Sun className="size-5" />
@@ -74,6 +75,7 @@ export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: 
           </span>
           <BacklogDialog />
           <SettingsDialog />
+          <ShareDashboardButton plantName={plantName} />
           <ThemeToggle />
         </div>
       </div>

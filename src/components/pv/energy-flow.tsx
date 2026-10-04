@@ -17,6 +17,7 @@ type EnergyFlowProps = {
   snapshot: PvSnapshot;
   source: DataSource;
   gridSource: GridSource;
+  className?: string;
 };
 
 type Accent = "green" | "rose" | "amber";
@@ -295,7 +296,7 @@ function useDiagramGeometry(
   return geometry;
 }
 
-export function EnergyFlow({ snapshot, source, gridSource }: EnergyFlowProps) {
+export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFlowProps) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
   const gridKw = snapshot.gridKw;
@@ -333,14 +334,17 @@ export function EnergyFlow({ snapshot, source, gridSource }: EnergyFlowProps) {
   }
 
   return (
-    <Card className="shadow-card rounded-2xl">
+    <Card className={cn("shadow-card rounded-2xl md:flex md:h-full md:flex-col", className)}>
       <CardHeader>
         <CardTitle className="text-sm font-medium text-muted-foreground">
           Energiefluss
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div ref={containerRef} className="relative mx-auto h-72 w-full max-w-sm sm:h-80">
+        <div
+          ref={containerRef}
+          className="relative mx-auto h-72 w-full max-w-sm sm:h-80 md:max-w-none"
+        >
           {paths ? (
             <svg
               viewBox={`0 0 ${geometry!.width} ${geometry!.height}`}

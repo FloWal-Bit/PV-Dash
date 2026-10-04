@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Roboto } from "next/font/google";
+import { ThemeModeController } from "@/components/pv/theme-mode-controller";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -45,16 +46,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="de"
-      className={`${roboto.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${roboto.variable} ${geistMono.variable} h-full w-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col overscroll-none">
+      <body className="flex min-h-full w-full min-w-0 flex-col overscroll-none">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
+          <ThemeModeController />
           {children}
         </ThemeProvider>
       </body>

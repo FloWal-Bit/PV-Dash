@@ -1,0 +1,58 @@
+"use client";
+
+import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useTheme } from "next-themes";
+import {
+  msUntilNextSunThemeSwitch,
+  resolveColorScheme,
+  themeModeStore,
+} from "@/lib/theme-mode";
+import { weatherDateKey, weatherStore } from "@/lib/weather-store";
+
+function todaySunTimes(): { sunriseAt: string; sunsetAt: string } | null {
+  const today = weatherStore.getWeatherForDate(weatherDateKey());
+  if (!today?.sunriseAt || !today.sunsetAt) return null;
+  return { sunriseAt: today.sunriseAt, sunsetAt: today.sunsetAt };
+}
+
+export function ThemeModeController() {
+  const { setTheme } = useTheme();
+  const mode = useSyncExternalStore(
+    themeModeStore.subscribe,
+    themeModeStore.getSnapshot,
+    themeModeStore.getServerSnapshot,
+  );
+  const weather = useSyncExternalStore(
+    weatherStore.subscribe,
+    weatherStore.getSnapshot,
+    weatherStore.getServerSnapshot,
+  );
+
+  const sunTimes = useMemo(
+    () => todaySunTimes(),
+    [weather.byDate, weather.data, weather.locationKey],
+  );
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const apply = () => {
+      const scheme = resolveColorScheme(mode, new Date(), sunTimes);
+      setTheme(scheme);
+    };
+
+    const schedule = () => {
+      window.clearTimeout(timeoutId);
+      apply();
+      if (mode !== "sun") return;
+      const delay = msUntilNextSunThemeSwitch(new Date());
+      if (delay == null) return;
+      timeoutId = window.setTimeout(schedule, Math.max(1_000, delay));
+    };
+
+    schedule();
+    return () => window.clearTimeout(timeoutId);
+  }, [mode, sunTimes, setTheme]);
+
+  return null;
+}

@@ -8,16 +8,20 @@
  */
 
 export type SiteLocation = {
+  /** Schweizer PLZ (vierstellig), steuert die Auswahl im PLZ-Verzeichnis. */
+  plz: string;
+  /** Ortsname für Wetter-Alarm (aus PLZ-Verzeichnis). */
   name: string;
   latitude: number;
   longitude: number;
 };
 
-/** Gemeindezentrum Bätterkinden (Kanton Bern), Standort der PV-Anlage. */
+/** Gemeinde Bätterkinden (Kanton Bern), Standort der PV-Anlage. */
 export const DEFAULT_SITE_LOCATION: SiteLocation = {
+  plz: "3315",
   name: "Bätterkinden",
-  latitude: 47.1316,
-  longitude: 7.5382,
+  latitude: 47.135,
+  longitude: 7.532,
 };
 
 const STORAGE_KEY = "pv-dash:site-location";
@@ -42,7 +46,7 @@ function readEnvLocation(): SiteLocation | null {
   const longitude = Number(lonRaw);
   if (!isValidCoordinate(latitude, longitude)) return null;
 
-  return { name: "Umgebungsvariable", latitude, longitude };
+  return { plz: "", name: "Umgebungsvariable", latitude, longitude };
 }
 
 /** Serverseitiger Fallback ohne localStorage (Env → Bätterkinden). */
@@ -59,10 +63,12 @@ function readStoredLocation(): SiteLocation | null {
     if (typeof parsed !== "object" || parsed === null) return null;
     const v = parsed as Record<string, unknown>;
     const name = typeof v.name === "string" && v.name.trim() ? v.name.trim() : "Eigener Standort";
+    const plz =
+      typeof v.plz === "string" && /^\d{4}$/.test(v.plz.trim()) ? v.plz.trim() : "";
     const latitude = Number(v.latitude);
     const longitude = Number(v.longitude);
     if (!isValidCoordinate(latitude, longitude)) return null;
-    return { name, latitude, longitude };
+    return { plz, name, latitude, longitude };
   } catch {
     return null;
   }
@@ -117,6 +123,7 @@ export const siteLocationStore = {
       return state;
     }
     const normalized: SiteLocation = {
+      plz: /^\d{4}$/.test(location.plz.trim()) ? location.plz.trim() : "",
       name: location.name.trim() || "Eigener Standort",
       latitude: Math.round(location.latitude * 1_000_000) / 1_000_000,
       longitude: Math.round(location.longitude * 1_000_000) / 1_000_000,

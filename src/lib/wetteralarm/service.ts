@@ -16,7 +16,8 @@ import { DEFAULT_SITE_LOCATION } from "@/lib/site-location";
 
 const SEARCH_URL = "https://my.wetteralarm.ch/web/search.json";
 const POI_URL = "https://my.wetteralarm.ch/v9/pois";
-const CACHE_TTL_MS = 30 * 60 * 1000;
+/** Tagesprognose ändert sich selten — langer Cache spart Wetter-Alarm-Traffic. */
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
 type PoiCacheEntry = { expiresAt: number; poiId: number };
 type ForecastCacheEntry = { expiresAt: number; data: WetterAlarmDailyWeather };
@@ -126,6 +127,8 @@ export async function getWetterAlarmDailyWeather(options?: {
     weatherLabel,
     sunrise: formatTimeInZone(day.sunrise, timeZone),
     sunset: formatTimeInZone(day.sunset, timeZone),
+    sunriseAt: day.sunrise,
+    sunsetAt: day.sunset,
     sunHours: round1(day.insolation ?? 0),
     source: "wetteralarm",
   };

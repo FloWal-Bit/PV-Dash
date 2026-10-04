@@ -71,7 +71,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
         gridSource={gridSource}
       />
 
-      <main className="safe-x safe-bottom mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6">
+      <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 py-4 sm:py-6">
         {error ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <span>{error}</span>
@@ -111,21 +111,28 @@ export function Dashboard({ plantName }: { plantName: string }) {
         ) : (
           <>
             <SunTimesCard
+              className="min-w-0"
               referenceDate={new Date(data.snapshot.timestamp)}
               forecastedTodayYieldKwh={forecastedTodayYieldKwh}
               forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
             />
 
-            <KpiGrid snapshot={data.snapshot} source={dataSource} gridSource={gridSource} />
-
-            <div className="grid grid-cols-1 gap-4 landscape:grid-cols-2 lg:grid-cols-2">
+            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
               <EnergyFlow
+                className="min-w-0 md:col-start-1"
                 snapshot={data.snapshot}
                 source={dataSource}
                 gridSource={gridSource}
               />
-              <TodayOverviewCard snapshot={data.snapshot} source={dataSource} />
+              <KpiGrid
+                className="min-w-0 md:col-start-2 md:grid-cols-2 md:content-start"
+                snapshot={data.snapshot}
+                source={dataSource}
+                gridSource={gridSource}
+              />
             </div>
+
+            <TodayOverviewCard snapshot={data.snapshot} source={dataSource} />
 
             <ChartsSection
               today={data.today}
@@ -139,7 +146,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
         )}
       </main>
 
-      <footer className="safe-x safe-bottom mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 pb-4 text-xs text-muted-foreground sm:px-6">
+      <footer className="dashboard-container safe-bottom flex w-full items-center justify-between gap-3 pb-4 text-xs text-muted-foreground">
         <span className="min-w-0 truncate">
           {source === "fusionsolar"
             ? "Live-Daten von FusionSolar"
@@ -157,16 +164,16 @@ export function Dashboard({ plantName }: { plantName: string }) {
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4">
-      <Skeleton className="h-[76px] rounded-2xl" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-[96px] rounded-2xl" />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 gap-4 landscape:grid-cols-2 lg:grid-cols-2">
+      <Skeleton className="h-[120px] rounded-2xl" />
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
         <Skeleton className="h-56 rounded-2xl" />
-        <Skeleton className="h-56 rounded-2xl" />
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-[96px] rounded-2xl" />
+          ))}
+        </div>
       </div>
+      <Skeleton className="h-40 rounded-2xl" />
       <Skeleton className="h-96 rounded-2xl" />
     </div>
   );

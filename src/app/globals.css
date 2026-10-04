@@ -141,6 +141,13 @@
     padding-right: env(safe-area-inset-right);
   }
 
+  /* Volle Viewport-Breite (Tablet/Kiosk): einheitliches Seitenpadding inkl. Safe Area. */
+  .dashboard-container {
+    @apply mx-auto w-full max-w-none;
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
   /* Weicherer, "schwebender" Schatten für Karten – ersetzt das flache
      shadow-sm der shadcn-Defaults durch etwas mit mehr Tiefe, in beiden
      Farbschemata abgestimmt. */
