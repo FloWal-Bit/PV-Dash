@@ -1,5 +1,6 @@
-import { BatteryFull, Home, Sun } from "lucide-react";
+import { BatteryFull, Gauge, Home, Sun } from "lucide-react";
 import { StatCard } from "@/components/pv/stat-card";
+import { financialAutarkyRate } from "@/lib/autarky";
 import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { formatSignedSwissNumber, formatSwissNumber } from "@/lib/format";
 import type { PvSnapshot } from "@/lib/pv-data";
@@ -23,6 +24,7 @@ export function KpiGrid({
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoChangeNegative =
     snapshot.stromkontoChangeTodayKwh != null && snapshot.stromkontoChangeTodayKwh < 0;
+  const financialAutarky = financialAutarkyRate(snapshot);
 
   return (
     <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-4", className)}>
@@ -30,11 +32,11 @@ export function KpiGrid({
         label={
           <>
             <span className="sm:hidden">
-              Heute
+              Ertrag
               <br />
-              erzeugt
+              heute
             </span>
-            <span className="hidden sm:inline">Heute erzeugt</span>
+            <span className="hidden sm:inline">Ertrag heute</span>
           </>
         }
         value={formatSwissNumber(snapshot.todayYieldKwh, 1)}
@@ -44,7 +46,16 @@ export function KpiGrid({
         simulated={pvSimulated}
       />
       <StatCard
-        label="Heute verbraucht"
+        label={
+          <>
+            <span className="sm:hidden">
+              Verbrauch
+              <br />
+              heute
+            </span>
+            <span className="hidden sm:inline">Verbrauch heute</span>
+          </>
+        }
         value={
           snapshot.todayConsumptionKwh != null
             ? formatSwissNumber(snapshot.todayConsumptionKwh, 1)
@@ -79,6 +90,40 @@ export function KpiGrid({
         icon={<BatteryFull className="size-5 -rotate-90" />}
         accent={stromkontoNegative ? "rose" : "green"}
         simulated={gridSimulated}
+      />
+      <StatCard
+        label={
+          <>
+            <span className="md:hidden">
+              Physischer Autarkiegrad
+              <br />
+              heute
+            </span>
+            <span className="hidden md:inline">Physischer Autarkiegrad heute</span>
+          </>
+        }
+        value={snapshot.autarkyRate != null ? String(snapshot.autarkyRate) : "–"}
+        unit={snapshot.autarkyRate != null ? "%" : undefined}
+        icon={<Gauge className="size-5" />}
+        accent="green"
+        simulated={pvSimulated}
+      />
+      <StatCard
+        label={
+          <>
+            <span className="md:hidden">
+              Finanzieller Autarkiegrad
+              <br />
+              heute
+            </span>
+            <span className="hidden md:inline">Finanzieller Autarkiegrad heute</span>
+          </>
+        }
+        value={financialAutarky != null ? String(financialAutarky) : "–"}
+        unit={financialAutarky != null ? "%" : undefined}
+        icon={<Gauge className="size-5" />}
+        accent="green"
+        simulated={pvSimulated}
       />
     </div>
   );

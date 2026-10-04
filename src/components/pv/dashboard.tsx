@@ -5,7 +5,6 @@ import { RefreshCcw } from "lucide-react";
 import { DashboardHeader } from "@/components/pv/header";
 import { KpiGrid } from "@/components/pv/kpi-grid";
 import { EnergyFlow } from "@/components/pv/energy-flow";
-import { TodayOverviewCard } from "@/components/pv/today-overview-card";
 import { SunTimesCard } from "@/components/pv/sun-times-card";
 import { ChartsSection } from "@/components/pv/charts-section";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,22 +116,20 @@ export function Dashboard({ plantName }: { plantName: string }) {
               forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
             />
 
-            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
+            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
               <EnergyFlow
-                className="min-w-0 md:col-start-1"
+                className="min-w-0"
                 snapshot={data.snapshot}
                 source={dataSource}
                 gridSource={gridSource}
               />
               <KpiGrid
-                className="min-w-0 md:col-start-2 md:grid-cols-2 md:content-start"
+                className="min-w-0 md:grid-cols-2 md:content-start"
                 snapshot={data.snapshot}
                 source={dataSource}
                 gridSource={gridSource}
               />
             </div>
-
-            <TodayOverviewCard snapshot={data.snapshot} source={dataSource} />
 
             <ChartsSection
               today={data.today}
@@ -166,14 +163,13 @@ function DashboardSkeleton() {
     <div className="flex flex-col gap-4">
       <Skeleton className="h-[120px] rounded-2xl" />
       <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
-        <Skeleton className="h-56 rounded-2xl" />
+        <Skeleton className="h-52 rounded-2xl md:h-64" />
         <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-[96px] rounded-2xl" />
           ))}
         </div>
       </div>
-      <Skeleton className="h-40 rounded-2xl" />
       <Skeleton className="h-96 rounded-2xl" />
     </div>
   );

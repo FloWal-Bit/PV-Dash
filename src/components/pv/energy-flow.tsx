@@ -334,16 +334,16 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   }
 
   return (
-    <Card className={cn("shadow-card rounded-2xl md:flex md:h-full md:flex-col", className)}>
-      <CardHeader>
+    <Card className={cn("shadow-card rounded-2xl", className)}>
+      <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           Energiefluss
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0 pb-3">
         <div
           ref={containerRef}
-          className="relative mx-auto h-72 w-full max-w-sm sm:h-80 md:max-w-none"
+          className="relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"
         >
           {paths ? (
             <svg
@@ -380,7 +380,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             muted={!isProducing}
             simulated={pvSimulated}
             labelPosition="top"
-            style={{ left: "50%", top: "16%" }}
+            style={{ left: "50%", top: "4%" }}
           />
           <FlowNode
             circleRef={(el) => {
@@ -395,7 +395,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             muted={!isConsuming}
             simulated={gridSource === "whatwatt" ? false : pvSimulated}
             labelPosition="bottom"
-            style={{ left: "16%", top: "86%" }}
+            style={{ left: "16%", top: "80%" }}
           />
           <FlowNode
             circleRef={(el) => {
@@ -408,7 +408,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             muted={!isGridImport && !isGridExport}
             simulated={gridSimulated}
             labelPosition="bottom"
-            style={{ left: "84%", top: "86%" }}
+            style={{ left: "84%", top: "80%" }}
           />
         </div>
       </CardContent>

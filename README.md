@@ -577,7 +577,7 @@ src/
       settings-dialog.tsx  Einstellungen-Dialog (Standort, Stromkonto, Benachrichtigungen)
       kpi-grid.tsx           Kennzahlen-Kacheln (Erzeugung, Verbrauch, Stromkonto, …)
       energy-flow.tsx        Visualisierung des Energieflusses
-      today-overview-card.tsx  Autarkiegrade (Heute)
+      kpi-grid.tsx             KPI-Kacheln inkl. Autarkiegrade
       sun-times-card.tsx     Wetter, Sonnenzeiten, Open-Meteo-Prognose (Swipe Heute/Morgen)
       charts-section.tsx     Ertrag & Verbrauch (Swipe über Zeiträume)
       swipe-carousel.tsx     Wischgesten + Punkt-Navigation (Carousel & Einzelansicht)
