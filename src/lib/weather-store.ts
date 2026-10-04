@@ -48,7 +48,7 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 let state: WeatherState = SERVER_STATE;
 let inflight: Promise<void> | null = null;
-let dailyTimer: ReturnType<typeof setTimeout> | null = null;
+let dailyTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let hydrated = false;
 
 function emit() {
@@ -172,8 +172,8 @@ async function fetchTodayAndTomorrow(locationName: string): Promise<void> {
 
 function scheduleDailyRefresh() {
   if (typeof window === "undefined") return;
-  if (dailyTimer != null) window.clearTimeout(dailyTimer);
-  dailyTimer = window.setTimeout(() => {
+  if (dailyTimer != null) globalThis.clearTimeout(dailyTimer);
+  dailyTimer = globalThis.setTimeout(() => {
     void weatherStore.refresh(state.locationKey, { force: true });
     scheduleDailyRefresh();
   }, msUntilNextDailyCheckpoint());

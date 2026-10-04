@@ -34,7 +34,7 @@ export function ThemeModeController() {
   );
 
   useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
 
     const apply = () => {
       const scheme = resolveColorScheme(mode, new Date(), sunTimes);
@@ -42,16 +42,16 @@ export function ThemeModeController() {
     };
 
     const schedule = () => {
-      window.clearTimeout(timeoutId);
+      globalThis.clearTimeout(timeoutId);
       apply();
       if (mode !== "sun") return;
       const delay = msUntilNextSunThemeSwitch(new Date());
       if (delay == null) return;
-      timeoutId = window.setTimeout(schedule, Math.max(1_000, delay));
+      timeoutId = globalThis.setTimeout(schedule, Math.max(1_000, delay));
     };
 
     schedule();
-    return () => window.clearTimeout(timeoutId);
+    return () => globalThis.clearTimeout(timeoutId);
   }, [mode, sunTimes, setTheme]);
 
   return null;
