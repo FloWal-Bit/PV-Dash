@@ -21,6 +21,7 @@
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
+  --color-eigenverbrauch: var(--eigenverbrauch);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
@@ -35,6 +36,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-pager-dot: var(--pager-dot);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -56,6 +58,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.22 0.02 250);
   --primary: oklch(0.7 0.17 55);
+  --pager-dot: oklch(0.46 0.012 250);
   --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.955 0.01 250);
   --secondary-foreground: oklch(0.22 0.02 250);
@@ -70,6 +73,7 @@
   --chart-1: oklch(0.75 0.16 60);
   --chart-2: oklch(0.6 0.13 230);
   --chart-3: oklch(0.62 0.14 155);
+  --eigenverbrauch: oklch(0.74 0.14 138);
   --chart-4: oklch(0.6 0.18 300);
   --chart-5: oklch(0.75 0.19 30);
   --radius: 0.85rem;
@@ -91,6 +95,7 @@
   --popover: oklch(0.21 0.02 260);
   --popover-foreground: oklch(0.96 0.005 90);
   --primary: oklch(0.75 0.16 58);
+  --pager-dot: oklch(0.84 0.008 250);
   --primary-foreground: oklch(0.16 0.02 260);
   --secondary: oklch(0.27 0.02 260);
   --secondary-foreground: oklch(0.96 0.005 90);
@@ -105,6 +110,7 @@
   --chart-1: oklch(0.78 0.15 60);
   --chart-2: oklch(0.68 0.13 225);
   --chart-3: oklch(0.68 0.13 155);
+  --eigenverbrauch: oklch(0.82 0.12 140);
   --chart-4: oklch(0.68 0.17 300);
   --chart-5: oklch(0.72 0.18 35);
   --sidebar: oklch(0.19 0.02 260);
@@ -180,6 +186,39 @@
   @media (prefers-reduced-motion: reduce) {
     .energy-flow-dash {
       animation: none;
+    }
+  }
+
+  .energy-flow-node-side {
+    top: 80%;
+  }
+  .energy-flow-node-pv {
+    top: 4%;
+  }
+
+  /* Tablet Hochformat: Kreise, Linien und die unteren Beschriftungen 0,8 cm
+     nach unten. Das PV-Label bleibt auf Höhe von „Ertrag heute“ /
+     „Verbrauch heute“. */
+  @media (orientation: portrait) and (min-width: 768px) {
+    .energy-flow-diagram.energy-flow-diagram {
+      height: calc(13rem + 0.8cm);
+    }
+    .energy-flow-node-pv {
+      top: calc(0.04 * 13rem + 0.8cm);
+    }
+    .energy-flow-node-side {
+      top: calc(0.8 * 13rem + 0.8cm);
+    }
+  }
+  @media (orientation: portrait) and (min-width: 1024px) {
+    .energy-flow-diagram.energy-flow-diagram {
+      height: calc(14rem + 0.8cm);
+    }
+    .energy-flow-node-pv {
+      top: calc(0.04 * 14rem + 0.8cm);
+    }
+    .energy-flow-node-side {
+      top: calc(0.8 * 14rem + 0.8cm);
     }
   }
 }

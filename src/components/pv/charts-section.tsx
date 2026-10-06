@@ -18,7 +18,7 @@ import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
 import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
-import { formatKw, formatSwissNumber, formatYieldKwh } from "@/lib/format";
+import { formatKw, formatSwissNumber, formatYieldKwh, formatYieldMwh } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ChartsSectionProps = {
@@ -149,7 +149,7 @@ function sampleIntervalHours(points: HistoryPoint[]): number {
 /**
  * Tageskurve analog FusionSolar: PV-Ausgabe als Fläche, Leistungsaufnahme
  * als rote Linie (gleiche Farbe wie der Verbrauch in Woche und Monat),
- * der Anteil „Verbraucht von PV“ als zweite Fläche.
+ * der Eigenverbrauch als zweite Fläche in einem helleren Grün.
  * Zukünftige Stunden bleiben leer (Kurve endet bei „jetzt“).
  */
 function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
@@ -165,8 +165,8 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
             <stop offset="100%" stopColor="var(--chart-3)" stopOpacity={0.06} />
           </linearGradient>
           <linearGradient id="fill-from-pv" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.28} />
-            <stop offset="100%" stopColor="var(--chart-3)" stopOpacity={0.04} />
+            <stop offset="0%" stopColor="var(--eigenverbrauch)" stopOpacity={0.55} />
+            <stop offset="100%" stopColor="var(--eigenverbrauch)" stopOpacity={0.12} />
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 6" />
@@ -199,7 +199,7 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
                 ? "PV"
                 : name === "consumptionKw"
                   ? "Verbrauch"
-                  : "Verbraucht von PV";
+                  : "Eigenverbrauch";
             return [formatKw(Number(value), 2), label];
           }}
           contentStyle={{
@@ -225,8 +225,7 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
           type="monotone"
           dataKey="consumedFromPvKw"
           name="consumedFromPvKw"
-          stroke="var(--chart-3)"
-          strokeOpacity={0.55}
+          stroke="var(--eigenverbrauch)"
           strokeWidth={1.5}
           fill="url(#fill-from-pv)"
           dot={false}
@@ -259,20 +258,48 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
   );
 }
 
+type EnergyUnit = "kWh" | "MWh";
+
+function toDisplayEnergy(valueKwh: number, unit: EnergyUnit): number {
+  return unit === "MWh" ? valueKwh / 1000 : valueKwh;
+}
+
+/** Unter 10 MWh zwei Nachkommastellen, sonst eine. */
+function mwhFractionDigits(valueMwh: number): number {
+  return valueMwh < 10 ? 2 : 1;
+}
+
 /** Drei Säulen pro Tag: Ertrag, Verbrauch, Eigenverbrauch (PV + Speicheranteil). */
-function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
+function YieldConsumptionChart({
+  data,
+  unit = "kWh",
+}: {
+  data: DailyEnergyPoint[];
+  unit?: EnergyUnit;
+}) {
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
     () =>
       data.map((point) => ({
         ...point,
-        eigenverbrauchKwh: point.directSolarKwh + point.batteryKwh,
+        yieldKwh: toDisplayEnergy(point.yieldKwh, unit),
+        consumptionKwh: toDisplayEnergy(point.consumptionKwh, unit),
+        eigenverbrauchKwh: toDisplayEnergy(point.directSolarKwh + point.batteryKwh, unit),
       })),
-    [data],
+    [data, unit],
   );
+  const maxValue = chartData.reduce(
+    (max, point) => Math.max(max, point.yieldKwh, point.consumptionKwh, point.eigenverbrauchKwh),
+    0,
+  );
+  const fractionDigits = unit === "MWh" ? mwhFractionDigits(maxValue) : 0;
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} barGap={2}>
+      <BarChart
+        data={chartData}
+        margin={{ top: unit === "MWh" ? 18 : 8, right: 8, left: -16, bottom: 0 }}
+        barGap={2}
+      >
         <defs>
           <linearGradient id="bar-yield" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={1} />
@@ -283,8 +310,8 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
             <stop offset="100%" stopColor="var(--chart-5)" stopOpacity={0.55} />
           </linearGradient>
           <linearGradient id="bar-eigenverbrauch" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={1} />
-            <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.55} />
+            <stop offset="0%" stopColor="var(--eigenverbrauch)" stopOpacity={1} />
+            <stop offset="100%" stopColor="var(--eigenverbrauch)" stopOpacity={0.55} />
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} stroke="var(--border)" />
@@ -298,9 +325,19 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={40}
+          width={unit === "MWh" ? 48 : 40}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          tickFormatter={(v) => formatSwissNumber(Number(v), 0)}
+          tickFormatter={(v) => formatSwissNumber(Number(v), fractionDigits)}
+          label={
+            unit === "MWh"
+              ? {
+                  value: "MWh",
+                  position: "insideTopLeft",
+                  offset: -4,
+                  style: { fill: "var(--muted-foreground)", fontSize: 11 },
+                }
+              : undefined
+          }
         />
         <Tooltip
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
@@ -313,7 +350,12 @@ function YieldConsumptionChart({ data }: { data: DailyEnergyPoint[] }) {
                   : name === "eigenverbrauchKwh"
                     ? "Eigenverbrauch"
                     : String(name);
-            return [formatYieldKwh(Number(value), 1), label];
+            const amount = Number(value);
+            const text =
+              unit === "MWh"
+                ? `${formatSwissNumber(amount, mwhFractionDigits(amount))} MWh`
+                : formatYieldKwh(amount, 1);
+            return [text, label];
           }}
           contentStyle={{
             background: "var(--popover)",
@@ -367,7 +409,11 @@ function formatRangeTotal(
     jahr: "Dieses Jahr",
     lebensdauer: "Laufzeit",
   };
-  return `${periodLabel[range as Exclude<Range, "heute">]}, ${formatYieldKwh(kwh, 0)}`;
+  const label = periodLabel[range as Exclude<Range, "heute">];
+  if (range === "jahr" || range === "lebensdauer") {
+    return `${label}, ${formatYieldMwh(kwh, mwhFractionDigits(kwh / 1000))}`;
+  }
+  return `${label}, ${formatYieldKwh(kwh, 0)}`;
 }
 
 export function ChartsSection({
@@ -432,55 +478,41 @@ export function ChartsSection({
       </CardHeader>
       <CardContent>
         <SwipePageSurface labels={RANGE_LABELS} page={page} onPageChange={setPage}>
-          <div
-            className={cn(
-              "h-56 w-full landscape:h-64 sm:h-72 transition-opacity",
-              pvSimulated && SIMULATED_OPACITY_CLASS,
-            )}
-          >
-            {range === "heute" ? (
-              <TodayPowerChart data={todayChartData} />
-            ) : (
-              <YieldConsumptionChart data={barData} />
-            )}
-          </div>
-          <div
-            className={cn(
-              "mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground transition-opacity",
-              pvSimulated && SIMULATED_OPACITY_CLASS,
-            )}
-          >
-            {range === "heute" ? (
-              <>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-chart-3" />
-                  PV
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-chart-5" />
-                  Verbrauch
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full border border-chart-3 bg-chart-3/40" />
-                  Verbraucht von PV
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-chart-3" />
-                  Ertrag
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-chart-5" />
-                  Verbrauch
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-chart-1" />
-                  Eigenverbrauch
-                </span>
-              </>
-            )}
+          <div className="flex flex-col gap-3">
+            <div
+              className={cn(
+                "h-56 min-w-0 landscape:h-64 sm:h-72 transition-opacity",
+                pvSimulated && SIMULATED_OPACITY_CLASS,
+              )}
+            >
+              {range === "heute" ? (
+                <TodayPowerChart data={todayChartData} />
+              ) : (
+                <YieldConsumptionChart
+                  data={barData}
+                  unit={range === "jahr" || range === "lebensdauer" ? "MWh" : "kWh"}
+                />
+              )}
+            </div>
+            <div
+              className={cn(
+                "flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground transition-opacity",
+                pvSimulated && SIMULATED_OPACITY_CLASS,
+              )}
+            >
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-chart-3" />
+                Ertrag
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-chart-5" />
+                Verbrauch
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-eigenverbrauch" />
+                Eigenverbrauch
+              </span>
+            </div>
           </div>
         </SwipePageSurface>
       </CardContent>

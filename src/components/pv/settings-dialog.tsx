@@ -157,7 +157,7 @@ function SiteLocationEditor({
         Wetter und Sonnenzeiten kommen von Wetter-Alarm. Wähle PLZ und Ort aus dem
         Schweizer PLZ-Verzeichnis. Standard: PLZ {DEFAULT_SITE_LOCATION.plz}{" "}
         {DEFAULT_SITE_LOCATION.name}.
-        {isCustom ? " Du verwendest einen angepassten Standort." : " Aktuell Standard."}
+        {isCustom ? " Du verwendest einen angepassten Standort." : null}
       </p>
 
       <div className="flex flex-col gap-1.5">
@@ -436,8 +436,15 @@ export function SettingsDialog() {
             title="Impressum"
           >
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Entstanden mit Koffein, Cursor und der Musik von Paul Kalkbrenner. Herbst
-              2026
+              Entstanden mit Cursor, Koffein und der Musik von Paul Kalkbrenner. Herbst
+              2026.
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Anbindung:
+              <br />
+              whatwatt via MQTT
+              <br />
+              FusionSolar via API
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
               Externe Datenquellen:

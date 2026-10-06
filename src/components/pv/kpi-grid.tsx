@@ -36,7 +36,9 @@ export function KpiGrid({
               <br />
               heute
             </span>
-            <span className="hidden sm:inline">Ertrag heute</span>
+            <span className="hidden sm:inline" data-kpi-label="ertrag-heute">
+              Ertrag heute
+            </span>
           </>
         }
         value={formatSwissNumber(snapshot.todayYieldKwh, 1)}

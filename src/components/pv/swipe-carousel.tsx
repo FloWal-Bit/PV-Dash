@@ -70,7 +70,7 @@ export function SwipePageDots({
           onClick={() => onPageChange(index)}
           className={cn(
             "size-2 rounded-full transition-colors",
-            page === index ? "bg-primary" : "bg-muted-foreground/30",
+            page === index ? "bg-pager-dot" : "bg-muted-foreground/30",
           )}
         />
       ))}
@@ -179,7 +179,7 @@ export function SwipeCarousel({
             onClick={() => goTo(index)}
             className={cn(
               "size-2 rounded-full transition-colors",
-              page === index ? "bg-primary" : "bg-muted-foreground/30",
+              page === index ? "bg-pager-dot" : "bg-muted-foreground/30",
             )}
           />
         ))}

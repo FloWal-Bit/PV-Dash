@@ -55,12 +55,14 @@ function SunStat({
   icon,
   label,
   value,
+  unit,
   accent,
   valueClassName,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  unit?: string;
   accent: "amber" | "rose" | "green" | "slate";
   valueClassName?: string;
 }) {
@@ -80,8 +82,20 @@ function SunStat({
       >
         {icon}
       </div>
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <span className={cn("text-sm font-semibold tabular-nums", valueClassName)}>{value}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="flex items-baseline justify-center gap-1">
+        <span
+          className={cn(
+            "text-sm font-semibold tabular-nums text-muted-foreground",
+            valueClassName,
+          )}
+        >
+          {value}
+        </span>
+        {unit ? (
+          <span className="text-sm font-medium text-muted-foreground">{unit}</span>
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -137,12 +151,9 @@ function SunTimesDayCard({
           icon={<Clock3 className="size-4" />}
           label="Sonnenstunden"
           value={
-            waLoading
-              ? "…"
-              : sunHoursDisplay != null
-                ? `${formatSwissNumber(sunHoursDisplay, 1)} h`
-                : "–"
+            waLoading ? "…" : sunHoursDisplay != null ? formatSwissNumber(sunHoursDisplay, 1) : "–"
           }
+          unit={!waLoading && sunHoursDisplay != null ? "h" : undefined}
           accent="slate"
         />
         <SunStat
@@ -159,12 +170,11 @@ function SunTimesDayCard({
         />
         <SunStat
           icon={<Zap className="size-4" />}
-          label="Prog. Tagesertrag"
+          label="Ertragsprognose"
           value={
-            forecastedYieldKwh != null
-              ? `${formatSwissNumber(forecastedYieldKwh, 1)} kWh`
-              : "–"
+            forecastedYieldKwh != null ? formatSwissNumber(forecastedYieldKwh, 1) : "–"
           }
+          unit={forecastedYieldKwh != null ? "kWh" : undefined}
           accent="slate"
         />
       </CardContent>

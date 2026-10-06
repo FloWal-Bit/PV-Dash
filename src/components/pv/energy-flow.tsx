@@ -58,6 +58,9 @@ function FlowNode({
   muted,
   simulated,
   labelPosition,
+  labelClassName,
+  labelRef,
+  className,
   style,
 }: {
   circleRef: (el: HTMLDivElement | null) => void;
@@ -68,19 +71,33 @@ function FlowNode({
   muted?: boolean;
   simulated?: boolean;
   labelPosition: "top" | "bottom";
+  labelClassName?: string;
+  labelRef?: (el: HTMLSpanElement | null) => void;
+  className?: string;
   style: CSSProperties;
 }) {
+  const labelNode = (
+    <span
+      ref={labelRef}
+      className={cn(
+        "text-[11px] font-medium text-muted-foreground",
+        labelClassName,
+      )}
+    >
+      {label}
+    </span>
+  );
+
   return (
     <div
       className={cn(
         "absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5 transition-opacity",
+        className,
         simulated && SIMULATED_OPACITY_CLASS,
       )}
       style={style}
     >
-      {labelPosition === "top" ? (
-        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      ) : null}
+      {labelPosition === "top" ? labelNode : null}
       <div
         ref={circleRef}
         className={cn(
@@ -95,9 +112,7 @@ function FlowNode({
           {value}
         </span>
       </div>
-      {labelPosition === "bottom" ? (
-        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      ) : null}
+      {labelPosition === "bottom" ? labelNode : null}
     </div>
   );
 }
@@ -290,7 +305,14 @@ function useDiagramGeometry(
     observer.observe(pv);
     observer.observe(verbrauch);
     observer.observe(stromkonto);
-    return () => observer.disconnect();
+    const portrait = window.matchMedia(
+      "(orientation: portrait) and (min-width: 768px)",
+    );
+    portrait.addEventListener("change", measure);
+    return () => {
+      observer.disconnect();
+      portrait.removeEventListener("change", measure);
+    };
   }, [containerRef, pvRef, verbrauchRef, stromkontoRef]);
 
   return geometry;
@@ -312,8 +334,47 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pvCircleRef = useRef<HTMLDivElement | null>(null);
+  const pvLabelRef = useRef<HTMLSpanElement | null>(null);
   const verbrauchCircleRef = useRef<HTMLDivElement | null>(null);
   const stromkontoCircleRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const query = window.matchMedia(
+      "(orientation: portrait) and (min-width: 768px)",
+    );
+
+    const align = () => {
+      const label = pvLabelRef.current;
+      if (!label) return;
+      if (!query.matches) {
+        label.style.transform = "";
+        return;
+      }
+      const anchor = document.querySelector<HTMLElement>(
+        '[data-kpi-label="ertrag-heute"]',
+      );
+      if (!anchor) return;
+      label.style.transform = "";
+      const delta =
+        anchor.getBoundingClientRect().top - label.getBoundingClientRect().top;
+      label.style.transform = `translateY(${delta}px)`;
+    };
+
+    align();
+    query.addEventListener("change", align);
+    window.addEventListener("resize", align);
+    const observer = new ResizeObserver(align);
+    if (containerRef.current) observer.observe(containerRef.current);
+    const anchor = document.querySelector('[data-kpi-label="ertrag-heute"]');
+    const kpiCard = anchor?.closest("[data-slot=card]");
+    if (kpiCard) observer.observe(kpiCard);
+
+    return () => {
+      query.removeEventListener("change", align);
+      window.removeEventListener("resize", align);
+      observer.disconnect();
+    };
+  }, []);
   const geometry = useDiagramGeometry(
     containerRef,
     pvCircleRef,
@@ -343,7 +404,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       <CardContent className="pt-0 pb-3">
         <div
           ref={containerRef}
-          className="relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"
+          className="energy-flow-diagram relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"
         >
           {paths ? (
             <svg
@@ -380,7 +441,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             muted={!isProducing}
             simulated={pvSimulated}
             labelPosition="top"
-            style={{ left: "50%", top: "4%" }}
+            labelRef={(el) => {
+              pvLabelRef.current = el;
+            }}
+            className="energy-flow-node-pv"
+            style={{ left: "50%" }}
           />
           <FlowNode
             circleRef={(el) => {
@@ -395,7 +460,8 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             muted={!isConsuming}
             simulated={gridSource === "whatwatt" ? false : pvSimulated}
             labelPosition="bottom"
-            style={{ left: "16%", top: "80%" }}
+            className="energy-flow-node-side"
+            style={{ left: "16%" }}
           />
           <FlowNode
             circleRef={(el) => {
@@ -408,7 +474,8 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             muted={!isGridImport && !isGridExport}
             simulated={gridSimulated}
             labelPosition="bottom"
-            style={{ left: "84%", top: "80%" }}
+            className="energy-flow-node-side"
+            style={{ left: "84%" }}
           />
         </div>
       </CardContent>

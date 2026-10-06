@@ -12,6 +12,10 @@ export function formatYieldKwh(value: number, fractionDigits: number): string {
   return `${formatSwissNumber(value, fractionDigits)} kWh`;
 }
 
+export function formatYieldMwh(valueKwh: number, fractionDigits: number): string {
+  return `${formatSwissNumber(valueKwh / 1000, fractionDigits)} MWh`;
+}
+
 export function formatKw(value: number, fractionDigits = 1): string {
   return `${formatSwissNumber(value, fractionDigits)} kW`;
 }
