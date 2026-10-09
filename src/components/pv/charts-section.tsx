@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   Area,
   Bar,
@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
+import { hideSimulatedStore } from "@/lib/hide-simulated";
 import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
 import { formatKw, formatSwissNumber, formatYieldKwh, formatYieldMwh } from "@/lib/format";
@@ -427,6 +428,12 @@ export function ChartsSection({
   const [page, setPage] = useState(0);
   const range = RANGE_ORDER[page] ?? "heute";
   const pvSimulated = isPvSimulated(source);
+  const hideSimulated = useSyncExternalStore(
+    hideSimulatedStore.subscribe,
+    hideSimulatedStore.getSnapshot,
+    hideSimulatedStore.getServerSnapshot,
+  );
+  const hidePv = hideSimulated && pvSimulated;
 
   const todayChartData = useMemo((): TodayChartPoint[] => {
     const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
@@ -473,7 +480,9 @@ export function ChartsSection({
           <CardTitle className="text-sm font-medium text-muted-foreground">
             Ertrag &amp; Verbrauch
           </CardTitle>
-          <span className="text-xs text-muted-foreground">{total}</span>
+          <span className="text-xs text-muted-foreground">
+            {hidePv ? "Simulierte Verläufe sind ausgeblendet" : total}
+          </span>
         </div>
       </CardHeader>
       <CardContent>
@@ -482,10 +491,14 @@ export function ChartsSection({
             <div
               className={cn(
                 "h-56 min-w-0 landscape:h-64 sm:h-72 transition-opacity",
-                pvSimulated && SIMULATED_OPACITY_CLASS,
+                !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
               )}
             >
-              {range === "heute" ? (
+              {hidePv ? (
+                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                  Keine gemessenen Verlaufsdaten.
+                </div>
+              ) : range === "heute" ? (
                 <TodayPowerChart data={todayChartData} />
               ) : (
                 <YieldConsumptionChart
@@ -497,7 +510,8 @@ export function ChartsSection({
             <div
               className={cn(
                 "flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground transition-opacity",
-                pvSimulated && SIMULATED_OPACITY_CLASS,
+                !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
+                hidePv && "invisible",
               )}
             >
               <span className="flex items-center gap-1.5">

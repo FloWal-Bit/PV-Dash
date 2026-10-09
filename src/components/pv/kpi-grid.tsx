@@ -1,7 +1,9 @@
+import { useSyncExternalStore } from "react";
 import { BatteryFull, Gauge, Home, Sun } from "lucide-react";
 import { StatCard } from "@/components/pv/stat-card";
 import { financialAutarkyRate } from "@/lib/autarky";
 import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
+import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatSignedSwissNumber, formatSwissNumber } from "@/lib/format";
 import type { PvSnapshot } from "@/lib/pv-data";
 import type { DataSource, GridSource } from "@/lib/pv-source";
@@ -20,6 +22,13 @@ export function KpiGrid({
 }) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
+  const hideSimulated = useSyncExternalStore(
+    hideSimulatedStore.subscribe,
+    hideSimulatedStore.getSnapshot,
+    hideSimulatedStore.getServerSnapshot,
+  );
+  const hidePv = hideSimulated && pvSimulated;
+  const hideGrid = hideSimulated && gridSimulated;
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoChangeNegative =
@@ -41,11 +50,11 @@ export function KpiGrid({
             </span>
           </>
         }
-        value={formatSwissNumber(snapshot.todayYieldKwh, 1)}
-        unit="kWh"
+        value={hidePv ? "–" : formatSwissNumber(snapshot.todayYieldKwh, 1)}
+        unit={hidePv ? undefined : "kWh"}
         icon={<Sun className="size-5" />}
         accent="green"
-        simulated={pvSimulated}
+        simulated={!hidePv && pvSimulated}
       />
       <StatCard
         label={
@@ -59,39 +68,39 @@ export function KpiGrid({
           </>
         }
         value={
-          snapshot.todayConsumptionKwh != null
-            ? formatSwissNumber(snapshot.todayConsumptionKwh, 1)
-            : "–"
+          hidePv || snapshot.todayConsumptionKwh == null
+            ? "–"
+            : formatSwissNumber(snapshot.todayConsumptionKwh, 1)
         }
-        unit={snapshot.todayConsumptionKwh != null ? "kWh" : undefined}
+        unit={hidePv || snapshot.todayConsumptionKwh == null ? undefined : "kWh"}
         hint={snapshot.todayConsumptionKwh == null ? "keine Verbrauchsdaten verfügbar" : undefined}
         icon={<Home className="size-5" />}
         accent="rose"
-        simulated={pvSimulated}
+        simulated={!hidePv && pvSimulated}
       />
       <StatCard
         label="Stromkonto heute"
         value={
-          snapshot.stromkontoChangeTodayKwh != null
-            ? formatSignedSwissNumber(snapshot.stromkontoChangeTodayKwh, 1)
-            : "–"
+          hideGrid || snapshot.stromkontoChangeTodayKwh == null
+            ? "–"
+            : formatSignedSwissNumber(snapshot.stromkontoChangeTodayKwh, 1)
         }
-        unit={snapshot.stromkontoChangeTodayKwh != null ? "kWh" : undefined}
+        unit={hideGrid || snapshot.stromkontoChangeTodayKwh == null ? undefined : "kWh"}
         icon={<BatteryFull className="size-5 -rotate-90" />}
         accent={stromkontoChangeNegative ? "rose" : "green"}
-        simulated={gridSimulated}
+        simulated={!hideGrid && gridSimulated}
       />
       <StatCard
         label="Stand Stromkonto"
         value={
-          snapshot.stromkontoBalanceKwh != null
-            ? formatSwissNumber(snapshot.stromkontoBalanceKwh, 1)
-            : "–"
+          hideGrid || snapshot.stromkontoBalanceKwh == null
+            ? "–"
+            : formatSwissNumber(snapshot.stromkontoBalanceKwh, 1)
         }
-        unit={snapshot.stromkontoBalanceKwh != null ? "kWh" : undefined}
+        unit={hideGrid || snapshot.stromkontoBalanceKwh == null ? undefined : "kWh"}
         icon={<BatteryFull className="size-5 -rotate-90" />}
         accent={stromkontoNegative ? "rose" : "green"}
-        simulated={gridSimulated}
+        simulated={!hideGrid && gridSimulated}
       />
       <StatCard
         label={
@@ -104,11 +113,11 @@ export function KpiGrid({
             <span className="hidden md:inline">Physischer Autarkiegrad heute</span>
           </>
         }
-        value={snapshot.autarkyRate != null ? String(snapshot.autarkyRate) : "–"}
-        unit={snapshot.autarkyRate != null ? "%" : undefined}
+        value={hidePv || snapshot.autarkyRate == null ? "–" : String(snapshot.autarkyRate)}
+        unit={hidePv || snapshot.autarkyRate == null ? undefined : "%"}
         icon={<Gauge className="size-5" />}
         accent="green"
-        simulated={pvSimulated}
+        simulated={!hidePv && pvSimulated}
       />
       <StatCard
         label={
@@ -121,11 +130,11 @@ export function KpiGrid({
             <span className="hidden md:inline">Finanzieller Autarkiegrad heute</span>
           </>
         }
-        value={financialAutarky != null ? String(financialAutarky) : "–"}
-        unit={financialAutarky != null ? "%" : undefined}
+        value={hidePv || financialAutarky == null ? "–" : String(financialAutarky)}
+        unit={hidePv || financialAutarky == null ? undefined : "%"}
         icon={<Gauge className="size-5" />}
         accent="green"
-        simulated={pvSimulated}
+        simulated={!hidePv && pvSimulated}
       />
     </div>
   );

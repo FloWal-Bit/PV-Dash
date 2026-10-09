@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
 import {
   BatteryFull,
   Home,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
+import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { PvSnapshot } from "@/lib/pv-data";
@@ -321,13 +322,22 @@ function useDiagramGeometry(
 export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFlowProps) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
+  const hideSimulated = useSyncExternalStore(
+    hideSimulatedStore.subscribe,
+    hideSimulatedStore.getSnapshot,
+    hideSimulatedStore.getServerSnapshot,
+  );
+  const hidePv = hideSimulated && pvSimulated;
+  const hideConsumption = hideSimulated && (pvSimulated || gridSimulated);
+  const hideGrid = hideSimulated && gridSimulated;
   const gridKw = snapshot.gridKw;
   const hasGrid = gridKw != null;
   const isProducing = snapshot.productionKw > 0.05;
   const isConsuming = (snapshot.consumptionKw ?? 0) > 0.05;
-  const isGridImport = hasGrid && gridKw > 0.05;
-  const isGridExport = hasGrid && gridKw < -0.05;
-  const stromkontoKw = hasGrid ? Math.abs(gridKw) : null;
+  const gridMeasured = gridSource === "whatwatt" || source === "fusionsolar";
+  const isGridImport = gridMeasured && hasGrid && gridKw > 0.05;
+  const isGridExport = gridMeasured && hasGrid && gridKw < -0.05;
+  const stromkontoKw = gridMeasured && hasGrid ? Math.abs(gridKw) : null;
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoAccent = stromkontoNegative ? "rose" : "amber";
@@ -383,10 +393,10 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   );
 
   const consumptionKw = snapshot.consumptionKw ?? 0;
-  const directSolarKw = Math.min(snapshot.productionKw, consumptionKw);
-  const pvSurplusKw = Math.max(0, snapshot.productionKw - consumptionKw);
+  const directSolarKw = hidePv ? 0 : Math.min(snapshot.productionKw, consumptionKw);
+  const pvSurplusKw = hidePv ? 0 : Math.max(0, snapshot.productionKw - consumptionKw);
   const isPvToVerbrauch = directSolarKw > 0.05;
-  const isPvToStromkonto = pvSurplusKw > 0.05 || isGridExport;
+  const isPvToStromkonto = pvSurplusKw > 0.05 || (!hidePv && isGridExport);
 
   let paths: FlowPaths | null = null;
 
@@ -435,11 +445,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               pvCircleRef.current = el;
             }}
             icon={<Sun className="size-5" />}
-            value={formatKw(snapshot.productionKw, 1)}
+            value={hidePv ? "–" : formatKw(snapshot.productionKw, 2)}
             label="PV"
             accent="green"
-            muted={!isProducing}
-            simulated={pvSimulated}
+            muted={hidePv || !isProducing}
+            simulated={!hidePv && pvSimulated}
             labelPosition="top"
             labelRef={(el) => {
               pvLabelRef.current = el;
@@ -453,12 +463,14 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             }}
             icon={<Home className="size-5" />}
             value={
-              snapshot.consumptionKw != null ? formatKw(snapshot.consumptionKw, 1) : "–"
+              hideConsumption || snapshot.consumptionKw == null
+                ? "–"
+                : formatKw(snapshot.consumptionKw, 2)
             }
             label="Verbrauch"
             accent="rose"
-            muted={!isConsuming}
-            simulated={gridSource === "whatwatt" ? false : pvSimulated}
+            muted={hideConsumption || !isConsuming}
+            simulated={!hideConsumption && pvSimulated && gridSource !== "whatwatt"}
             labelPosition="bottom"
             className="energy-flow-node-side"
             style={{ left: "16%" }}
@@ -468,11 +480,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               stromkontoCircleRef.current = el;
             }}
             icon={<BatteryFull className="size-5 -rotate-90" />}
-            value={stromkontoKw != null ? formatKw(stromkontoKw, 1) : "–"}
+            value={hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, 2)}
             label="Stromkonto"
             accent={stromkontoAccent}
-            muted={!isGridImport && !isGridExport}
-            simulated={gridSimulated}
+            muted={hideGrid || (!isGridImport && !isGridExport)}
+            simulated={!hideGrid && gridSimulated}
             labelPosition="bottom"
             className="energy-flow-node-side"
             style={{ left: "84%" }}

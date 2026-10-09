@@ -23,9 +23,21 @@ type MeterBaseline = {
   establishedAt: string;
 };
 
+type TodayEntry = {
+  /** Lokaler Kalendertag, für den der Tageswert gilt. */
+  day: string;
+  /** Eingegebener Netto-Tageswert in kWh (positiv = eingezahlt). */
+  changeKwh: number;
+  /** Zählerstand Bezug zum Speicherzeitpunkt; null, bis ein Messwert da ist. */
+  importKwh: number | null;
+  /** Zählerstand Einspeisung zum Speicherzeitpunkt. */
+  exportKwh: number | null;
+};
+
 type PersistedState = {
   configuredBalanceKwh: number;
   baseline: MeterBaseline | null;
+  today: TodayEntry | null;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -42,6 +54,11 @@ function defaultConfiguredBalance(): number {
   return readEnvBalance() ?? DEFAULT_STROMKONTO_BALANCE_KWH;
 }
 
+/** True, sobald ein Startstand gespeichert oder per Umgebungsvariable gesetzt wurde. */
+function hasExplicitBalance(): boolean {
+  return existsSync(DATA_FILE) || readEnvBalance() != null;
+}
+
 function isMeterBaseline(value: unknown): value is MeterBaseline {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -52,15 +69,38 @@ function isMeterBaseline(value: unknown): value is MeterBaseline {
   );
 }
 
+function localDayKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function isTodayEntry(value: unknown): value is TodayEntry {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const importKwh = v.importKwh;
+  const exportKwh = v.exportKwh;
+  return (
+    typeof v.day === "string" &&
+    Number.isFinite(Number(v.changeKwh)) &&
+    (importKwh == null || Number.isFinite(Number(importKwh))) &&
+    (exportKwh == null || Number.isFinite(Number(exportKwh)))
+  );
+}
+
+function emptyState(): PersistedState {
+  return { configuredBalanceKwh: defaultConfiguredBalance(), baseline: null, today: null };
+}
+
 function loadState(): PersistedState {
   try {
     if (!existsSync(DATA_FILE)) {
-      return { configuredBalanceKwh: defaultConfiguredBalance(), baseline: null };
+      return emptyState();
     }
 
     const parsed: unknown = JSON.parse(readFileSync(DATA_FILE, "utf8"));
     if (typeof parsed !== "object" || parsed === null) {
-      return { configuredBalanceKwh: defaultConfiguredBalance(), baseline: null };
+      return emptyState();
     }
 
     const v = parsed as Record<string, unknown>;
@@ -69,11 +109,21 @@ function loadState(): PersistedState {
     if ("configuredBalanceKwh" in v) {
       const configuredBalanceKwh = Number(v.configuredBalanceKwh);
       const baseline = isMeterBaseline(v.baseline) ? v.baseline : null;
+      const todayRaw = v.today;
+      const today = isTodayEntry(todayRaw)
+        ? {
+            day: todayRaw.day,
+            changeKwh: Number(todayRaw.changeKwh),
+            importKwh: todayRaw.importKwh == null ? null : Number(todayRaw.importKwh),
+            exportKwh: todayRaw.exportKwh == null ? null : Number(todayRaw.exportKwh),
+          }
+        : null;
       return {
         configuredBalanceKwh: Number.isFinite(configuredBalanceKwh)
           ? configuredBalanceKwh
           : defaultConfiguredBalance(),
         baseline,
+        today,
       };
     }
 
@@ -90,13 +140,14 @@ function loadState(): PersistedState {
       return {
         configuredBalanceKwh: balanceKwh,
         baseline: { importBaseline, exportBaseline, establishedAt },
+        today: null,
       };
     }
   } catch {
     // fall through
   }
 
-  return { configuredBalanceKwh: defaultConfiguredBalance(), baseline: null };
+  return emptyState();
 }
 
 function saveState(state: PersistedState): void {
@@ -129,6 +180,7 @@ export function setStromkontoBaseBalance(
   balanceKwh: number,
   meterTotals?: { energyInKwh: number; energyOutKwh: number },
 ): PersistedState {
+  const previous = loadState();
   const state: PersistedState = {
     configuredBalanceKwh: round(balanceKwh),
     baseline: meterTotals
@@ -138,6 +190,36 @@ export function setStromkontoBaseBalance(
           establishedAt: new Date().toISOString(),
         }
       : null,
+    today: previous.today,
+  };
+  saveState(state);
+  return state;
+}
+
+/** Gespeicherter Tageswert, wenn er zum heutigen Kalendertag gehört. */
+export function getStromkontoTodayChange(): number | null {
+  const today = loadState().today;
+  if (!today || today.day !== localDayKey(new Date())) return null;
+  return today.changeKwh;
+}
+
+/**
+ * Setzt den Netto-Tageswert (positiv = eingezahlt, negativ = bezogen).
+ * Liegt ein Zählerstand vor, werden spätere Messwerte darauf addiert.
+ */
+export function setStromkontoTodayChange(
+  changeKwh: number,
+  meterTotals?: { energyInKwh: number; energyOutKwh: number },
+): PersistedState {
+  const previous = loadState();
+  const state: PersistedState = {
+    ...previous,
+    today: {
+      day: localDayKey(new Date()),
+      changeKwh: round(changeKwh),
+      importKwh: meterTotals?.energyInKwh ?? null,
+      exportKwh: meterTotals?.energyOutKwh ?? null,
+    },
   };
   saveState(state);
   return state;
@@ -170,26 +252,73 @@ export function computeStromkonto(
     baseline.exportBaseline -
     (cumulativeImportKwh - baseline.importBaseline);
 
-  const changeTodayKwh = gridFeedInTodayKwh - gridImportTodayKwh;
+  const changeTodayKwh = resolveChangeToday(
+    state,
+    cumulativeImportKwh,
+    cumulativeExportKwh,
+    gridFeedInTodayKwh - gridImportTodayKwh,
+    now,
+  );
 
   return {
     balanceKwh: round(state.configuredBalanceKwh + netDeltaKwh),
-    changeTodayKwh: round(changeTodayKwh),
+    changeTodayKwh,
   };
 }
 
+function resolveChangeToday(
+  state: PersistedState,
+  cumulativeImportKwh: number,
+  cumulativeExportKwh: number,
+  measuredTodayKwh: number,
+  now: Date,
+): number {
+  const today = state.today;
+  if (!today || today.day !== localDayKey(now)) {
+    return round(measuredTodayKwh);
+  }
+
+  if (today.importKwh == null || today.exportKwh == null) {
+    const anchored: PersistedState = {
+      ...state,
+      today: {
+        ...today,
+        importKwh: cumulativeImportKwh,
+        exportKwh: cumulativeExportKwh,
+      },
+    };
+    saveState(anchored);
+    return round(today.changeKwh);
+  }
+
+  const sinceEntryKwh =
+    cumulativeExportKwh -
+    today.exportKwh -
+    (cumulativeImportKwh - today.importKwh);
+  return round(today.changeKwh + sinceEntryKwh);
+}
+
 /**
- * Stellt sicher, dass der Snapshot immer einen Stromkonto-Stand zeigt:
- * - whatwatt: präzise Berechnung (Basis ± kumulierte Netzänderung seit Anheftung)
- * - sonst: Basis ± heutige Netzbilanz, falls Netzdaten vorhanden
- * - sonst: nur der konfigurierte Basiskontostand
+ * Stromkonto nur aus gemessenen Netzdaten:
+ * - whatwatt: Basis ± kumulierte Netzänderung seit Anheftung
+ * - FusionSolar: Basis ± heutige Netzbilanz, falls die Anlage sie meldet
+ * - Simulation: gespeicherter Startstand, aber keine erfundene Tagesänderung.
+ *   Ohne gespeicherten Startstand bleiben beide Werte leer.
  */
 export function applyStromkontoToSnapshot(
   snapshot: PvSnapshot,
-  options: { fromWhatWatt: boolean },
+  options: { fromWhatWatt: boolean; fromSimulation: boolean },
 ): PvSnapshot {
   if (options.fromWhatWatt && snapshot.stromkontoBalanceKwh != null) {
     return snapshot;
+  }
+
+  if (options.fromSimulation) {
+    return {
+      ...snapshot,
+      stromkontoBalanceKwh: hasExplicitBalance() ? getStromkontoBaseBalance() : null,
+      stromkontoChangeTodayKwh: null,
+    };
   }
 
   const base = getStromkontoBaseBalance();

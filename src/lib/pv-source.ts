@@ -18,14 +18,14 @@ import {
 } from "@/lib/pv-data";
 import { isFusionSolarConfigured } from "@/lib/fusionsolar/config";
 import { getFusionSolarDashboardData } from "@/lib/fusionsolar/service";
-import { applyStromkontoToSnapshot } from "@/lib/stromkonto";
+import { applyStromkontoToSnapshot, computeStromkonto } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
 import { resolveOpenMeteoPeakKwp } from "@/lib/open-meteo-yield/config";
 import {
   getOpenMeteoTodayAndTomorrowYieldKwh,
   type OpenMeteoYieldMeta,
 } from "@/lib/open-meteo-yield/service";
-import { getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
+import { getLatestWhatWattMeterTotals, getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
 
 export type DashboardData = {
   snapshot: PvSnapshot;
@@ -163,9 +163,26 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
   })();
 
   const overlay = await overlayWhatWattGrid(base.data);
-  const snapshot = applyStromkontoToSnapshot(overlay.data.snapshot, {
+  let snapshot = applyStromkontoToSnapshot(overlay.data.snapshot, {
     fromWhatWatt: overlay.gridSource === "whatwatt",
+    fromSimulation: base.source === "simulation",
   });
+  if (overlay.gridSource === "whatwatt") {
+    const meters = getLatestWhatWattMeterTotals();
+    if (meters) {
+      const stromkonto = computeStromkonto(
+        meters.energyInKwh,
+        meters.energyOutKwh,
+        snapshot.gridImportTodayKwh ?? 0,
+        snapshot.gridFeedInTodayKwh ?? 0,
+      );
+      snapshot = {
+        ...snapshot,
+        stromkontoBalanceKwh: stromkonto.balanceKwh,
+        stromkontoChangeTodayKwh: stromkonto.changeTodayKwh,
+      };
+    }
+  }
 
   const yieldForecast = await getOpenMeteoTodayAndTomorrowYieldKwh(
     resolveOpenMeteoPeakKwp(),
