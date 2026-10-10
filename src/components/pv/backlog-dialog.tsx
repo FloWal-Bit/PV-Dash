@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useSyncExternalStore, type FormEvent } from "react";
-import { Check, ListTodo, Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { backlogStore } from "@/lib/backlog-store";
@@ -18,7 +17,13 @@ import { cn } from "@/lib/utils";
 const inputClassName =
   "flex h-10 min-w-0 flex-1 rounded-xl border border-border/80 bg-background px-3 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60";
 
-export function BacklogDialog() {
+export function BacklogDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { items, loading, error } = useSyncExternalStore(
     backlogStore.subscribe,
     backlogStore.getSnapshot,
@@ -28,7 +33,6 @@ export function BacklogDialog() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const openCount = items.filter((item) => !item.done).length;
   const openItems = items.filter((item) => !item.done);
   const doneItems = items.filter((item) => item.done);
 
@@ -53,24 +57,7 @@ export function BacklogDialog() {
   }
 
   return (
-    <Dialog>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="relative rounded-full"
-            aria-label="Backlog"
-          />
-        }
-      >
-        <ListTodo className="size-4" />
-        {openCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-chart-3 px-1 text-[9px] font-semibold text-white">
-            {openCount > 9 ? "9+" : openCount}
-          </span>
-        ) : null}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] gap-0 overflow-hidden p-0 sm:max-w-md">
         <div className="border-b border-border/70 bg-muted/40 px-5 py-4">
           <DialogHeader className="gap-1.5">

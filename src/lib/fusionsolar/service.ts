@@ -8,7 +8,7 @@
  * verwalteten 100 Anlagen (bei einer einzelnen Anlage also 1 Slot), und für
  * die stündlichen/täglichen/monatlichen Verlaufs-Endpunkte jeweils
  * Aufrufe/Tag = Aufrund(Anlagen/100) + 24. Ohne Cache würde ein Browser, der
- * alle 10 Sekunden pollt, das Tageslimit binnen Minuten aufbrauchen und die
+ * alle 15 Sekunden pollt, das Tageslimit binnen Minuten aufbrauchen und die
  * Anlage für den Rest des Tages mit Fehlercode 407 sperren.
  */
 

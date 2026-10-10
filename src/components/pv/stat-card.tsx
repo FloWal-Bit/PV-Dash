@@ -11,6 +11,7 @@ type StatCardProps = {
   icon: ReactNode;
   accent?: "amber" | "green" | "rose";
   simulated?: boolean;
+  valueClassName?: string;
   className?: string;
 };
 
@@ -28,6 +29,7 @@ export function StatCard({
   icon,
   accent = "amber",
   simulated = false,
+  valueClassName,
   className,
 }: StatCardProps) {
   return (
@@ -43,7 +45,12 @@ export function StatCard({
             {label}
           </span>
           <div className="flex items-baseline gap-1">
-            <span className="text-[1.75rem] font-semibold tracking-tight tabular-nums">
+            <span
+              className={cn(
+                "text-[1.75rem] font-semibold tracking-tight tabular-nums",
+                valueClassName,
+              )}
+            >
               {value}
             </span>
             {unit ? (

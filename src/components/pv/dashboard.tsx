@@ -17,7 +17,7 @@ import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 
 export function Dashboard({ plantName }: { plantName: string }) {
   const {
-    data,
+    snapshot,
     error,
     source,
     gridSource,
@@ -26,6 +26,9 @@ export function Dashboard({ plantName }: { plantName: string }) {
     forecastSolarError,
     warning,
     lastFetchedAt,
+    history,
+    historySource,
+    historyError,
   } = useSyncExternalStore(pvStore.subscribe, pvStore.getSnapshot, pvStore.getServerSnapshot);
   const { location } = useSyncExternalStore(
     siteLocationStore.subscribe,
@@ -52,9 +55,9 @@ export function Dashboard({ plantName }: { plantName: string }) {
   }, [location.name]);
 
   useEffect(() => {
-    if (!data) return;
-    checkYieldNotification(data.snapshot.todayYieldKwh, data.snapshot.timestamp);
-  }, [data]);
+    if (!snapshot) return;
+    checkYieldNotification(snapshot.todayYieldKwh, snapshot.timestamp);
+  }, [snapshot]);
 
   return (
     <div className="relative flex min-h-dvh flex-col bg-background">
@@ -105,13 +108,13 @@ export function Dashboard({ plantName }: { plantName: string }) {
           </div>
         ) : null}
 
-        {!data ? (
+        {!snapshot ? (
           <DashboardSkeleton />
         ) : (
           <>
             <SunTimesCard
               className="min-w-0"
-              referenceDate={new Date(data.snapshot.timestamp)}
+              referenceDate={new Date(snapshot.timestamp)}
               forecastedTodayYieldKwh={forecastedTodayYieldKwh}
               forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
             />
@@ -119,26 +122,30 @@ export function Dashboard({ plantName }: { plantName: string }) {
             <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
               <EnergyFlow
                 className="min-w-0 md:h-full"
-                snapshot={data.snapshot}
+                snapshot={snapshot}
                 source={dataSource}
                 gridSource={gridSource}
               />
               <KpiGrid
                 className="min-w-0 md:h-full md:grid-cols-2 md:grid-rows-3"
-                snapshot={data.snapshot}
+                snapshot={snapshot}
                 source={dataSource}
                 gridSource={gridSource}
               />
             </div>
 
-            <ChartsSection
-              today={data.today}
-              week={data.week}
-              month={data.month}
-              year={data.year}
-              lifetime={data.lifetime}
-              source={dataSource}
-            />
+            {history ? (
+              <ChartsSection
+                today={history.today}
+                week={history.week}
+                month={history.month}
+                year={history.year}
+                lifetime={history.lifetime}
+                source={historySource ?? dataSource}
+              />
+            ) : (
+              <ChartHistoryPlaceholder error={historyError} />
+            )}
           </>
         )}
       </main>
@@ -154,6 +161,24 @@ export function Dashboard({ plantName }: { plantName: string }) {
           {APP_NAME} {APP_VERSION_LABEL}
         </span>
       </footer>
+    </div>
+  );
+}
+
+function ChartHistoryPlaceholder({ error }: { error: string | null }) {
+  if (!error) return <Skeleton className="h-96 rounded-2xl" />;
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      <span>{error}</span>
+      <Button
+        size="sm"
+        variant="outline"
+        className="border-destructive/40 text-destructive hover:bg-destructive/10"
+        onClick={pvStore.refresh}
+      >
+        <RefreshCcw className="size-3.5" />
+        Erneut versuchen
+      </Button>
     </div>
   );
 }

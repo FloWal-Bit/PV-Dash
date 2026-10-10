@@ -26,6 +26,7 @@ import {
 } from "@/lib/stromkonto-shared";
 import { formatYieldKwh } from "@/lib/format";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import { pvStore } from "@/lib/pv-store";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 import { cn } from "@/lib/utils";
@@ -475,6 +476,10 @@ export function SettingsDialog() {
                 className="data-checked:bg-chart-3"
               />
             </div>
+            <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
+              <span className="text-sm font-medium">Farbschema</span>
+              <ThemeModeSetting />
+            </div>
           </SettingsSection>
 
           <StromkontoEditor />
@@ -532,7 +537,7 @@ export function SettingsDialog() {
           <SettingsSection
             icon={<Info className="size-4" />}
             iconClassName="bg-muted text-foreground/70"
-            title="Impressum"
+            title="Über PV Dash"
           >
             <p className="text-xs leading-relaxed text-muted-foreground">
               Entstanden mit Cursor, Koffein und der Musik von Paul Kalkbrenner. Herbst
@@ -541,7 +546,7 @@ export function SettingsDialog() {
             <p className="text-xs leading-relaxed text-muted-foreground">
               Anbindung:
               <br />
-              whatwatt via MQTT
+              whatwatt via MQTT und HiveMQ als Broker
               <br />
               FusionSolar via API
             </p>

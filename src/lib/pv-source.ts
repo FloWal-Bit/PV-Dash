@@ -17,7 +17,11 @@ import {
   type PvSnapshot,
 } from "@/lib/pv-data";
 import { isFusionSolarConfigured } from "@/lib/fusionsolar/config";
-import { getFusionSolarDashboardData } from "@/lib/fusionsolar/service";
+import {
+  getFusionSolarHistory,
+  getFusionSolarLifetimeHistory,
+  getFusionSolarLiveSnapshot,
+} from "@/lib/fusionsolar/service";
 import { applyStromkontoToSnapshot, computeStromkonto } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
 import { resolveOpenMeteoPeakKwp } from "@/lib/open-meteo-yield/config";
@@ -27,8 +31,7 @@ import {
 } from "@/lib/open-meteo-yield/service";
 import { getLatestWhatWattMeterTotals, getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
 
-export type DashboardData = {
-  snapshot: PvSnapshot;
+export type PvHistory = {
   today: HistoryPoint[];
   week: DailyEnergyPoint[];
   month: DailyEnergyPoint[];
@@ -62,11 +65,11 @@ function consumptionMetrics(productionKw: number, consumptionKw: number) {
   return { selfConsumptionRate, autarkyRate };
 }
 
-export type DashboardPayload = {
+export type LiveDashboardPayload = {
   source: DataSource;
   /** Ist ein whatwatt Go konfiguriert und erreichbar, überschreibt es die Netzwerte der Hauptquelle. */
   gridSource: GridSource;
-  data: DashboardData;
+  snapshot: PvSnapshot;
   /** Prognostizierter Tagesertrag (kWh), Open-Meteo GTI × kWp × PR für heute. */
   forecastedTodayYieldKwh: number | null;
   /** Gesetzt, wenn die Ertragsprognose (Open-Meteo) nicht erreichbar ist. */
@@ -79,10 +82,12 @@ export type DashboardPayload = {
   warning: string | null;
 };
 
-function simulate(): DashboardData {
-  const now = new Date();
+export type HistoryPayload = PvHistory & {
+  source: DataSource;
+};
+
+function simulateHistory(now = new Date()): PvHistory {
   return {
-    snapshot: getSnapshot(now),
     today: getTodayHistory(now),
     week: getWeekHistory(now),
     month: getMonthHistory(now),
@@ -100,33 +105,30 @@ function simulate(): DashboardData {
  * Hauptquelle (FusionSolar/Simulation) unverändert.
  */
 async function overlayWhatWattGrid(
-  data: DashboardData,
-): Promise<{ data: DashboardData; gridSource: GridSource; warning: string | null }> {
+  snapshot: PvSnapshot,
+): Promise<{ snapshot: PvSnapshot; gridSource: GridSource; warning: string | null }> {
   if (!isWhatWattConfigured()) {
-    return { data, gridSource: null, warning: null };
+    return { snapshot, gridSource: null, warning: null };
   }
 
   try {
     const grid = await getWhatWattGridSnapshot();
-    const consumptionKw = consumptionFromEnergyBalance(data.snapshot.productionKw, grid.gridKw);
+    const consumptionKw = consumptionFromEnergyBalance(snapshot.productionKw, grid.gridKw);
     const { selfConsumptionRate, autarkyRate } = consumptionMetrics(
-      data.snapshot.productionKw,
+      snapshot.productionKw,
       consumptionKw,
     );
     return {
-      data: {
-        ...data,
-        snapshot: {
-          ...data.snapshot,
-          gridKw: grid.gridKw,
-          consumptionKw,
-          selfConsumptionRate,
-          autarkyRate,
-          gridImportTodayKwh: grid.gridImportTodayKwh,
-          gridFeedInTodayKwh: grid.gridFeedInTodayKwh,
-          stromkontoBalanceKwh: grid.stromkontoBalanceKwh,
-          stromkontoChangeTodayKwh: grid.stromkontoChangeTodayKwh,
-        },
+      snapshot: {
+        ...snapshot,
+        gridKw: grid.gridKw,
+        consumptionKw,
+        selfConsumptionRate,
+        autarkyRate,
+        gridImportTodayKwh: grid.gridImportTodayKwh,
+        gridFeedInTodayKwh: grid.gridFeedInTodayKwh,
+        stromkontoBalanceKwh: grid.stromkontoBalanceKwh,
+        stromkontoChangeTodayKwh: grid.stromkontoChangeTodayKwh,
       },
       gridSource: "whatwatt",
       warning: null,
@@ -135,35 +137,36 @@ async function overlayWhatWattGrid(
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
     console.error("[whatwatt] Netzmesswerte nicht verfügbar, zeige Netzwerte der Hauptquelle:", message);
     return {
-      data,
+      snapshot,
       gridSource: null,
       warning: `whatwatt Go nicht erreichbar (${message}). Zeige Netzwerte der Hauptquelle.`,
     };
   }
 }
 
-export async function getDashboardPayload(): Promise<DashboardPayload> {
-  const base = await (async (): Promise<{ source: DataSource; data: DashboardData; warning: string | null }> => {
+/** Momentanwerte für Energiefluss, Kennzahlen und Prognose. Ohne Verlaufsreihen. */
+export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
+  const base = await (async (): Promise<{ source: DataSource; snapshot: PvSnapshot; warning: string | null }> => {
     if (!isFusionSolarConfigured()) {
-      return { source: "simulation", data: simulate(), warning: null };
+      return { source: "simulation", snapshot: getSnapshot(new Date()), warning: null };
     }
 
     try {
-      const data = await getFusionSolarDashboardData();
-      return { source: "fusionsolar", data, warning: null };
+      const snapshot = await getFusionSolarLiveSnapshot();
+      return { source: "fusionsolar", snapshot, warning: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unbekannter Fehler";
       console.error("[fusionsolar] Live-Abruf fehlgeschlagen, zeige Simulation:", message);
       return {
         source: "simulation",
-        data: simulate(),
+        snapshot: getSnapshot(new Date()),
         warning: `FusionSolar nicht erreichbar (${message}). Zeige simulierte Daten.`,
       };
     }
   })();
 
-  const overlay = await overlayWhatWattGrid(base.data);
-  let snapshot = applyStromkontoToSnapshot(overlay.data.snapshot, {
+  const overlay = await overlayWhatWattGrid(base.snapshot);
+  let snapshot = applyStromkontoToSnapshot(overlay.snapshot, {
     fromWhatWatt: overlay.gridSource === "whatwatt",
     fromSimulation: base.source === "simulation",
   });
@@ -192,14 +195,25 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
   return {
     source: base.source,
     gridSource: overlay.gridSource,
-    data: { ...overlay.data, snapshot },
+    snapshot,
     forecastedTodayYieldKwh: yieldForecast.today.kwh,
     forecastSolarError: yieldForecast.today.error ?? yieldForecast.error,
     forecastYieldMeta: yieldForecast.today.meta,
     forecastedTomorrowYieldKwh: yieldForecast.tomorrow.kwh,
     forecastTomorrowYieldMeta: yieldForecast.tomorrow.meta,
-    // Eine bereits vorhandene FusionSolar-Warnung hat Vorrang, damit nicht
-    // zwei Warnbanner gleichzeitig um Aufmerksamkeit konkurrieren.
     warning: base.warning ?? overlay.warning,
   };
+}
+
+/** Verlaufsreihen für die Diagramme. Unabhängig vom 15-Sekunden-Live-Abruf. */
+export async function getHistoryPayload(): Promise<HistoryPayload> {
+  if (!isFusionSolarConfigured()) {
+    return { source: "simulation", ...simulateHistory() };
+  }
+
+  const [history, lifetime] = await Promise.all([
+    getFusionSolarHistory(),
+    getFusionSolarLifetimeHistory(),
+  ]);
+  return { source: "fusionsolar", ...history, lifetime };
 }

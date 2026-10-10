@@ -1,12 +1,15 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { Radio } from "lucide-react";
 import { ShareDashboardButton } from "@/components/pv/share-dashboard-button";
-import { ThemeToggle } from "@/components/pv/theme-toggle";
 import { BacklogDialog } from "@/components/pv/backlog-dialog";
 import { SettingsDialog } from "@/components/pv/settings-dialog";
 import { cn } from "@/lib/utils";
 import type { DataSource, GridSource } from "@/lib/pv-source";
+
+const BACKLOG_TAP_COUNT = 5;
+const BACKLOG_TAP_GAP_MS = 1500;
 
 type HeaderProps = {
   lastUpdated: Date | null;
@@ -16,13 +19,33 @@ type HeaderProps = {
 };
 
 export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: HeaderProps) {
+  const [backlogOpen, setBacklogOpen] = useState(false);
+  const taps = useRef({ count: 0, last: 0 });
+
+  function handleTitleTap() {
+    const now = Date.now();
+    if (now - taps.current.last > BACKLOG_TAP_GAP_MS) {
+      taps.current.count = 0;
+    }
+    taps.current.last = now;
+    taps.current.count += 1;
+    if (taps.current.count >= BACKLOG_TAP_COUNT) {
+      taps.current.count = 0;
+      setBacklogOpen(true);
+    }
+  }
+
   return (
     <header className="safe-top sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md landscape:py-1.5">
       <div className="dashboard-container flex items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-col pl-4">
-          <span className="truncate text-base font-semibold leading-tight">
+          <button
+            type="button"
+            onClick={handleTitleTap}
+            className="truncate text-left text-base font-semibold leading-tight"
+          >
             PV Dash
-          </span>
+          </button>
           <span className="truncate text-xs text-muted-foreground leading-tight">
             {plantName}
           </span>
@@ -68,10 +91,9 @@ export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: 
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-chart-3/70" />
             <span className="relative inline-flex size-2 rounded-full bg-chart-3" />
           </span>
-          <BacklogDialog />
+          <BacklogDialog open={backlogOpen} onOpenChange={setBacklogOpen} />
           <SettingsDialog />
           <ShareDashboardButton plantName={plantName} />
-          <ThemeToggle />
         </div>
       </div>
     </header>

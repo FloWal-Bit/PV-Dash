@@ -100,9 +100,10 @@ davon, wie oft das Dashboard im Browser pollt. Der Server cacht deshalb selbst
 werden höchstens alle 6 Minuten neu von FusionSolar geholt, Stunden-/Tagesdaten
 höchstens einmal pro Stunde und die Jahresdaten für die "Lebensdauer"-Ansicht
 (`getKpiStationYear`) höchstens alle 6 Stunden, da sie sich innerhalb eines
-Tages ohnehin kaum ändern. Der Browser pollt `/api/pv` durchgehend alle
-**10 Sekunden** (u. a. für Verbrauch und Netz auch nachts). Tagsüber kommt
-meist der Server-Cache, nicht ein neuer FusionSolar-Call.
+Tages ohnehin kaum ändern. Der Browser holt die Live-Zahlen über `/api/pv` alle **15 Sekunden**, solange
+der Tab sichtbar ist, und die Verläufe über `/api/pv/history` alle 5 Minuten
+oder beim Wechsel des Diagramm-Zeitraums. Im Hintergrund pausiert beides.
+Tagsüber kommt meist der Server-Cache, nicht ein neuer FusionSolar-Call.
 
 **Bekannte Einschränkungen:** FusionSolar liefert Momentanleistung nur pro
 Wechselrichter-Gerät (`active_power`, kW) und Ertrags-/Verbrauchssummen pro

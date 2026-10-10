@@ -89,6 +89,7 @@ export function KpiGrid({
         icon={<BatteryFull className="size-5 -rotate-90" />}
         accent={stromkontoChangeNegative ? "rose" : "green"}
         simulated={!hideGrid && gridSimulated}
+        valueClassName={gridSource === "whatwatt" ? "text-muted-foreground" : undefined}
       />
       <StatCard
         label="Stand Stromkonto"
@@ -101,6 +102,7 @@ export function KpiGrid({
         icon={<BatteryFull className="size-5 -rotate-90" />}
         accent={stromkontoNegative ? "rose" : "green"}
         simulated={!hideGrid && gridSimulated}
+        valueClassName={gridSource === "whatwatt" ? "text-muted-foreground" : undefined}
       />
       <StatCard
         label={

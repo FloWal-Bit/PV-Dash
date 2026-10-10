@@ -51,7 +51,15 @@ export function applyDocumentColorScheme(scheme: "light" | "dark"): void {
   const root = document.documentElement;
   root.classList.remove("light", "dark");
   root.classList.add(scheme);
-  root.style.colorScheme = scheme;
+  // "only" untersagt Chrome/Vivaldi, eine helle Seite bei dunklem System
+  // noch einmal abzudunkeln. Die CSSOM-Eigenschaft colorScheme kennt "only" nicht.
+  root.style.setProperty("color-scheme", scheme === "dark" ? "only dark" : "only light");
+  try {
+    window.localStorage.setItem("pv-dash:color-scheme", scheme);
+    window.localStorage.setItem("theme", scheme);
+  } catch {
+    // ignore
+  }
 
   const themeColor = scheme === "dark" ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
   const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];

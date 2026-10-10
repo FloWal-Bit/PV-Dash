@@ -58,6 +58,7 @@ function FlowNode({
   accent,
   muted,
   simulated,
+  valueClassName,
   labelPosition,
   labelClassName,
   labelRef,
@@ -71,6 +72,7 @@ function FlowNode({
   accent: Accent;
   muted?: boolean;
   simulated?: boolean;
+  valueClassName?: string;
   labelPosition: "top" | "bottom";
   labelClassName?: string;
   labelRef?: (el: HTMLSpanElement | null) => void;
@@ -109,7 +111,12 @@ function FlowNode({
         )}
       >
         {icon}
-        <span className="text-xs font-semibold tabular-nums leading-none sm:text-sm">
+        <span
+          className={cn(
+            "text-xs font-semibold tabular-nums leading-none sm:text-sm",
+            valueClassName,
+          )}
+        >
           {value}
         </span>
       </div>
@@ -471,6 +478,9 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             accent="rose"
             muted={hideConsumption || !isConsuming}
             simulated={!hideConsumption && pvSimulated && gridSource !== "whatwatt"}
+            valueClassName={
+              gridSource === "whatwatt" ? "text-muted-foreground" : undefined
+            }
             labelPosition="bottom"
             className="energy-flow-node-side"
             style={{ left: "16%" }}
@@ -485,6 +495,9 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             accent={stromkontoAccent}
             muted={hideGrid || (!isGridImport && !isGridExport)}
             simulated={!hideGrid && gridSimulated}
+            valueClassName={
+              gridSource === "whatwatt" ? "text-muted-foreground" : undefined
+            }
             labelPosition="bottom"
             className="energy-flow-node-side"
             style={{ left: "84%" }}

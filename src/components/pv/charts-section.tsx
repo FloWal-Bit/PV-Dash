@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { pvStore } from "@/lib/pv-store";
 import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
 import { formatKw, formatSwissNumber, formatYieldKwh, formatYieldMwh } from "@/lib/format";
@@ -486,7 +487,14 @@ export function ChartsSection({
         </div>
       </CardHeader>
       <CardContent>
-        <SwipePageSurface labels={RANGE_LABELS} page={page} onPageChange={setPage}>
+        <SwipePageSurface
+          labels={RANGE_LABELS}
+          page={page}
+          onPageChange={(next) => {
+            setPage(next);
+            if (next !== page) pvStore.refreshHistory();
+          }}
+        >
           <div className="flex flex-col gap-3">
             <div
               className={cn(
