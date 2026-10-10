@@ -34,17 +34,28 @@ export function StatCard({
 }: StatCardProps) {
   return (
     <Card className={cn("shadow-card h-full justify-center gap-3 rounded-2xl py-4", className)}>
-      <CardContent className="flex items-center justify-between gap-3 px-4">
+      <CardContent className="flex flex-col gap-1 px-4">
+        <div className="flex items-start justify-between gap-2">
+          <span className="line-clamp-2 min-w-0 text-xs leading-tight font-medium text-muted-foreground">
+            {label}
+          </span>
+          <div
+            className={cn(
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br transition-opacity",
+              accentStyles[accent],
+              simulated && SIMULATED_OPACITY_CLASS,
+            )}
+          >
+            {icon}
+          </div>
+        </div>
         <div
           className={cn(
             "flex min-w-0 flex-col gap-1 transition-opacity",
             simulated && SIMULATED_OPACITY_CLASS,
           )}
         >
-          <span className="line-clamp-2 text-xs leading-tight font-medium text-muted-foreground">
-            {label}
-          </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span
               className={cn(
                 "text-[1.75rem] font-semibold tracking-tight tabular-nums",
@@ -60,15 +71,6 @@ export function StatCard({
           {hint ? (
             <span className="truncate text-xs text-muted-foreground">{hint}</span>
           ) : null}
-        </div>
-        <div
-          className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br transition-opacity",
-            accentStyles[accent],
-            simulated && SIMULATED_OPACITY_CLASS,
-          )}
-        >
-          {icon}
         </div>
       </CardContent>
     </Card>

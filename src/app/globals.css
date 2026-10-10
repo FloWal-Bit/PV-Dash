@@ -125,6 +125,32 @@
   --sidebar-ring: oklch(0.75 0.16 58);
 }
 
+/* Flaches Dunkel: Karten und Seite liegen näher beieinander, Schrift und Grün sind gedämpfter. */
+.dark.dark-flat {
+  --background: oklch(0.145 0.012 255);
+  --foreground: oklch(0.84 0.008 250);
+  --card: oklch(0.168 0.013 255);
+  --card-foreground: oklch(0.84 0.008 250);
+  --popover: oklch(0.168 0.013 255);
+  --popover-foreground: oklch(0.84 0.008 250);
+  --primary: oklch(0.7 0.11 58);
+  --primary-foreground: oklch(0.145 0.012 255);
+  --secondary: oklch(0.2 0.012 255);
+  --secondary-foreground: oklch(0.84 0.008 250);
+  --muted: oklch(0.2 0.012 255);
+  --muted-foreground: oklch(0.58 0.012 250);
+  --accent: oklch(0.24 0.035 155);
+  --accent-foreground: oklch(0.82 0.04 145);
+  --border: oklch(1 0 0 / 7%);
+  --input: oklch(1 0 0 / 10%);
+  --chart-1: oklch(0.68 0.09 60);
+  --chart-3: oklch(0.58 0.075 155);
+  --eigenverbrauch: oklch(0.68 0.07 140);
+  --chart-5: oklch(0.64 0.1 35);
+  --sidebar: oklch(0.155 0.012 255);
+  --sidebar-foreground: oklch(0.84 0.008 250);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -169,6 +195,9 @@
       0 1px 2px 0 oklch(0 0 0 / 0.4),
       0 16px 32px -16px oklch(0 0 0 / 0.6);
   }
+  .dark.dark-flat .shadow-card {
+    box-shadow: 0 1px 1px 0 oklch(0 0 0 / 0.28);
+  }
 
   @keyframes energy-flow-dash {
     to {
@@ -196,6 +225,16 @@
   }
   .energy-flow-node-pv {
     top: 4%;
+  }
+
+  /* Recharts setzt nach einem Tipp den Fokus auf die Zeichenfläche.
+     Der globale Fokusring (Amber) wirkt dann wie ein Rahmen und trägt keine Information. */
+  .recharts-responsive-container,
+  .recharts-responsive-container:focus,
+  .recharts-wrapper,
+  .recharts-wrapper:focus,
+  .recharts-surface:focus {
+    outline: none;
   }
 
   /* Tablet Hochformat: Kreise, Linien und die unteren Beschriftungen 0,8 cm

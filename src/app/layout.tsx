@@ -49,7 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full w-full min-w-0 flex-col overscroll-none">
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var scheme=localStorage.getItem("pv-dash:color-scheme");var mode=localStorage.getItem("pv-dash:theme-mode");var legacy=localStorage.getItem("theme");if(scheme!=="dark"&&scheme!=="light"){scheme=mode==="dark"||(mode==null&&legacy==="dark")?"dark":"light";}var root=document.documentElement;root.classList.remove("light","dark");root.classList.add(scheme);root.style.setProperty("color-scheme",scheme==="dark"?"only dark":"only light");}catch(e){}})();`,
+            __html: `(function(){try{var scheme=localStorage.getItem("pv-dash:color-scheme");var mode=localStorage.getItem("pv-dash:theme-mode");var legacy=localStorage.getItem("theme");if(scheme!=="dark"&&scheme!=="light"){scheme=mode==="dark"||(mode==null&&legacy==="dark")?"dark":"light";}var root=document.documentElement;root.classList.remove("light","dark","dark-flat");root.classList.add(scheme);if(scheme==="dark"&&localStorage.getItem("pv-dash:dark-variant")==="flat"){root.classList.add("dark-flat");}root.style.setProperty("color-scheme",scheme==="dark"?"only dark":"only light");}catch(e){}})();`,
           }}
         />
         <ThemeProvider

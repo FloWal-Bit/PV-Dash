@@ -9,6 +9,15 @@ export type ThemeMode = "light" | "dark" | "sun";
 export type { WetterAlarmSunTimes };
 
 const STORAGE_KEY = "pv-dash:theme-mode";
+const DARK_VARIANT_KEY = "pv-dash:dark-variant";
+
+/** Abgesetzt: Karten heller als der Hintergrund. Flach: Karten liegen näher am Hintergrund. */
+export type DarkVariant = "raised" | "flat";
+
+export const DARK_VARIANT_LABELS: Record<DarkVariant, string> = {
+  raised: "Abgesetzt",
+  flat: "Flach",
+};
 
 export const THEME_MODE_LABELS: Record<ThemeMode, string> = {
   light: "Hell",
@@ -38,6 +47,16 @@ export function writeThemeMode(mode: ThemeMode): void {
 
 const LIGHT_THEME_COLOR = "#fbf9f5";
 const DARK_THEME_COLOR = "#171d2c";
+const DARK_FLAT_THEME_COLOR = "#12151c";
+
+export function readDarkVariant(): DarkVariant {
+  if (typeof window === "undefined") return "raised";
+  try {
+    return window.localStorage.getItem(DARK_VARIANT_KEY) === "flat" ? "flat" : "raised";
+  } catch {
+    return "raised";
+  }
+}
 
 /**
  * Setzt Klasse, color-scheme und theme-color direkt am Dokument.
@@ -49,8 +68,11 @@ export function applyDocumentColorScheme(scheme: "light" | "dark"): void {
   if (typeof document === "undefined") return;
 
   const root = document.documentElement;
-  root.classList.remove("light", "dark");
+  root.classList.remove("light", "dark", "dark-flat");
   root.classList.add(scheme);
+  if (scheme === "dark" && readDarkVariant() === "flat") {
+    root.classList.add("dark-flat");
+  }
   // "only" untersagt Chrome/Vivaldi, eine helle Seite bei dunklem System
   // noch einmal abzudunkeln. Die CSSOM-Eigenschaft colorScheme kennt "only" nicht.
   root.style.setProperty("color-scheme", scheme === "dark" ? "only dark" : "only light");
@@ -61,7 +83,12 @@ export function applyDocumentColorScheme(scheme: "light" | "dark"): void {
     // ignore
   }
 
-  const themeColor = scheme === "dark" ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
+  const themeColor =
+    scheme === "dark"
+      ? readDarkVariant() === "flat"
+        ? DARK_FLAT_THEME_COLOR
+        : DARK_THEME_COLOR
+      : LIGHT_THEME_COLOR;
   const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];
   const primary = themeMetas[0] ?? document.createElement("meta");
   primary.setAttribute("name", "theme-color");
@@ -98,7 +125,9 @@ export function msUntilNextSunThemeSwitch(now: Date): number | null {
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
+const darkVariantListeners = new Set<Listener>();
 let snapshot: ThemeMode = "light";
+let darkVariantSnapshot: DarkVariant = "raised";
 
 function refreshSnapshot() {
   snapshot = readThemeMode();
@@ -120,5 +149,32 @@ export const themeModeStore = {
     writeThemeMode(mode);
     refreshSnapshot();
     for (const listener of listeners) listener();
+  },
+};
+
+function refreshDarkVariantSnapshot() {
+  darkVariantSnapshot = readDarkVariant();
+}
+
+export const darkVariantStore = {
+  subscribe(listener: Listener): () => void {
+    if (typeof window !== "undefined") refreshDarkVariantSnapshot();
+    darkVariantListeners.add(listener);
+    return () => darkVariantListeners.delete(listener);
+  },
+  getSnapshot(): DarkVariant {
+    return darkVariantSnapshot;
+  },
+  getServerSnapshot(): DarkVariant {
+    return "raised";
+  },
+  setVariant(variant: DarkVariant): void {
+    try {
+      window.localStorage.setItem(DARK_VARIANT_KEY, variant);
+    } catch {
+      // ignore
+    }
+    refreshDarkVariantSnapshot();
+    for (const listener of darkVariantListeners) listener();
   },
 };
