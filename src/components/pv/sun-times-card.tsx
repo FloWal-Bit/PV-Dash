@@ -44,6 +44,8 @@ function formatDayHeading(date: Date): string {
   });
 }
 
+const WETTERALARM_URL = "https://app.wetteralarm.ch/V00A/m787crdw";
+
 const weatherIcon: Record<PvSnapshot["weather"], ReactNode> = {
   sonnig: <Sun className="size-4" />,
   "leicht bewölkt": <SunDim className="size-4" />,
@@ -58,6 +60,7 @@ function SunStat({
   unit,
   accent,
   valueClassName,
+  href,
 }: {
   icon: ReactNode;
   label: string;
@@ -65,6 +68,7 @@ function SunStat({
   unit?: string;
   accent: "amber" | "rose" | "green" | "slate";
   valueClassName?: string;
+  href?: string;
 }) {
   const accentStyles: Record<typeof accent, string> = {
     amber: "from-chart-1/25 to-chart-1/5 text-chart-1",
@@ -74,14 +78,29 @@ function SunStat({
   };
   return (
     <div className="flex flex-col items-center gap-1.5 text-center transition-opacity">
-      <div
-        className={cn(
-          "flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br shadow-inner",
-          accentStyles[accent],
-        )}
-      >
-        {icon}
-      </div>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${label} bei Wetter-Alarm öffnen`}
+          className={cn(
+            "flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br shadow-inner transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            accentStyles[accent],
+          )}
+        >
+          {icon}
+        </a>
+      ) : (
+        <div
+          className={cn(
+            "flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br shadow-inner",
+            accentStyles[accent],
+          )}
+        >
+          {icon}
+        </div>
+      )}
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <span className="flex items-baseline justify-center gap-1">
         <span
@@ -143,6 +162,7 @@ function SunTimesDayCard({
         <SunStat
           icon={weatherIcon[weatherCategory]}
           label="Wetter"
+          href={WETTERALARM_URL}
           value={waLoading && !dayWeather ? "…" : weatherLabel}
           accent="slate"
           valueClassName="lowercase"

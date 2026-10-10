@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   THEME_MODE_LABELS,
   type ThemeMode,
+  applyDocumentColorScheme,
   resolveColorScheme,
   themeModeStore,
 } from "@/lib/theme-mode";
@@ -61,7 +62,9 @@ export function ThemeToggle() {
 
   const selectMode = (next: ThemeMode) => {
     themeModeStore.setMode(next);
-    setTheme(resolveColorScheme(next, new Date(), sunTimes));
+    const scheme = resolveColorScheme(next, new Date(), sunTimes);
+    applyDocumentColorScheme(scheme);
+    setTheme(scheme);
     setOpen(false);
   };
 

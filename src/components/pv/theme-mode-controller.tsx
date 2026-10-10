@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import {
+  applyDocumentColorScheme,
   msUntilNextSunThemeSwitch,
   resolveColorScheme,
   themeModeStore,
@@ -38,6 +39,7 @@ export function ThemeModeController() {
 
     const apply = () => {
       const scheme = resolveColorScheme(mode, new Date(), sunTimes);
+      applyDocumentColorScheme(scheme);
       setTheme(scheme);
     };
 

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "PV Dash",
   },
   icons: {
@@ -36,10 +36,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbf9f5" },
-    { media: "(prefers-color-scheme: dark)", color: "#171d2c" },
-  ],
+  themeColor: "#fbf9f5",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -50,6 +47,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="flex min-h-full w-full min-w-0 flex-col overscroll-none">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var mode=localStorage.getItem("pv-dash:theme-mode");var legacy=localStorage.getItem("theme");var scheme=mode==="dark"||(mode==null&&legacy==="dark")?"dark":"light";var root=document.documentElement;root.classList.remove("light","dark");root.classList.add(scheme);root.style.colorScheme=scheme;}catch(e){}})();`,
+          }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
