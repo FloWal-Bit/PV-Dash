@@ -27,7 +27,6 @@ import {
 import { formatYieldKwh } from "@/lib/format";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
-import { pvStore } from "@/lib/pv-store";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
@@ -222,10 +221,8 @@ function SiteLocationEditor({
 
 function StromkontoEditor() {
   const [balanceInput, setBalanceInput] = useState(String(DEFAULT_STROMKONTO_BALANCE_KWH));
-  const [todayInput, setTodayInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingToday, setSavingToday] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -235,10 +232,9 @@ function StromkontoEditor() {
       try {
         const response = await fetch("/api/stromkonto");
         if (!response.ok) throw new Error("Laden fehlgeschlagen");
-        const data: { balanceKwh: number; todayChangeKwh: number | null } = await response.json();
+        const data: { balanceKwh: number } = await response.json();
         if (!cancelled) {
           setBalanceInput(String(data.balanceKwh));
-          setTodayInput(data.todayChangeKwh == null ? "" : String(data.todayChangeKwh));
         }
       } catch {
         if (!cancelled) {
@@ -290,43 +286,6 @@ function StromkontoEditor() {
     }
   }
 
-  async function handleSaveToday() {
-    const todayChangeKwh = parseStromkontoBalanceInput(todayInput);
-    if (todayChangeKwh == null) {
-      setError("Bitte einen Tageswert eingeben, z. B. -1.4 oder 0.8.");
-      setSuccess(null);
-      return;
-    }
-
-    setSavingToday(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch("/api/stromkonto", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ todayChangeKwh }),
-      });
-      const data: { todayChangeKwh?: number; anchored?: boolean; error?: string } =
-        await response.json();
-      if (!response.ok) {
-        throw new Error(data.error ?? "Speichern fehlgeschlagen");
-      }
-      setTodayInput(String(data.todayChangeKwh));
-      setSuccess(
-        data.anchored
-          ? "Tageswert gespeichert. Weitere Zählermessungen werden darauf addiert."
-          : "Tageswert gespeichert. Anheftung an den Zähler erfolgt beim nächsten Messwert.",
-      );
-      pvStore.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
-    } finally {
-      setSavingToday(false);
-    }
-  }
-
   return (
     <SettingsSection
       icon={<BatteryFull className="size-4 -rotate-90" />}
@@ -347,7 +306,7 @@ function StromkontoEditor() {
           inputMode="decimal"
           className={inputClassName}
           value={balanceInput}
-          disabled={loading || saving || savingToday}
+          disabled={loading || saving}
           onChange={(e) => setBalanceInput(e.target.value)}
           placeholder="516"
         />
@@ -357,42 +316,19 @@ function StromkontoEditor() {
         type="button"
         variant="secondary"
         size="sm"
-        disabled={loading || saving || savingToday}
+        disabled={loading || saving}
         onClick={() => void handleSaveBalance()}
       >
         {saving ? "Speichern…" : "Basiskontostand speichern"}
       </Button>
 
-      <div className="flex flex-col gap-1.5 border-t border-border/70 pt-4">
-        <Label htmlFor="stromkonto-today">Tageswert heute (kWh)</Label>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Positiv, wenn heute ins Konto eingezahlt wurde. Negativ, wenn bezogen
-          wurde. Ab dem Speichern zählt whatwatt ab diesem Wert weiter.
-        </p>
-        <input
-          id="stromkonto-today"
-          type="text"
-          inputMode="decimal"
-          className={inputClassName}
-          value={todayInput}
-          disabled={loading || saving || savingToday}
-          onChange={(e) => setTodayInput(e.target.value)}
-          placeholder="z. B. -1.4"
-        />
-      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Stromkonto heute wird um 00:00 Uhr Schweizer Zeit auf 0 gesetzt und zählt
+        ab dann Einspeisung minus Bezug.
+      </p>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       {success ? <p className="text-xs text-chart-3">{success}</p> : null}
-
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        disabled={loading || saving || savingToday}
-        onClick={() => void handleSaveToday()}
-      >
-        {savingToday ? "Speichern…" : "Tageswert speichern"}
-      </Button>
     </SettingsSection>
   );
 }

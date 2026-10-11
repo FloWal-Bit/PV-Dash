@@ -34,10 +34,20 @@ type TodayEntry = {
   exportKwh: number | null;
 };
 
+type DayMeterBaseline = {
+  /** Kalendertag Europe/Zurich, YYYY-MM-DD. */
+  day: string;
+  /** Zählerstand Bezug zu Beginn dieses Tages. */
+  importKwh: number;
+  /** Zählerstand Einspeisung zu Beginn dieses Tages. */
+  exportKwh: number;
+};
+
 type PersistedState = {
   configuredBalanceKwh: number;
   baseline: MeterBaseline | null;
   today: TodayEntry | null;
+  dayBaseline: DayMeterBaseline | null;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -69,12 +79,6 @@ function isMeterBaseline(value: unknown): value is MeterBaseline {
   );
 }
 
-function localDayKey(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 function isTodayEntry(value: unknown): value is TodayEntry {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -89,7 +93,32 @@ function isTodayEntry(value: unknown): value is TodayEntry {
 }
 
 function emptyState(): PersistedState {
-  return { configuredBalanceKwh: defaultConfiguredBalance(), baseline: null, today: null };
+  return {
+    configuredBalanceKwh: defaultConfiguredBalance(),
+    baseline: null,
+    today: null,
+    dayBaseline: null,
+  };
+}
+
+/** Kalendertag in Europe/Zurich. Unabhängig von der Zeitzone des Servers. */
+export function appDayKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function isDayMeterBaseline(value: unknown): value is DayMeterBaseline {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.day === "string" &&
+    Number.isFinite(Number(v.importKwh)) &&
+    Number.isFinite(Number(v.exportKwh))
+  );
 }
 
 function loadState(): PersistedState {
@@ -124,6 +153,13 @@ function loadState(): PersistedState {
           : defaultConfiguredBalance(),
         baseline,
         today,
+        dayBaseline: isDayMeterBaseline(v.dayBaseline)
+          ? {
+              day: v.dayBaseline.day,
+              importKwh: Number(v.dayBaseline.importKwh),
+              exportKwh: Number(v.dayBaseline.exportKwh),
+            }
+          : null,
       };
     }
 
@@ -141,6 +177,7 @@ function loadState(): PersistedState {
         configuredBalanceKwh: balanceKwh,
         baseline: { importBaseline, exportBaseline, establishedAt },
         today: null,
+        dayBaseline: null,
       };
     }
   } catch {
@@ -191,6 +228,7 @@ export function setStromkontoBaseBalance(
         }
       : null,
     today: previous.today,
+    dayBaseline: previous.dayBaseline,
   };
   saveState(state);
   return state;
@@ -199,7 +237,7 @@ export function setStromkontoBaseBalance(
 /** Gespeicherter Tageswert, wenn er zum heutigen Kalendertag gehört. */
 export function getStromkontoTodayChange(): number | null {
   const today = loadState().today;
-  if (!today || today.day !== localDayKey(new Date())) return null;
+  if (!today || today.day !== appDayKey(new Date())) return null;
   return today.changeKwh;
 }
 
@@ -215,7 +253,7 @@ export function setStromkontoTodayChange(
   const state: PersistedState = {
     ...previous,
     today: {
-      day: localDayKey(new Date()),
+      day: appDayKey(new Date()),
       changeKwh: round(changeKwh),
       importKwh: meterTotals?.energyInKwh ?? null,
       exportKwh: meterTotals?.energyOutKwh ?? null,
@@ -223,6 +261,38 @@ export function setStromkontoTodayChange(
   };
   saveState(state);
   return state;
+}
+
+/**
+ * Bezug und Einspeisung seit Mitternacht Europe/Zurich.
+ * Der Zählerstand zu Tagesbeginn bleibt in stromkonto.json, damit ein
+ * Neustart des Servers den Tageswert nicht auf 0 setzt.
+ */
+export function meterTotalsSinceZurichDayStart(
+  cumulativeImportKwh: number,
+  cumulativeExportKwh: number,
+  now: Date = new Date(),
+): { gridImportTodayKwh: number; gridFeedInTodayKwh: number } {
+  const key = appDayKey(now);
+  const state = loadState();
+  let day = state.dayBaseline;
+
+  if (!day || day.day !== key) {
+    day = { day: key, importKwh: cumulativeImportKwh, exportKwh: cumulativeExportKwh };
+    saveState({ ...state, dayBaseline: day });
+  } else if (cumulativeImportKwh < day.importKwh || cumulativeExportKwh < day.exportKwh) {
+    day = {
+      day: key,
+      importKwh: Math.min(day.importKwh, cumulativeImportKwh),
+      exportKwh: Math.min(day.exportKwh, cumulativeExportKwh),
+    };
+    saveState({ ...state, dayBaseline: day });
+  }
+
+  return {
+    gridImportTodayKwh: round(Math.max(0, cumulativeImportKwh - day.importKwh)),
+    gridFeedInTodayKwh: round(Math.max(0, cumulativeExportKwh - day.exportKwh)),
+  };
 }
 
 /**
@@ -252,50 +322,12 @@ export function computeStromkonto(
     baseline.exportBaseline -
     (cumulativeImportKwh - baseline.importBaseline);
 
-  const changeTodayKwh = resolveChangeToday(
-    state,
-    cumulativeImportKwh,
-    cumulativeExportKwh,
-    gridFeedInTodayKwh - gridImportTodayKwh,
-    now,
-  );
+  const changeTodayKwh = round(gridFeedInTodayKwh - gridImportTodayKwh);
 
   return {
     balanceKwh: round(state.configuredBalanceKwh + netDeltaKwh),
     changeTodayKwh,
   };
-}
-
-function resolveChangeToday(
-  state: PersistedState,
-  cumulativeImportKwh: number,
-  cumulativeExportKwh: number,
-  measuredTodayKwh: number,
-  now: Date,
-): number {
-  const today = state.today;
-  if (!today || today.day !== localDayKey(now)) {
-    return round(measuredTodayKwh);
-  }
-
-  if (today.importKwh == null || today.exportKwh == null) {
-    const anchored: PersistedState = {
-      ...state,
-      today: {
-        ...today,
-        importKwh: cumulativeImportKwh,
-        exportKwh: cumulativeExportKwh,
-      },
-    };
-    saveState(anchored);
-    return round(today.changeKwh);
-  }
-
-  const sinceEntryKwh =
-    cumulativeExportKwh -
-    today.exportKwh -
-    (cumulativeImportKwh - today.importKwh);
-  return round(today.changeKwh + sinceEntryKwh);
 }
 
 /**
