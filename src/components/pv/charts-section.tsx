@@ -13,7 +13,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoPopover } from "@/components/pv/info-popover";
 import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
@@ -476,7 +477,7 @@ export function ChartsSection({
 
   return (
     <Card className="shadow-card rounded-2xl">
-      <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+      <CardHeader>
         <div className="flex flex-col gap-1">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             Ertrag &amp; Verbrauch
@@ -485,6 +486,27 @@ export function ChartsSection({
             {hidePv ? "Simulierte Verläufe sind ausgeblendet" : total}
           </span>
         </div>
+        <CardAction>
+          <InfoPopover label="Farbgebung von Ertrag und Verbrauch">
+            <ul className="flex flex-col gap-2">
+              <li className="flex gap-2">
+                <span className="mt-0.5 size-2.5 shrink-0 rounded-full bg-chart-3" aria-hidden />
+                <span>Grün: Ertrag</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="mt-0.5 size-2.5 shrink-0 rounded-full bg-chart-5" aria-hidden />
+                <span>Rot: Verbrauch</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="mt-0.5 size-2.5 shrink-0 rounded-full bg-eigenverbrauch" aria-hidden />
+                <span>Hellgrün: Eigenverbrauch</span>
+              </li>
+            </ul>
+            <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
+              FusionSolar. Aktualisierungsrate alle 6 Minuten.
+            </p>
+          </InfoPopover>
+        </CardAction>
       </CardHeader>
       <CardContent>
         <SwipePageSurface

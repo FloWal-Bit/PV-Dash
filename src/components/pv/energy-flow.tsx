@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
 import {
   Home,
-  Info,
   Sun,
 } from "lucide-react";
+import { InfoPopover } from "@/components/pv/info-popover";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
-import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
@@ -331,123 +330,50 @@ function useDiagramGeometry(
 const STROMKONTO_COLOR_LEGEND = [
   {
     swatch: "bg-chart-3",
-    text: "Grün, wenn Strom einfliesst (Einspeisung). Das ist dasselbe Grün wie bei der PV.",
+    text: "Grün, wenn Strom einfliesst (Einspeisung).",
   },
   {
     swatch: "bg-chart-1",
-    text: "Orange, wenn Strom ausfliesst (Bezug) und das Konto im Plus ist. Das ist das bisherige Stromkonto-Orange.",
+    text: "Orange, wenn Strom ausfliesst (Bezug) und das Konto im Plus ist.",
   },
   {
     swatch: "bg-chart-5",
-    text: "Rot, wenn Strom ausfliesst und der Kontostand negativ ist. Das ist dasselbe Rot wie beim Verbrauch.",
+    text: "Rot, wenn Strom ausfliesst und der Kontostand negativ ist.",
   },
 ] as const;
 
 function StromkontoColorInfo() {
-  const panelId = useId();
-  const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const panel = panelRef.current;
-    const button = buttonRef.current;
-    if (!open || !panel || !button) return;
-
-    const place = () => {
-      const rect = button.getBoundingClientRect();
-      const panelRect = panel.getBoundingClientRect();
-      const margin = 8;
-      let left = rect.right - panelRect.width;
-      left = Math.max(margin, Math.min(left, window.innerWidth - margin - panelRect.width));
-      let top = rect.bottom + 6;
-      if (top + panelRect.height > window.innerHeight - margin) {
-        top = Math.max(margin, rect.top - 6 - panelRect.height);
-      }
-      panel.style.inset = "auto";
-      panel.style.margin = "0";
-      panel.style.top = `${top}px`;
-      panel.style.left = `${left}px`;
-    };
-
-    if (!panel.matches(":popover-open")) panel.showPopover();
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
   return (
-    <>
-      <Button
-        ref={buttonRef}
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-label="Farbgebung des Stromkontos"
-        className="text-muted-foreground"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <Info />
-      </Button>
-      {open ? (
-        <div
-          ref={panelRef}
-          id={panelId}
-          role="note"
-          popover="manual"
-          className="fixed z-50 m-0 w-72 rounded-xl border-0 bg-popover p-3 text-xs leading-snug text-popover-foreground shadow-card ring-1 ring-foreground/10"
-        >
-          <ul className="flex flex-col gap-2">
-            {STROMKONTO_COLOR_LEGEND.map((item) => (
-              <li key={item.swatch} className="flex gap-2">
-                <span
-                  className={cn("mt-0.5 size-2.5 shrink-0 rounded-full", item.swatch)}
-                  aria-hidden
-                />
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </>
+    <InfoPopover label="Farbgebung des Stromkontos">
+      <ul className="flex flex-col gap-2">
+        {STROMKONTO_COLOR_LEGEND.map((item) => (
+          <li key={item.swatch} className="flex gap-2">
+            <span
+              className={cn("mt-0.5 size-2.5 shrink-0 rounded-full", item.swatch)}
+              aria-hidden
+            />
+            <span>{item.text}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
+        Stromkonto. Aktualisierungsrate alle 15 Sekunden.
+      </p>
+    </InfoPopover>
   );
 }
 
-function EnergyFlowTitle() {
+function EnergyFlowTitle({ showInfo = false }: { showInfo?: boolean }) {
   return (
     <CardHeader className="pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">
         Energiefluss
       </CardTitle>
-      <CardAction>
-        <StromkontoColorInfo />
-      </CardAction>
+      {showInfo ? (
+        <CardAction>
+          <StromkontoColorInfo />
+        </CardAction>
+      ) : null}
     </CardHeader>
   );
 }
@@ -505,7 +431,7 @@ function StromkontoFocus({
 }) {
   return (
     <Card className="shadow-card h-full flex-1 rounded-2xl">
-      <EnergyFlowTitle />
+      <EnergyFlowTitle showInfo />
       <CardContent className="flex flex-1 items-center justify-center pt-2 pb-6">
         <div
           className={cn(
@@ -515,7 +441,7 @@ function StromkontoFocus({
         >
           <div
             className={cn(
-              "flex size-48 flex-col items-center justify-center gap-2 rounded-full border-[6px] bg-gradient-to-br shadow-inner",
+              "flex size-48 flex-col items-center justify-center gap-2 rounded-full border-[3px] bg-gradient-to-br shadow-inner",
               muted
                 ? "border-border text-muted-foreground/60"
                 : cn(ACCENT_RING[accent], ACCENT_BG[accent]),
