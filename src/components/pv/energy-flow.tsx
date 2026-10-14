@@ -1,12 +1,16 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import {
   BatteryFull,
   Home,
+  Info,
   Sun,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SwipeCarousel } from "@/components/pv/swipe-carousel";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw } from "@/lib/format";
@@ -326,6 +330,177 @@ function useDiagramGeometry(
   return geometry;
 }
 
+const STROMKONTO_COLOR_LEGEND = [
+  {
+    swatch: "bg-chart-3",
+    text: "Grün, wenn Strom einfliesst (Einspeisung). Das ist dasselbe Grün wie bei der PV.",
+  },
+  {
+    swatch: "bg-chart-1",
+    text: "Orange, wenn Strom ausfliesst (Bezug) und das Konto im Plus ist. Das ist das bisherige Stromkonto-Orange.",
+  },
+  {
+    swatch: "bg-chart-5",
+    text: "Rot, wenn Strom ausfliesst und der Kontostand negativ ist. Das ist dasselbe Rot wie beim Verbrauch.",
+  },
+] as const;
+
+function StromkontoColorInfo() {
+  const panelId = useId();
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const button = buttonRef.current;
+    if (!open || !panel || !button) return;
+
+    const place = () => {
+      const rect = button.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const margin = 8;
+      let left = rect.right - panelRect.width;
+      left = Math.max(margin, Math.min(left, window.innerWidth - margin - panelRect.width));
+      let top = rect.bottom + 6;
+      if (top + panelRect.height > window.innerHeight - margin) {
+        top = Math.max(margin, rect.top - 6 - panelRect.height);
+      }
+      panel.style.top = `${top}px`;
+      panel.style.left = `${left}px`;
+    };
+
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <Button
+        ref={buttonRef}
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label="Farbgebung des Stromkontos"
+        className="text-muted-foreground"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Info />
+      </Button>
+      {open
+        ? createPortal(
+            <div
+              ref={panelRef}
+              id={panelId}
+              role="note"
+              className="fixed z-50 w-72 rounded-xl bg-popover p-3 text-xs leading-snug text-popover-foreground shadow-card ring-1 ring-foreground/10"
+            >
+              <ul className="flex flex-col gap-2">
+                {STROMKONTO_COLOR_LEGEND.map((item) => (
+                  <li key={item.swatch} className="flex gap-2">
+                    <span
+                      className={cn("mt-0.5 size-2.5 shrink-0 rounded-full", item.swatch)}
+                      aria-hidden
+                    />
+                    <span>{item.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function EnergyFlowTitle() {
+  return (
+    <CardHeader className="pb-2">
+      <CardTitle className="text-sm font-medium text-muted-foreground">
+        Energiefluss
+      </CardTitle>
+      <CardAction>
+        <StromkontoColorInfo />
+      </CardAction>
+    </CardHeader>
+  );
+}
+
+function StromkontoFocus({
+  value,
+  accent,
+  muted,
+  simulated,
+  valueClassName,
+}: {
+  value: string;
+  accent: Accent;
+  muted?: boolean;
+  simulated?: boolean;
+  valueClassName?: string;
+}) {
+  return (
+    <Card className="shadow-card h-full flex-1 rounded-2xl">
+      <EnergyFlowTitle />
+      <CardContent className="flex flex-1 items-center justify-center pt-2 pb-6">
+        <div
+          className={cn(
+            "flex flex-col items-center gap-2",
+            simulated && SIMULATED_OPACITY_CLASS,
+          )}
+        >
+          <div
+            className={cn(
+              "flex size-48 flex-col items-center justify-center gap-2 rounded-full border-[6px] bg-gradient-to-br shadow-inner",
+              muted
+                ? "border-border text-muted-foreground/60"
+                : cn(ACCENT_RING[accent], ACCENT_BG[accent]),
+            )}
+          >
+            <BatteryFull className="size-10 -rotate-90" />
+            <span
+              className={cn(
+                "text-[1.75rem] font-semibold tabular-nums leading-none",
+                valueClassName,
+              )}
+            >
+              {value}
+            </span>
+          </div>
+          <span className="text-sm font-medium text-muted-foreground">Stromkonto</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFlowProps) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
@@ -347,7 +522,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   const stromkontoKw = gridMeasured && hasGrid ? Math.abs(gridKw) : null;
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
-  const stromkontoAccent = stromkontoNegative ? "rose" : "amber";
+  const stromkontoAccent: Accent = isGridExport
+    ? "green"
+    : stromkontoNegative
+      ? "rose"
+      : "amber";
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pvCircleRef = useRef<HTMLDivElement | null>(null);
@@ -411,13 +590,26 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
     paths = buildFlowPaths(geometry.pv, geometry.verbrauch, geometry.stromkonto);
   }
 
+  const stromkontoValue =
+    hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, 2);
+  const stromkontoValueClassName =
+    gridSource === "whatwatt" ? "text-muted-foreground" : undefined;
+
   return (
-    <Card className={cn("shadow-card rounded-2xl", className)}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          Energiefluss
-        </CardTitle>
-      </CardHeader>
+    <SwipeCarousel
+      labels={["Stromkonto", "Energiefluss"]}
+      stretch
+      className={cn("min-w-0 gap-1", className)}
+    >
+      <StromkontoFocus
+        value={stromkontoValue}
+        accent={stromkontoAccent}
+        muted={hideGrid || (!isGridImport && !isGridExport)}
+        simulated={!hideGrid && gridSimulated}
+        valueClassName={stromkontoValueClassName}
+      />
+      <Card className="shadow-card h-full flex-1 rounded-2xl">
+      <EnergyFlowTitle />
       <CardContent className="pt-0 pb-3">
         <div
           ref={containerRef}
@@ -490,14 +682,12 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               stromkontoCircleRef.current = el;
             }}
             icon={<BatteryFull className="size-5 -rotate-90" />}
-            value={hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, 2)}
+            value={stromkontoValue}
             label="Stromkonto"
             accent={stromkontoAccent}
             muted={hideGrid || (!isGridImport && !isGridExport)}
             simulated={!hideGrid && gridSimulated}
-            valueClassName={
-              gridSource === "whatwatt" ? "text-muted-foreground" : undefined
-            }
+            valueClassName={stromkontoValueClassName}
             labelPosition="bottom"
             className="energy-flow-node-side"
             style={{ left: "84%" }}
@@ -505,5 +695,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         </div>
       </CardContent>
     </Card>
+    </SwipeCarousel>
   );
 }

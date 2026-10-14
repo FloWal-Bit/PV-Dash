@@ -108,12 +108,15 @@ export function SwipeCarousel({
   className,
   page: controlledPage,
   onPageChange,
+  stretch = false,
 }: {
   labels: string[];
   children: ReactNode[];
   className?: string;
   page?: number;
   onPageChange?: (page: number) => void;
+  /** Fills a stretched parent from the md breakpoint up; dots stay below the slides. */
+  stretch?: boolean;
 }) {
   const pageCount = children.length;
   const [internalPage, setInternalPage] = useState(0);
@@ -145,9 +148,9 @@ export function SwipeCarousel({
   };
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    <div className={cn("flex flex-col gap-2", stretch && "md:h-full", className)}>
       <div
-        className="touch-pan-y overflow-hidden"
+        className={cn("touch-pan-y overflow-hidden", stretch && "md:min-h-0 md:flex-1")}
         onTouchStart={(e) => onTouchStart(e.changedTouches[0]?.clientX ?? 0)}
         onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
         onPointerDown={(e) => {
@@ -158,11 +161,17 @@ export function SwipeCarousel({
         }}
       >
         <div
-          className="flex transition-transform duration-300 ease-out"
+          className={cn(
+            "flex transition-transform duration-300 ease-out",
+            stretch && "md:h-full",
+          )}
           style={{ transform: `translateX(-${page * 100}%)` }}
         >
           {children.map((child, index) => (
-            <div key={labels[index] ?? index} className="w-full shrink-0">
+            <div
+              key={labels[index] ?? index}
+              className={cn("flex w-full shrink-0 flex-col", stretch && "md:h-full")}
+            >
               {child}
             </div>
           ))}
