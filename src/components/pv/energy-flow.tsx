@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
-import { createPortal } from "react-dom";
 import {
   BatteryFull,
   Home,
@@ -366,10 +365,13 @@ function StromkontoColorInfo() {
       if (top + panelRect.height > window.innerHeight - margin) {
         top = Math.max(margin, rect.top - 6 - panelRect.height);
       }
+      panel.style.inset = "auto";
+      panel.style.margin = "0";
       panel.style.top = `${top}px`;
       panel.style.left = `${left}px`;
     };
 
+    if (!panel.matches(":popover-open")) panel.showPopover();
     place();
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
@@ -413,29 +415,27 @@ function StromkontoColorInfo() {
       >
         <Info />
       </Button>
-      {open
-        ? createPortal(
-            <div
-              ref={panelRef}
-              id={panelId}
-              role="note"
-              className="fixed z-50 w-72 rounded-xl bg-popover p-3 text-xs leading-snug text-popover-foreground shadow-card ring-1 ring-foreground/10"
-            >
-              <ul className="flex flex-col gap-2">
-                {STROMKONTO_COLOR_LEGEND.map((item) => (
-                  <li key={item.swatch} className="flex gap-2">
-                    <span
-                      className={cn("mt-0.5 size-2.5 shrink-0 rounded-full", item.swatch)}
-                      aria-hidden
-                    />
-                    <span>{item.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>,
-            document.body,
-          )
-        : null}
+      {open ? (
+        <div
+          ref={panelRef}
+          id={panelId}
+          role="note"
+          popover="manual"
+          className="fixed z-50 m-0 w-72 rounded-xl border-0 bg-popover p-3 text-xs leading-snug text-popover-foreground shadow-card ring-1 ring-foreground/10"
+        >
+          <ul className="flex flex-col gap-2">
+            {STROMKONTO_COLOR_LEGEND.map((item) => (
+              <li key={item.swatch} className="flex gap-2">
+                <span
+                  className={cn("mt-0.5 size-2.5 shrink-0 rounded-full", item.swatch)}
+                  aria-hidden
+                />
+                <span>{item.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </>
   );
 }
