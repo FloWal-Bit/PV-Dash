@@ -220,6 +220,69 @@
     }
   }
 
+  .stromkonto-battery-bar {
+    opacity: 0.2;
+  }
+
+  .stromkonto-battery.is-charging .stromkonto-battery-bar:nth-child(1) {
+    animation: stromkonto-bar-charge-1 2.4s linear infinite;
+  }
+  .stromkonto-battery.is-charging .stromkonto-battery-bar:nth-child(2) {
+    animation: stromkonto-bar-charge-2 2.4s linear infinite;
+  }
+  .stromkonto-battery.is-charging .stromkonto-battery-bar:nth-child(3) {
+    animation: stromkonto-bar-charge-3 2.4s linear infinite;
+  }
+
+  .stromkonto-battery.is-discharging .stromkonto-battery-bar:nth-child(1) {
+    animation: stromkonto-bar-drain-1 2.4s linear infinite;
+  }
+  .stromkonto-battery.is-discharging .stromkonto-battery-bar:nth-child(2) {
+    animation: stromkonto-bar-drain-2 2.4s linear infinite;
+  }
+  .stromkonto-battery.is-discharging .stromkonto-battery-bar:nth-child(3) {
+    animation: stromkonto-bar-drain-3 2.4s linear infinite;
+  }
+
+  @keyframes stromkonto-bar-charge-1 {
+    0%, 6% { opacity: 0.2; }
+    12%, 78% { opacity: 1; }
+    90%, 100% { opacity: 0.2; }
+  }
+  @keyframes stromkonto-bar-charge-2 {
+    0%, 28% { opacity: 0.2; }
+    34%, 78% { opacity: 1; }
+    90%, 100% { opacity: 0.2; }
+  }
+  @keyframes stromkonto-bar-charge-3 {
+    0%, 50% { opacity: 0.2; }
+    56%, 78% { opacity: 1; }
+    90%, 100% { opacity: 0.2; }
+  }
+
+  @keyframes stromkonto-bar-drain-3 {
+    0%, 8% { opacity: 1; }
+    16%, 78% { opacity: 0.2; }
+    90%, 100% { opacity: 1; }
+  }
+  @keyframes stromkonto-bar-drain-2 {
+    0%, 28% { opacity: 1; }
+    36%, 78% { opacity: 0.2; }
+    90%, 100% { opacity: 1; }
+  }
+  @keyframes stromkonto-bar-drain-1 {
+    0%, 48% { opacity: 1; }
+    56%, 78% { opacity: 0.2; }
+    90%, 100% { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stromkonto-battery-bar {
+      animation: none;
+      opacity: 1;
+    }
+  }
+
   .energy-flow-node-side {
     top: 80%;
   }

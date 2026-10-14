@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
 import {
-  BatteryFull,
   Home,
   Info,
   Sun,
@@ -453,18 +452,56 @@ function EnergyFlowTitle() {
   );
 }
 
+type StromkontoFlow = "in" | "out" | "idle";
+
+function StromkontoBattery({
+  direction,
+  className,
+}: {
+  direction: StromkontoFlow;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className={cn(
+        "stromkonto-battery",
+        direction === "in" && "is-charging",
+        direction === "out" && "is-discharging",
+        className,
+      )}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 2h4" />
+      <rect x="6" y="6" width="12" height="16" rx="2" />
+      <g>
+        <path className="stromkonto-battery-bar" d="M10 18h4" />
+        <path className="stromkonto-battery-bar" d="M10 14h4" />
+        <path className="stromkonto-battery-bar" d="M10 10h4" />
+      </g>
+    </svg>
+  );
+}
+
 function StromkontoFocus({
   value,
   accent,
   muted,
   simulated,
   valueClassName,
+  direction,
 }: {
   value: string;
   accent: Accent;
   muted?: boolean;
   simulated?: boolean;
   valueClassName?: string;
+  direction: StromkontoFlow;
 }) {
   return (
     <Card className="shadow-card h-full flex-1 rounded-2xl">
@@ -484,7 +521,7 @@ function StromkontoFocus({
                 : cn(ACCENT_RING[accent], ACCENT_BG[accent]),
             )}
           >
-            <BatteryFull className="size-10 -rotate-90" />
+            <StromkontoBattery direction={direction} className="size-10" />
             <span
               className={cn(
                 "text-[1.75rem] font-semibold tabular-nums leading-none",
@@ -594,6 +631,13 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
     hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, 2);
   const stromkontoValueClassName =
     gridSource === "whatwatt" ? "text-muted-foreground" : undefined;
+  const stromkontoDirection: StromkontoFlow = hideGrid
+    ? "idle"
+    : isGridExport
+      ? "in"
+      : isGridImport
+        ? "out"
+        : "idle";
 
   return (
     <SwipeCarousel
@@ -607,6 +651,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         muted={hideGrid || (!isGridImport && !isGridExport)}
         simulated={!hideGrid && gridSimulated}
         valueClassName={stromkontoValueClassName}
+        direction={stromkontoDirection}
       />
       <Card className="shadow-card h-full flex-1 rounded-2xl">
       <EnergyFlowTitle />
@@ -681,7 +726,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             circleRef={(el) => {
               stromkontoCircleRef.current = el;
             }}
-            icon={<BatteryFull className="size-5 -rotate-90" />}
+            icon={<StromkontoBattery direction={stromkontoDirection} className="size-5" />}
             value={stromkontoValue}
             label="Stromkonto"
             accent={stromkontoAccent}
