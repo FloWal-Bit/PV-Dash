@@ -6,7 +6,8 @@ import { getLiveDashboardPayload } from "@/lib/pv-source";
 // laufen, nicht durch Next.js' Route-Cache.
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const payload = await getLiveDashboardPayload();
+export async function GET(request: Request) {
+  const fusionLive = new URL(request.url).searchParams.get("fusionLive") === "1";
+  const payload = await getLiveDashboardPayload({ fusionLive });
   return NextResponse.json(payload);
 }

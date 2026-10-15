@@ -26,6 +26,7 @@ import {
 } from "@/lib/stromkonto-shared";
 import { formatYieldKwh } from "@/lib/format";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { fusionsolarLiveStore } from "@/lib/fusionsolar-live";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
@@ -372,6 +373,11 @@ export function SettingsDialog() {
     hideSimulatedStore.getSnapshot,
     hideSimulatedStore.getServerSnapshot,
   );
+  const fusionLive = useSyncExternalStore(
+    fusionsolarLiveStore.subscribe,
+    fusionsolarLiveStore.getSnapshot,
+    fusionsolarLiveStore.getServerSnapshot,
+  );
   const [pending, setPending] = useState(false);
 
   async function handleToggle(checked: boolean) {
@@ -429,6 +435,22 @@ export function SettingsDialog() {
                 id="hide-simulated"
                 checked={hideSimulated}
                 onCheckedChange={(checked) => hideSimulatedStore.set(checked)}
+                className="data-checked:bg-chart-3"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t border-border/70 pt-3">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <Label htmlFor="fusionsolar-live">FusionSolar-Livedaten</Label>
+                <span className="text-xs leading-relaxed text-muted-foreground">
+                  Standardmässig aus. Huawei wird nicht abgefragt. Eingeschaltet holt das
+                  Dashboard Livedaten höchstens alle 6 Minuten. whatwatt bleibt davon
+                  unberührt.
+                </span>
+              </div>
+              <Switch
+                id="fusionsolar-live"
+                checked={fusionLive}
+                onCheckedChange={(checked) => fusionsolarLiveStore.set(checked)}
                 className="data-checked:bg-chart-3"
               />
             </div>

@@ -145,9 +145,11 @@ async function overlayWhatWattGrid(
 }
 
 /** Momentanwerte für Energiefluss, Kennzahlen und Prognose. Ohne Verlaufsreihen. */
-export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
+export async function getLiveDashboardPayload(options?: {
+  fusionLive?: boolean;
+}): Promise<LiveDashboardPayload> {
   const base = await (async (): Promise<{ source: DataSource; snapshot: PvSnapshot; warning: string | null }> => {
-    if (!isFusionSolarConfigured()) {
+    if (!options?.fusionLive || !isFusionSolarConfigured()) {
       return { source: "simulation", snapshot: getSnapshot(new Date()), warning: null };
     }
 
@@ -206,8 +208,10 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
 }
 
 /** Verlaufsreihen für die Diagramme. Unabhängig vom 15-Sekunden-Live-Abruf. */
-export async function getHistoryPayload(): Promise<HistoryPayload> {
-  if (!isFusionSolarConfigured()) {
+export async function getHistoryPayload(options?: {
+  fusionLive?: boolean;
+}): Promise<HistoryPayload> {
+  if (!options?.fusionLive || !isFusionSolarConfigured()) {
     return { source: "simulation", ...simulateHistory() };
   }
 

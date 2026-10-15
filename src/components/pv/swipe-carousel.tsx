@@ -177,7 +177,7 @@ export function SwipeCarousel({
           ))}
         </div>
       </div>
-      <div className="flex items-center justify-center gap-2" role="tablist">
+      <div className="swipe-carousel-dots flex items-center justify-center gap-2" role="tablist">
         {labels.map((label, index) => (
           <button
             key={label}

@@ -9,7 +9,9 @@
  * die stündlichen/täglichen/monatlichen Verlaufs-Endpunkte jeweils
  * Aufrufe/Tag = Aufrund(Anlagen/100) + 24. Ohne Cache würde ein Browser, der
  * alle 15 Sekunden pollt, das Tageslimit binnen Minuten aufbrauchen und die
- * Anlage für den Rest des Tages mit Fehlercode 407 sperren.
+ * Anlage für den Rest des Tages mit Fehlercode 407 sperren. Live-KPIs werden
+ * höchstens alle 6 Minuten geholt. Ein Fehlversuch wartet genauso lange,
+ * statt bei jedem Browser-Poll erneut anzufragen.
  */
 
 import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
@@ -73,6 +75,10 @@ let lifetimeCache: Cache<DailyEnergyPoint[]> | null = null;
 // Deduplicate concurrent in-flight fetches of the same resource (e.g. two
 // browser tabs polling at the same moment) so we never double-spend our
 // rate-limit budget on a cache miss.
+let liveFailure: Cache<Error> | null = null;
+let historyFailure: Cache<Error> | null = null;
+let lifetimeFailure: Cache<Error> | null = null;
+
 let liveInFlight: Promise<PvSnapshot> | null = null;
 let historyInFlight: Promise<{
   today: HistoryPoint[];
@@ -219,16 +225,30 @@ async function fetchLifetime(): Promise<DailyEnergyPoint[]> {
   }
 }
 
+function asError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err));
+}
+
 export async function getFusionSolarLiveSnapshot(): Promise<PvSnapshot> {
   if (fresh(liveCache)) return liveCache.value;
+  if (fresh(liveFailure)) throw liveFailure.value;
   if (!liveInFlight) {
-    liveInFlight = fetchLiveSnapshot().finally(() => {
-      liveInFlight = null;
-    });
+    liveInFlight = fetchLiveSnapshot()
+      .then((snapshot) => {
+        liveCache = { value: snapshot, expiresAt: Date.now() + LIVE_TTL_MS };
+        liveFailure = null;
+        return snapshot;
+      })
+      .catch((err: unknown) => {
+        const error = asError(err);
+        liveFailure = { value: error, expiresAt: Date.now() + LIVE_TTL_MS };
+        throw error;
+      })
+      .finally(() => {
+        liveInFlight = null;
+      });
   }
-  const snapshot = await liveInFlight;
-  liveCache = { value: snapshot, expiresAt: Date.now() + LIVE_TTL_MS };
-  return snapshot;
+  return liveInFlight;
 }
 
 export async function getFusionSolarHistory(): Promise<{
@@ -238,26 +258,46 @@ export async function getFusionSolarHistory(): Promise<{
   year: DailyEnergyPoint[];
 }> {
   if (fresh(historyCache)) return historyCache.value;
+  if (fresh(historyFailure)) throw historyFailure.value;
   if (!historyInFlight) {
-    historyInFlight = fetchHistory().finally(() => {
-      historyInFlight = null;
-    });
+    historyInFlight = fetchHistory()
+      .then((history) => {
+        historyCache = { value: history, expiresAt: Date.now() + HISTORY_TTL_MS };
+        historyFailure = null;
+        return history;
+      })
+      .catch((err: unknown) => {
+        const error = asError(err);
+        historyFailure = { value: error, expiresAt: Date.now() + LIVE_TTL_MS };
+        throw error;
+      })
+      .finally(() => {
+        historyInFlight = null;
+      });
   }
-  const history = await historyInFlight;
-  historyCache = { value: history, expiresAt: Date.now() + HISTORY_TTL_MS };
-  return history;
+  return historyInFlight;
 }
 
 export async function getFusionSolarLifetimeHistory(): Promise<DailyEnergyPoint[]> {
   if (fresh(lifetimeCache)) return lifetimeCache.value;
+  if (fresh(lifetimeFailure)) throw lifetimeFailure.value;
   if (!lifetimeInFlight) {
-    lifetimeInFlight = fetchLifetime().finally(() => {
-      lifetimeInFlight = null;
-    });
+    lifetimeInFlight = fetchLifetime()
+      .then((lifetime) => {
+        lifetimeCache = { value: lifetime, expiresAt: Date.now() + LIFETIME_TTL_MS };
+        lifetimeFailure = null;
+        return lifetime;
+      })
+      .catch((err: unknown) => {
+        const error = asError(err);
+        lifetimeFailure = { value: error, expiresAt: Date.now() + LIVE_TTL_MS };
+        throw error;
+      })
+      .finally(() => {
+        lifetimeInFlight = null;
+      });
   }
-  const lifetime = await lifetimeInFlight;
-  lifetimeCache = { value: lifetime, expiresAt: Date.now() + LIFETIME_TTL_MS };
-  return lifetime;
+  return lifetimeInFlight;
 }
 
 export async function getFusionSolarDashboardData(): Promise<FusionSolarDashboardData> {

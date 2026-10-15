@@ -569,7 +569,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
     <SwipeCarousel
       labels={["Stromkonto", "Energiefluss"]}
       stretch
-      className={cn("min-w-0 gap-1", className)}
+      className={cn("energy-flow-carousel min-w-0 gap-1", className)}
     >
       <StromkontoFocus
         value={stromkontoValue}

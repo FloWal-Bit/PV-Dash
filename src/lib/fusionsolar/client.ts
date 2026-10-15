@@ -104,6 +104,7 @@ async function login(): Promise<Session> {
 
   const body = (await res.json()) as FusionSolarEnvelope<unknown>;
   if (!res.ok || !body.success) {
+    if (body.failCode === 407) throw new FusionSolarRateLimitError(body.message ?? undefined);
     throw new FusionSolarError(
       body.message || `FusionSolar-Login fehlgeschlagen (HTTP ${res.status}).`,
       body.failCode,
