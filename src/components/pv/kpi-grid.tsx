@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { BatteryFull, Gauge, Home, Sun } from "lucide-react";
+import { BatteryFull, Home, Sun } from "lucide-react";
 import { StatCard } from "@/components/pv/stat-card";
-import { financialAutarkyRate } from "@/lib/autarky";
 import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatSignedSwissNumber, formatSwissNumber } from "@/lib/format";
@@ -33,7 +32,6 @@ export function KpiGrid({
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoChangeNegative =
     snapshot.stromkontoChangeTodayKwh != null && snapshot.stromkontoChangeTodayKwh < 0;
-  const financialAutarky = financialAutarkyRate(snapshot);
 
   return (
     <div className={cn("grid h-full grid-cols-2 gap-3 sm:grid-cols-4", className)}>
@@ -103,40 +101,6 @@ export function KpiGrid({
         accent={stromkontoNegative ? "rose" : "green"}
         simulated={!hideGrid && gridSimulated}
         valueClassName={gridSource === "whatwatt" ? "text-muted-foreground" : undefined}
-      />
-      <StatCard
-        label={
-          <>
-            <span className="md:hidden">
-              Physischer Autarkiegrad
-              <br />
-              heute
-            </span>
-            <span className="hidden md:inline">Physischer Autarkiegrad heute</span>
-          </>
-        }
-        value={hidePv || snapshot.autarkyRate == null ? "–" : String(snapshot.autarkyRate)}
-        unit={hidePv || snapshot.autarkyRate == null ? undefined : "%"}
-        icon={<Gauge className="size-5" />}
-        accent="green"
-        simulated={!hidePv && pvSimulated}
-      />
-      <StatCard
-        label={
-          <>
-            <span className="md:hidden">
-              Finanzieller Autarkiegrad
-              <br />
-              heute
-            </span>
-            <span className="hidden md:inline">Finanzieller Autarkiegrad heute</span>
-          </>
-        }
-        value={hidePv || financialAutarky == null ? "–" : String(financialAutarky)}
-        unit={hidePv || financialAutarky == null ? undefined : "%"}
-        icon={<Gauge className="size-5" />}
-        accent="green"
-        simulated={!hidePv && pvSimulated}
       />
     </div>
   );

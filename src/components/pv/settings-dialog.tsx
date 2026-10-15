@@ -26,12 +26,32 @@ import {
 } from "@/lib/stromkonto-shared";
 import { formatYieldKwh } from "@/lib/format";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
   "flex h-10 w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60";
+
+function StatusBarSwitch() {
+  const hideStatusBar = useSyncExternalStore(
+    hideStatusBarStore.subscribe,
+    hideStatusBarStore.getSnapshot,
+    hideStatusBarStore.getServerSnapshot,
+  );
+
+  return (
+    <Switch
+      id="hide-status-bar"
+      checked={hideStatusBar}
+      onCheckedChange={(checked) => {
+        void setHideStatusBar(checked);
+      }}
+      className="data-checked:bg-chart-3"
+    />
+  );
+}
 
 function SettingsSection({
   icon,
@@ -411,6 +431,19 @@ export function SettingsDialog() {
                 onCheckedChange={(checked) => hideSimulatedStore.set(checked)}
                 className="data-checked:bg-chart-3"
               />
+            </div>
+            <div
+              data-status-bar-toggle
+              className="flex items-start justify-between gap-3 border-t border-border/70 pt-3"
+            >
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <Label htmlFor="hide-status-bar">Statusleiste ausblenden</Label>
+                <span className="text-xs leading-relaxed text-muted-foreground">
+                  Blendet die Leiste mit Uhrzeit und Akku aus. Beim nächsten Öffnen
+                  genügt ein Tipp, falls der Browser sie wieder zeigt.
+                </span>
+              </div>
+              <StatusBarSwitch />
             </div>
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
               <span className="text-sm font-medium">Farbschema</span>

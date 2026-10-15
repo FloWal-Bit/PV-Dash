@@ -127,7 +127,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
                 gridSource={gridSource}
               />
               <KpiGrid
-                className="min-w-0 md:h-full md:grid-cols-2 md:grid-rows-3"
+                className="min-w-0 md:h-full md:grid-cols-2 md:grid-rows-2"
                 snapshot={snapshot}
                 source={dataSource}
                 gridSource={gridSource}
@@ -189,8 +189,8 @@ function DashboardSkeleton() {
       <Skeleton className="h-[120px] rounded-2xl" />
       <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
         <Skeleton className="h-52 rounded-2xl md:h-full md:min-h-64" />
-        <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-2">
+          {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[96px] rounded-2xl md:h-full" />
           ))}
         </div>
