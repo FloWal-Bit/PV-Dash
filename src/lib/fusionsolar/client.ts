@@ -185,8 +185,20 @@ async function request<T>(path: string, requestBody: Record<string, unknown>): P
   return body.data;
 }
 
+type PagedList<T> = { list?: T[] };
+
+function asList<T>(data: T[] | PagedList<T>): T[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.list)) return data.list;
+  throw new FusionSolarError("FusionSolar-Antwort enthielt keine Liste.");
+}
+
 export async function listStations(): Promise<StationListItem[]> {
-  return request<StationListItem[]>("/thirdData/stations", { pageNo: 1, pageSize: 100 });
+  const data = await request<StationListItem[] | PagedList<StationListItem>>(
+    "/thirdData/stations",
+    { pageNo: 1, pageSize: 100 },
+  );
+  return asList(data);
 }
 
 export async function getStationRealKpi(stationCodes: string[]): Promise<StationRealKpiItem[]> {
