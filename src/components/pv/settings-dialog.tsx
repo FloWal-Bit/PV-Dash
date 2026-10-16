@@ -28,11 +28,54 @@ import { formatYieldKwh } from "@/lib/format";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
-import { DOCUMENTATION } from "@/lib/documentation";
+import { ReadmeView } from "@/components/pv/readme-view";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
   "flex h-10 w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60";
+
+function ReadmeDisclosure() {
+  const [open, setOpen] = useState(false);
+  const [markdown, setMarkdown] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || markdown) return;
+    let cancelled = false;
+    void fetch("/api/readme", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.text();
+      })
+      .then((text) => {
+        if (!cancelled) setMarkdown(text);
+      })
+      .catch(() => {
+        if (!cancelled) setError("README konnte nicht geladen werden.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, markdown]);
+
+  return (
+    <details
+      className="group"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className="cursor-pointer text-sm font-medium text-foreground">
+        Gesamtes README anzeigen
+      </summary>
+      <div className="mt-3 max-h-80 overflow-y-auto pr-1">
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        {open && !markdown && !error ? (
+          <p className="text-xs text-muted-foreground">README wird geladen…</p>
+        ) : null}
+        {markdown ? <ReadmeView markdown={markdown} /> : null}
+      </div>
+    </details>
+  );
+}
 
 function StatusBarSwitch() {
   const hideStatusBar = useSyncExternalStore(
@@ -486,21 +529,9 @@ export function SettingsDialog() {
           <SettingsSection
             icon={<Info className="size-4" />}
             iconClassName="bg-muted text-foreground/70"
-            title="Dokumentation"
+            title="README"
           >
-            <ul className="flex flex-col gap-3">
-              {DOCUMENTATION.map((entry) => (
-                <li key={entry.title} className="flex flex-col gap-0.5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-sm font-medium">{entry.title}</span>
-                    <time className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                      {entry.updated}
-                    </time>
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{entry.body}</p>
-                </li>
-              ))}
-            </ul>
+            <ReadmeDisclosure />
           </SettingsSection>
 
           <SettingsSection
