@@ -128,7 +128,8 @@ function FlowNode({
 
 /**
  * Verbindungslinie mit animierten Strichsegmenten entlang des Pfads.
- * `reverse` kehrt die Laufrichtung um (z. B. Netzbezug: Stromkonto → Verteiler).
+ * Die Leitung Verbrauch–Stromkonto ist von Stromkonto nach Verbrauch gezeichnet
+ * und läuft nur bei Netzbezug.
  */
 function FlowPath({
   d,
@@ -594,8 +595,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               <FlowPath
                 d={paths.gridToVerbrauchBus}
                 accent={stromkontoAccent}
-                active={isGridImport || isGridExport}
-                reverse={isGridExport}
+                active={isGridImport}
               />
               <FlowPath
                 d={paths.pvToVerbrauch}

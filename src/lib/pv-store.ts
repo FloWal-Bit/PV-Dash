@@ -1,6 +1,5 @@
 import type { DataSource, GridSource, PvHistory } from "@/lib/pv-source";
 import type { PvSnapshot } from "@/lib/pv-data";
-import { fusionsolarLiveStore } from "@/lib/fusionsolar-live";
 
 export type PvStoreState = {
   snapshot: PvSnapshot | null;
@@ -19,7 +18,7 @@ export type PvStoreState = {
 };
 
 const LIVE_INTERVAL_MS = 15_000;
-const HISTORY_INTERVAL_MS = 5 * 60 * 1000;
+const HISTORY_INTERVAL_MS = 60 * 60 * 1000;
 /** Beim Wechsel des Diagramm-Zeitraums neu laden, wenn der Stand älter ist. */
 const HISTORY_RANGE_MIN_AGE_MS = 60_000;
 
@@ -53,10 +52,11 @@ type LiveResponse = {
 type HistoryResponse = PvHistory & { source: DataSource };
 
 /**
- * Live-Zahlen alle 15 Sekunden, Verläufe alle 5 Minuten. Beides pausiert,
+ * Live-Zahlen alle 15 Sekunden, Verläufe einmal pro Stunde. Beides pausiert,
  * solange der Tab im Hintergrund ist. whatwatt liefert etwa alle 15 Sekunden
- * einen neuen Zählerstand. Huawei wird dadurch nicht öfter gefragt: der
- * Server hält FusionSolar-Livedaten 6 Minuten, Verläufe deutlich länger.
+ * einen neuen Zählerstand. Huawei-Livedaten holt der Server höchstens alle
+ * 6 Minuten, die heutige Stundenreihe einmal pro Stunde, längere Reihen
+ * zweimal täglich.
  */
 class PvStore {
   private listeners = new Set<Listener>();
@@ -64,7 +64,6 @@ class PvStore {
   private liveIntervalId: ReturnType<typeof setInterval> | null = null;
   private historyIntervalId: ReturnType<typeof setInterval> | null = null;
   private visibilityBound = false;
-  private fusionLiveBound = false;
   private liveInflight: Promise<void> | null = null;
   private historyInflight: Promise<void> | null = null;
   private lastHistoryAt: number | null = null;
@@ -77,8 +76,7 @@ class PvStore {
     if (this.liveInflight) return this.liveInflight;
     this.liveInflight = (async () => {
       try {
-        const fusionLive = fusionsolarLiveStore.getSnapshot() ? "1" : "0";
-        const res = await fetch(`/api/pv?fusionLive=${fusionLive}`, { cache: "no-store" });
+        const res = await fetch("/api/pv", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const payload = (await res.json()) as LiveResponse;
         this.state = {
@@ -111,8 +109,7 @@ class PvStore {
     if (this.historyInflight) return this.historyInflight;
     this.historyInflight = (async () => {
       try {
-        const fusionLive = fusionsolarLiveStore.getSnapshot() ? "1" : "0";
-        const res = await fetch(`/api/pv/history?fusionLive=${fusionLive}`, { cache: "no-store" });
+        const res = await fetch("/api/pv/history", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const payload = (await res.json()) as HistoryResponse;
         this.lastHistoryAt = Date.now();
@@ -179,21 +176,11 @@ class PvStore {
     this.startTimers();
   };
 
-  private onFusionLive = () => {
-    if (typeof document !== "undefined" && document.hidden) return;
-    void this.tickLive();
-    void this.tickHistory();
-  };
-
   private ensureRunning() {
     if (typeof document === "undefined") return;
     if (!this.visibilityBound) {
       document.addEventListener("visibilitychange", this.onVisibility);
       this.visibilityBound = true;
-    }
-    if (!this.fusionLiveBound) {
-      fusionsolarLiveStore.subscribe(this.onFusionLive);
-      this.fusionLiveBound = true;
     }
     this.startTimers();
   }
@@ -223,6 +210,12 @@ class PvStore {
     if (typeof document !== "undefined" && document.hidden) return;
     void this.tickLive();
     if (this.state.history == null) void this.tickHistory();
+  };
+
+  /** Live-Zahlen und Verläufe sofort neu vom eigenen Server lesen. */
+  reload = () => {
+    void this.tickLive();
+    void this.tickHistory();
   };
 
   /** Diagramm-Zeitraum gewechselt: Verlauf neu holen, wenn er älter als eine Minute ist. */

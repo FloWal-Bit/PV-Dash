@@ -3,10 +3,9 @@ import { getHistoryPayload } from "@/lib/pv-source";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const fusionLive = new URL(request.url).searchParams.get("fusionLive") === "1";
-    const payload = await getHistoryPayload({ fusionLive });
+    const payload = await getHistoryPayload();
     return NextResponse.json(payload);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";

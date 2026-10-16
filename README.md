@@ -97,12 +97,11 @@ Echtzeitdaten (`getStationRealKpi`) praktisch nur alle ~5 Minuten abrufen und
 Verlaufsdaten (stündlich/täglich/monatlich/jährlich) nur ~24×/Tag – unabhängig
 davon, wie oft das Dashboard im Browser pollt. Der Server cacht deshalb selbst
 ([`src/lib/fusionsolar/service.ts`](src/lib/fusionsolar/service.ts)): Live-KPIs
-werden höchstens alle 6 Minuten neu von FusionSolar geholt, Stunden-/Tagesdaten
-höchstens einmal pro Stunde und die Jahresdaten für die "Lebensdauer"-Ansicht
-(`getKpiStationYear`) höchstens alle 6 Stunden, da sie sich innerhalb eines
-Tages ohnehin kaum ändern. Der Browser holt die Live-Zahlen über `/api/pv` alle **15 Sekunden**, solange
-der Tab sichtbar ist, und die Verläufe über `/api/pv/history` alle 5 Minuten
-oder beim Wechsel des Diagramm-Zeitraums. Im Hintergrund pausiert beides.
+werden höchstens alle 6 Minuten neu von FusionSolar geholt, die heutige
+Stundenreihe einmal pro Stunde und Woche, Monat, Jahr sowie die
+"Lebensdauer"-Ansicht zweimal täglich. Der Browser holt die Live-Zahlen über
+`/api/pv` alle **15 Sekunden**, solange der Tab sichtbar ist, und die Verläufe
+über `/api/pv/history` einmal pro Stunde. Im Hintergrund pausiert beides.
 Tagsüber kommt meist der Server-Cache, nicht ein neuer FusionSolar-Call.
 
 **Bekannte Einschränkungen:** FusionSolar liefert Momentanleistung nur pro

@@ -95,23 +95,19 @@ export type MeterRealKpiItem = {
 
 /**
  * Antwort von thirdData/getKpiStationHour|getKpiStationDay|getKpiStationMonth.
- *
- * ACHTUNG: Huaweis Doku gibt für diese Zeitreihen-Endpunkte keine Einheit für
- * `inverter_power`/`ongrid_power`/`use_power` an (im Gegensatz zu
- * `getStationRealKpi`, wo explizit kWh dokumentiert ist). Community-Clients
- * gehen von Wh pro Intervall aus – siehe `WATT_HOURS_TO_KWH` in mapper.ts. Falls
- * sich nach dem Live-Test mit echten Zugangsdaten andere Größenordnungen
- * zeigen, hier den Umrechnungsfaktor anpassen.
+ * Diese Anlage liefert die Intervallwerte bereits in kWh.
  */
 export type StationKpiTimeseriesItem = {
   stationCode: string;
   collectTime: number;
   dataItemMap: {
-    /** Ertrag im Intervall (Wh, siehe Hinweis oben) */
+    /** Ertrag im Intervall, kWh. Diese Anlage liefert die Zeitreihen bereits in kWh. */
     inverter_power?: number | null;
-    /** Netzeinspeisung im Intervall (Wh) */
+    /** Netzeinspeisung im Intervall, kWh */
     ongrid_power?: number | null;
-    /** Verbrauch im Intervall (Wh) */
+    /** Verbrauch im Intervall, kWh. Fehlt auf manchen Anlagen. */
     use_power?: number | null;
+    /** Eigenverbrauch im Intervall, kWh. Ersatz, wenn use_power fehlt. */
+    selfProvide?: number | null;
   };
 };

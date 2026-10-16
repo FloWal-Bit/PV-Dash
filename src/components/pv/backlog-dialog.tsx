@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { backlogStore } from "@/lib/backlog-store";
 import { MAX_BACKLOG_TITLE_LENGTH } from "@/lib/backlog-shared";
+import { pvStore } from "@/lib/pv-store";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
@@ -144,8 +145,56 @@ export function BacklogDialog({
             </>
           )}
         </div>
+        {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DevFusionRefresh() {
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  async function reload() {
+    setPending(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/pv/dev-refresh", { method: "POST" });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setFailed(true);
+        setMessage(body.error ?? "Nachladen fehlgeschlagen.");
+        return;
+      }
+      pvStore.reload();
+      setFailed(false);
+      setMessage("Gespeichert. Weitere Abrufe lesen nur noch diese Daten.");
+    } catch {
+      setFailed(true);
+      setMessage("Nachladen fehlgeschlagen.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">FusionSolar nachladen</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Einmal von Huawei holen und lokal behalten.
+          </p>
+        </div>
+        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => void reload()}>
+          {pending ? "…" : "Nachladen"}
+        </Button>
+      </div>
+      {message ? (
+        <p className={cn("text-xs", failed ? "text-destructive" : "text-muted-foreground")}>{message}</p>
+      ) : null}
+    </div>
   );
 }
 

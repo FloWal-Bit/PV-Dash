@@ -18,9 +18,21 @@ import {
 } from "@/lib/pv-data";
 import { isFusionSolarConfigured } from "@/lib/fusionsolar/config";
 import {
+  fusionSolarDevCacheEnabled,
+  fusionSolarDevCooldownActive,
+  fusionSolarDevFetchEnabled,
+  noteFusionSolarDevCooldown,
+  readFusionSolarDevHistory,
+  readFusionSolarDevLive,
+  saveFusionSolarDevHistory,
+  saveFusionSolarDevLive,
+} from "@/lib/fusionsolar/dev-cache";
+import { FusionSolarRateLimitError } from "@/lib/fusionsolar/client";
+import {
   getFusionSolarHistory,
   getFusionSolarLifetimeHistory,
   getFusionSolarLiveSnapshot,
+  loadFusionSolarFresh,
 } from "@/lib/fusionsolar/service";
 import { applyStromkontoToSnapshot, computeStromkonto } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
@@ -144,19 +156,35 @@ async function overlayWhatWattGrid(
   }
 }
 
+const DEV_CACHE_ONLY_WARNING =
+  "Lokale Entwicklung fragt FusionSolar nicht ab. Es liegt noch kein Zwischenspeicher vor.";
+
+async function rememberDevRateLimit(err: unknown): Promise<void> {
+  if (!fusionSolarDevCacheEnabled() || !(err instanceof FusionSolarRateLimitError)) return;
+  await noteFusionSolarDevCooldown();
+}
+
 /** Momentanwerte für Energiefluss, Kennzahlen und Prognose. Ohne Verlaufsreihen. */
-export async function getLiveDashboardPayload(options?: {
-  fusionLive?: boolean;
-}): Promise<LiveDashboardPayload> {
+export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
   const base = await (async (): Promise<{ source: DataSource; snapshot: PvSnapshot; warning: string | null }> => {
-    if (!options?.fusionLive || !isFusionSolarConfigured()) {
+    if (!isFusionSolarConfigured()) {
       return { source: "simulation", snapshot: getSnapshot(new Date()), warning: null };
+    }
+
+    if (fusionSolarDevCacheEnabled()) {
+      const cached = await readFusionSolarDevLive();
+      if (cached) return { source: "fusionsolar", snapshot: cached, warning: null };
+      if (!fusionSolarDevFetchEnabled() || (await fusionSolarDevCooldownActive())) {
+        return { source: "simulation", snapshot: getSnapshot(new Date()), warning: DEV_CACHE_ONLY_WARNING };
+      }
     }
 
     try {
       const snapshot = await getFusionSolarLiveSnapshot();
+      if (fusionSolarDevCacheEnabled()) await saveFusionSolarDevLive(snapshot);
       return { source: "fusionsolar", snapshot, warning: null };
     } catch (err) {
+      await rememberDevRateLimit(err);
       const message = err instanceof Error ? err.message : "Unbekannter Fehler";
       console.error("[fusionsolar] Live-Abruf fehlgeschlagen, zeige Simulation:", message);
       return {
@@ -207,17 +235,61 @@ export async function getLiveDashboardPayload(options?: {
   };
 }
 
-/** Verlaufsreihen für die Diagramme. Unabhängig vom 15-Sekunden-Live-Abruf. */
-export async function getHistoryPayload(options?: {
-  fusionLive?: boolean;
-}): Promise<HistoryPayload> {
-  if (!options?.fusionLive || !isFusionSolarConfigured()) {
+let devRefreshInFlight: Promise<{ ok: true } | { ok: false; error: string }> | null = null;
+
+/** Einmaliger Huawei-Abruf in der lokalen Entwicklung. Schreibt den Datei-Speicher. */
+export function refreshFusionSolarDevCache(): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!fusionSolarDevCacheEnabled()) {
+    return Promise.resolve({ ok: false, error: "Nur in der lokalen Entwicklung verfügbar." });
+  }
+  if (!isFusionSolarConfigured()) {
+    return Promise.resolve({ ok: false, error: "FusionSolar ist nicht konfiguriert." });
+  }
+  if (!devRefreshInFlight) {
+    devRefreshInFlight = loadFusionSolarFresh()
+      .then(async (loaded) => {
+        if (loaded.snapshot) await saveFusionSolarDevLive(loaded.snapshot);
+        if (loaded.history) await saveFusionSolarDevHistory(loaded.history);
+        if (loaded.error) {
+          await rememberDevRateLimit(loaded.error);
+          const saved = loaded.snapshot || loaded.history ? " Bereits geladene Teile bleiben gespeichert." : "";
+          return { ok: false as const, error: `${loaded.error.message}${saved}` };
+        }
+        return { ok: true as const };
+      })
+      .finally(() => {
+        devRefreshInFlight = null;
+      });
+  }
+  return devRefreshInFlight;
+}
+
+/** Verlaufsreihen für die Diagramme. */
+export async function getHistoryPayload(): Promise<HistoryPayload> {
+  if (!isFusionSolarConfigured()) {
     return { source: "simulation", ...simulateHistory() };
   }
 
-  const [history, lifetime] = await Promise.all([
-    getFusionSolarHistory(),
-    getFusionSolarLifetimeHistory(),
-  ]);
-  return { source: "fusionsolar", ...history, lifetime };
+  if (fusionSolarDevCacheEnabled()) {
+    const cached = await readFusionSolarDevHistory();
+    if (cached) return { source: "fusionsolar", ...cached };
+    if (!fusionSolarDevFetchEnabled() || (await fusionSolarDevCooldownActive())) {
+      return { source: "simulation", ...simulateHistory() };
+    }
+  }
+
+  try {
+    const [history, lifetime] = await Promise.all([
+      getFusionSolarHistory(),
+      getFusionSolarLifetimeHistory(),
+    ]);
+    const payload = { ...history, lifetime };
+    if (fusionSolarDevCacheEnabled()) await saveFusionSolarDevHistory(payload);
+    return { source: "fusionsolar", ...payload };
+  } catch (err) {
+    await rememberDevRateLimit(err);
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+    console.error("[fusionsolar] Verlaufs-Abruf fehlgeschlagen, zeige Simulation:", message);
+    return { source: "simulation", ...simulateHistory() };
+  }
 }

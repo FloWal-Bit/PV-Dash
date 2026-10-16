@@ -18,12 +18,9 @@ function round(value: number): number {
 }
 
 /**
- * getKpiStationHour/Day/Month geben Energie pro Intervall zurück, ohne dass
- * Huawei die Einheit dokumentiert. Community-Implementierungen (und die
- * Größenordnung der Beispielwerte) legen Wh nahe – daher die Umrechnung.
- * Bitte nach dem ersten Live-Abruf mit echten Zugangsdaten verifizieren.
+ * getKpiStationHour/Day/Month/Year dieser Anlage liefern die Energiemengen
+ * bereits in kWh (ein Stundenwert von 6,23 ist eine Stunde Ertrag, nicht Wh).
  */
-const WATT_HOURS_TO_KWH = 1 / 1000;
 
 export type StationOverview = {
   todayYieldKwh: number;
@@ -135,19 +132,60 @@ export function buildSnapshot(input: {
   };
 }
 
+const ZURICH = "Europe/Zurich";
+
+function zurichParts(ms: number) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: ZURICH,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "short",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ms));
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    year: Number(value("year")),
+    month: Number(value("month")),
+    day: Number(value("day")),
+    hour: value("hour"),
+    minute: value("minute"),
+    weekday: value("weekday"),
+  };
+}
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+function stationYieldKwh(map: StationKpiTimeseriesItem["dataItemMap"]): number {
+  return round(num(map.inverter_power) ?? 0);
+}
+
+function stationConsumptionKwh(map: StationKpiTimeseriesItem["dataItemMap"]): number {
+  return round(num(map.use_power) ?? num(map.selfProvide) ?? 0);
+}
+
 export function mapHourSeriesToToday(items: StationKpiTimeseriesItem[]): HistoryPoint[] {
   return [...items]
     .sort((a, b) => a.collectTime - b.collectTime)
     .map((item) => {
-      const date = new Date(item.collectTime);
-      const label = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-      const production = num(item.dataItemMap.inverter_power);
-      const consumption = num(item.dataItemMap.use_power);
+      const parts = zurichParts(item.collectTime);
+      const label = `${parts.hour}:${parts.minute}`;
       return {
         time: label,
         label,
-        productionKw: production != null ? round(production * WATT_HOURS_TO_KWH) : 0,
-        consumptionKw: consumption != null ? round(consumption * WATT_HOURS_TO_KWH) : 0,
+        productionKw: stationYieldKwh(item.dataItemMap),
+        consumptionKw: stationConsumptionKwh(item.dataItemMap),
       };
     });
 }
@@ -185,17 +223,15 @@ export function mapDaySeriesToWeek(
   items: StationKpiTimeseriesItem[],
   hasBattery: boolean,
 ): DailyEnergyPoint[] {
-  const today = new Date();
+  const now = zurichParts(Date.now());
   return [...items]
     .sort((a, b) => a.collectTime - b.collectTime)
     .slice(-7)
     .map((item) => {
-      const date = new Date(item.collectTime);
-      const isToday = date.toDateString() === today.toDateString();
-      const yieldKwh = num(item.dataItemMap.inverter_power);
-      const consumptionKwh = num(item.dataItemMap.use_power);
-      const yieldKwhRounded = yieldKwh != null ? round(yieldKwh * WATT_HOURS_TO_KWH) : 0;
-      const consumptionKwhRounded = consumptionKwh != null ? round(consumptionKwh * WATT_HOURS_TO_KWH) : 0;
+      const parts = zurichParts(item.collectTime);
+      const isToday = now.day === parts.day && now.month === parts.month && now.year === parts.year;
+      const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
+      const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
       const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
         yieldKwhRounded,
         consumptionKwhRounded,
@@ -204,7 +240,7 @@ export function mapDaySeriesToWeek(
       return {
         // Der aktuelle Tag heißt "Heute" statt des Wochentagskürzels, analog
         // zur Verlaufsansicht in gängigen PV-Monitoring-Apps.
-        label: isToday ? "Heute" : WEEKDAYS_DE[date.getDay()],
+        label: isToday ? "Heute" : WEEKDAYS_DE[WEEKDAY_INDEX[parts.weekday] ?? 0],
         yieldKwh: yieldKwhRounded,
         consumptionKwh: consumptionKwhRounded,
         directSolarKwh,
@@ -220,18 +256,16 @@ export function mapDaySeriesToMonth(
   return [...items]
     .sort((a, b) => a.collectTime - b.collectTime)
     .map((item) => {
-      const date = new Date(item.collectTime);
-      const yieldKwh = num(item.dataItemMap.inverter_power);
-      const consumptionKwh = num(item.dataItemMap.use_power);
-      const yieldKwhRounded = yieldKwh != null ? round(yieldKwh * WATT_HOURS_TO_KWH) : 0;
-      const consumptionKwhRounded = consumptionKwh != null ? round(consumptionKwh * WATT_HOURS_TO_KWH) : 0;
+      const parts = zurichParts(item.collectTime);
+      const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
+      const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
       const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
         yieldKwhRounded,
         consumptionKwhRounded,
         hasBattery,
       );
       return {
-        label: String(date.getDate()),
+        label: String(parts.day),
         yieldKwh: yieldKwhRounded,
         consumptionKwh: consumptionKwhRounded,
         directSolarKwh,
@@ -250,24 +284,21 @@ export function mapMonthSeriesToYear(
   items: StationKpiTimeseriesItem[],
   hasBattery: boolean,
 ): DailyEnergyPoint[] {
-  const now = new Date();
+  const now = zurichParts(Date.now());
   return [...items]
     .sort((a, b) => a.collectTime - b.collectTime)
     .map((item) => {
-      const date = new Date(item.collectTime);
-      const yieldKwh = num(item.dataItemMap.inverter_power);
-      const consumptionKwh = num(item.dataItemMap.use_power);
-      const yieldKwhRounded = yieldKwh != null ? round(yieldKwh * WATT_HOURS_TO_KWH) : 0;
-      const consumptionKwhRounded = consumptionKwh != null ? round(consumptionKwh * WATT_HOURS_TO_KWH) : 0;
+      const parts = zurichParts(item.collectTime);
+      const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
+      const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
       const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
         yieldKwhRounded,
         consumptionKwhRounded,
         hasBattery,
       );
-      const isCurrentMonth =
-        date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+      const isCurrentMonth = parts.year === now.year && parts.month === now.month;
       return {
-        label: isCurrentMonth ? "Dieser Monat" : MONTHS_DE[date.getMonth()],
+        label: isCurrentMonth ? "Dieser Monat" : MONTHS_DE[parts.month - 1],
         yieldKwh: yieldKwhRounded,
         consumptionKwh: consumptionKwhRounded,
         directSolarKwh,
@@ -288,18 +319,16 @@ export function mapYearSeriesToLifetime(
   return [...items]
     .sort((a, b) => a.collectTime - b.collectTime)
     .map((item) => {
-      const date = new Date(item.collectTime);
-      const yieldKwh = num(item.dataItemMap.inverter_power);
-      const consumptionKwh = num(item.dataItemMap.use_power);
-      const yieldKwhRounded = yieldKwh != null ? round(yieldKwh * WATT_HOURS_TO_KWH) : 0;
-      const consumptionKwhRounded = consumptionKwh != null ? round(consumptionKwh * WATT_HOURS_TO_KWH) : 0;
+      const parts = zurichParts(item.collectTime);
+      const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
+      const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
       const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
         yieldKwhRounded,
         consumptionKwhRounded,
         hasBattery,
       );
       return {
-        label: String(date.getFullYear()),
+        label: String(parts.year),
         yieldKwh: yieldKwhRounded,
         consumptionKwh: consumptionKwhRounded,
         directSolarKwh,

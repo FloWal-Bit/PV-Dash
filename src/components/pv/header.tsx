@@ -57,7 +57,7 @@ export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: 
               className={cn(
                 "hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex",
                 source === "fusionsolar"
-                  ? "bg-chart-1/15 text-chart-1"
+                  ? "bg-chart-3/15 text-chart-3"
                   : "bg-muted text-muted-foreground",
               )}
             >
