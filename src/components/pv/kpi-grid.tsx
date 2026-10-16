@@ -34,7 +34,31 @@ export function KpiGrid({
     snapshot.stromkontoChangeTodayKwh != null && snapshot.stromkontoChangeTodayKwh < 0;
 
   return (
-    <div className={cn("grid h-full grid-cols-2 gap-3 sm:grid-cols-4", className)}>
+    <div className={cn("grid h-full grid-cols-2 gap-3", className)}>
+      <StatCard
+        label={<span data-kpi-label="kpi-top">Stromkonto heute</span>}
+        value={
+          hideGrid || snapshot.stromkontoChangeTodayKwh == null
+            ? "–"
+            : formatSignedSwissNumber(snapshot.stromkontoChangeTodayKwh, 1)
+        }
+        unit={hideGrid || snapshot.stromkontoChangeTodayKwh == null ? undefined : "kWh"}
+        icon={<BatteryFull className="size-5 -rotate-90" />}
+        accent={stromkontoChangeNegative ? "rose" : "green"}
+        simulated={!hideGrid && gridSimulated}
+      />
+      <StatCard
+        label="Stand Stromkonto"
+        value={
+          hideGrid || snapshot.stromkontoBalanceKwh == null
+            ? "–"
+            : formatSwissNumber(snapshot.stromkontoBalanceKwh, 1)
+        }
+        unit={hideGrid || snapshot.stromkontoBalanceKwh == null ? undefined : "kWh"}
+        icon={<BatteryFull className="size-5 -rotate-90" />}
+        accent={stromkontoNegative ? "rose" : "green"}
+        simulated={!hideGrid && gridSimulated}
+      />
       <StatCard
         label={
           <>
@@ -43,9 +67,7 @@ export function KpiGrid({
               <br />
               heute
             </span>
-            <span className="hidden sm:inline" data-kpi-label="ertrag-heute">
-              Ertrag heute
-            </span>
+            <span className="hidden sm:inline">Ertrag heute</span>
           </>
         }
         value={hidePv ? "–" : formatSwissNumber(snapshot.todayYieldKwh, 1)}
@@ -75,32 +97,6 @@ export function KpiGrid({
         icon={<Home className="size-5" />}
         accent="rose"
         simulated={!hidePv && pvSimulated}
-      />
-      <StatCard
-        label="Stromkonto heute"
-        value={
-          hideGrid || snapshot.stromkontoChangeTodayKwh == null
-            ? "–"
-            : formatSignedSwissNumber(snapshot.stromkontoChangeTodayKwh, 1)
-        }
-        unit={hideGrid || snapshot.stromkontoChangeTodayKwh == null ? undefined : "kWh"}
-        icon={<BatteryFull className="size-5 -rotate-90" />}
-        accent={stromkontoChangeNegative ? "rose" : "green"}
-        simulated={!hideGrid && gridSimulated}
-        valueClassName={gridSource === "whatwatt" ? "text-muted-foreground" : undefined}
-      />
-      <StatCard
-        label="Stand Stromkonto"
-        value={
-          hideGrid || snapshot.stromkontoBalanceKwh == null
-            ? "–"
-            : formatSwissNumber(snapshot.stromkontoBalanceKwh, 1)
-        }
-        unit={hideGrid || snapshot.stromkontoBalanceKwh == null ? undefined : "kWh"}
-        icon={<BatteryFull className="size-5 -rotate-90" />}
-        accent={stromkontoNegative ? "rose" : "green"}
-        simulated={!hideGrid && gridSimulated}
-        valueClassName={gridSource === "whatwatt" ? "text-muted-foreground" : undefined}
       />
     </div>
   );

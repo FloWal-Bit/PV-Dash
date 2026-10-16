@@ -462,8 +462,8 @@ export function SettingsDialog() {
               <div className="flex min-w-0 flex-col gap-0.5">
                 <Label htmlFor="hide-status-bar">Statusleiste ausblenden</Label>
                 <span className="text-xs leading-relaxed text-muted-foreground">
-                  Blendet die Leiste mit Uhrzeit und Akku aus. Beim nächsten Öffnen
-                  genügt ein Tipp, falls der Browser sie wieder zeigt.
+                  Die App startet im Vollbild und blendet Uhrzeit und Akku aus. Lässt
+                  der Browser das beim Öffnen nicht zu, genügt ein Tipp.
                 </span>
               </div>
               <StatusBarSwitch />

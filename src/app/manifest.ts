@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Behalte deine Solaranlage im Blick: Erzeugung, Verbrauch, Speicher und Ertrag – schlicht und intuitiv.",
     start_url: "/",
-    display: "standalone",
+    display: "fullscreen",
     orientation: "any",
     background_color: "#fbf9f5",
     theme_color: "#e2a33d",

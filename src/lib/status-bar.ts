@@ -2,18 +2,18 @@ const STORAGE_KEY = "pv-dash:hide-status-bar";
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
-let snapshot = false;
+let snapshot = true;
 
 function refreshSnapshot() {
   snapshot = readHideStatusBar();
 }
 
 export function readHideStatusBar(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "1";
+    return window.localStorage.getItem(STORAGE_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -33,7 +33,7 @@ export const hideStatusBarStore = {
     return snapshot;
   },
   getServerSnapshot(): boolean {
-    return false;
+    return true;
   },
 };
 
@@ -51,7 +51,7 @@ export async function setHideStatusBar(hide: boolean): Promise<boolean> {
     return false;
   }
   try {
-    await document.documentElement.requestFullscreen();
+    await document.documentElement.requestFullscreen({ navigationUI: "hide" });
     writeHideStatusBar(true);
     return true;
   } catch {

@@ -385,6 +385,10 @@ function YieldConsumptionChart({
   );
 }
 
+function lifetimeWithout2021(points: DailyEnergyPoint[]): DailyEnergyPoint[] {
+  return points.filter((point) => point.label !== "2021");
+}
+
 function formatRangeTotal(
   range: Range,
   today: HistoryPoint[],
@@ -403,7 +407,13 @@ function formatRangeTotal(
     return `Heute, ${formatYieldKwh(kwh, 1)}`;
   }
   const points =
-    range === "woche" ? week : range === "monat" ? month : range === "jahr" ? year : lifetime;
+    range === "woche"
+      ? week
+      : range === "monat"
+        ? month
+        : range === "jahr"
+          ? year
+          : lifetimeWithout2021(lifetime);
   const kwh = points.reduce((sum, p) => sum + p.yieldKwh, 0);
   const periodLabel: Record<Exclude<Range, "heute">, string> = {
     woche: "Diese Woche",
@@ -472,7 +482,7 @@ export function ChartsSection({
         ? month
         : range === "jahr"
           ? year
-          : lifetime;
+          : lifetimeWithout2021(lifetime);
 
   return (
     <Card className="shadow-card rounded-2xl">

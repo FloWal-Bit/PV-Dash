@@ -511,7 +511,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         return;
       }
       const anchor = document.querySelector<HTMLElement>(
-        '[data-kpi-label="ertrag-heute"]',
+        '[data-kpi-label="kpi-top"]',
       );
       if (!anchor) return;
       label.style.transform = "";
@@ -525,7 +525,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
     window.addEventListener("resize", align);
     const observer = new ResizeObserver(align);
     if (containerRef.current) observer.observe(containerRef.current);
-    const anchor = document.querySelector('[data-kpi-label="ertrag-heute"]');
+    const anchor = document.querySelector('[data-kpi-label="kpi-top"]');
     const kpiCard = anchor?.closest("[data-slot=card]");
     if (kpiCard) observer.observe(kpiCard);
 
@@ -556,8 +556,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
 
   const stromkontoValue =
     hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, 2);
-  const stromkontoValueClassName =
-    gridSource === "whatwatt" ? "text-muted-foreground" : undefined;
   const stromkontoDirection: StromkontoFlow = hideGrid
     ? "idle"
     : isGridExport
@@ -577,7 +575,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         accent={stromkontoAccent}
         muted={hideGrid || (!isGridImport && !isGridExport)}
         simulated={!hideGrid && gridSimulated}
-        valueClassName={stromkontoValueClassName}
         direction={stromkontoDirection}
       />
       <Card className="shadow-card h-full flex-1 rounded-2xl">
@@ -641,9 +638,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             accent="rose"
             muted={hideConsumption || !isConsuming}
             simulated={!hideConsumption && pvSimulated && gridSource !== "whatwatt"}
-            valueClassName={
-              gridSource === "whatwatt" ? "text-muted-foreground" : undefined
-            }
             labelPosition="bottom"
             className="energy-flow-node-side"
             style={{ left: "16%" }}
@@ -658,7 +652,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             accent={stromkontoAccent}
             muted={hideGrid || (!isGridImport && !isGridExport)}
             simulated={!hideGrid && gridSimulated}
-            valueClassName={stromkontoValueClassName}
             labelPosition="bottom"
             className="energy-flow-node-side"
             style={{ left: "84%" }}

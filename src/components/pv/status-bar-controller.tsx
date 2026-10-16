@@ -4,14 +4,21 @@ import { useEffect } from "react";
 import { readHideStatusBar } from "@/lib/status-bar";
 
 /**
- * Stellt den Vollbildmodus nach einem Neuladen wieder her. Der Browser
- * erlaubt das nur nach einer Nutzeraktion, deshalb beim ersten Tipp.
- * Verlässt jemand den Vollbildmodus selbst, bleibt er für diese Sitzung aus.
+ * Startet im Vollbild. Installierte Apps öffnen darüber bereits ohne
+ * Browserleiste. Ein normaler Tab darf den Vollbildmodus erst nach einem
+ * Tipp betreten, deshalb beim ersten Zeigerkontakt. Wer ihn selbst verlässt,
+ * bleibt für diese Sitzung im Fenster.
  */
 export function StatusBarController() {
   useEffect(() => {
     let sawFullscreen = false;
     let userLeft = false;
+
+    const enter = () => {
+      if (userLeft || !readHideStatusBar() || document.fullscreenElement) return;
+      if (typeof document.documentElement.requestFullscreen !== "function") return;
+      document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+    };
 
     const onChange = () => {
       if (document.fullscreenElement) sawFullscreen = true;
@@ -19,14 +26,14 @@ export function StatusBarController() {
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      if (userLeft || !readHideStatusBar() || document.fullscreenElement) return;
       const target = event.target;
       if (target instanceof Element && target.closest("[data-status-bar-toggle]")) return;
-      document.documentElement.requestFullscreen().catch(() => {});
+      enter();
     };
 
     document.addEventListener("fullscreenchange", onChange);
     window.addEventListener("pointerdown", onPointerDown);
+    enter();
     return () => {
       document.removeEventListener("fullscreenchange", onChange);
       window.removeEventListener("pointerdown", onPointerDown);
