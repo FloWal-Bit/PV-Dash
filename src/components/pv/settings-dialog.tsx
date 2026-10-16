@@ -25,10 +25,10 @@ import {
   parseStromkontoBalanceInput,
 } from "@/lib/stromkonto-shared";
 import { formatYieldKwh } from "@/lib/format";
-import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
+import { DOCUMENTATION } from "@/lib/documentation";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
@@ -367,11 +367,6 @@ export function SettingsDialog() {
     siteLocationStore.getSnapshot,
     siteLocationStore.getServerSnapshot,
   );
-  const hideSimulated = useSyncExternalStore(
-    hideSimulatedStore.subscribe,
-    hideSimulatedStore.getSnapshot,
-    hideSimulatedStore.getServerSnapshot,
-  );
   const [pending, setPending] = useState(false);
 
   async function handleToggle(checked: boolean) {
@@ -417,24 +412,9 @@ export function SettingsDialog() {
             iconClassName="bg-muted text-foreground/70"
             title="Anzeige"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <Label htmlFor="hide-simulated">Simulierte Werte ausblenden</Label>
-                <span className="text-xs leading-relaxed text-muted-foreground">
-                  Ertrag, Verbrauch und Verläufe ohne FusionSolar bleiben leer. Gemessene
-                  Netzwerte von whatwatt Go bleiben sichtbar.
-                </span>
-              </div>
-              <Switch
-                id="hide-simulated"
-                checked={hideSimulated}
-                onCheckedChange={(checked) => hideSimulatedStore.set(checked)}
-                className="data-checked:bg-chart-3"
-              />
-            </div>
             <div
               data-status-bar-toggle
-              className="flex items-start justify-between gap-3 border-t border-border/70 pt-3"
+              className="flex items-start justify-between gap-3"
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <Label htmlFor="hide-status-bar">Statusleiste ausblenden</Label>
@@ -501,6 +481,26 @@ export function SettingsDialog() {
             >
               Testbenachrichtigung senden
             </Button>
+          </SettingsSection>
+
+          <SettingsSection
+            icon={<Info className="size-4" />}
+            iconClassName="bg-muted text-foreground/70"
+            title="Dokumentation"
+          >
+            <ul className="flex flex-col gap-3">
+              {DOCUMENTATION.map((entry) => (
+                <li key={entry.title} className="flex flex-col gap-0.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium">{entry.title}</span>
+                    <time className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {entry.updated}
+                    </time>
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{entry.body}</p>
+                </li>
+              ))}
+            </ul>
           </SettingsSection>
 
           <SettingsSection

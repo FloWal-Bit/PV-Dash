@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Radio } from "lucide-react";
 import { ShareDashboardButton } from "@/components/pv/share-dashboard-button";
 import { BacklogDialog } from "@/components/pv/backlog-dialog";
@@ -16,9 +16,24 @@ type HeaderProps = {
   plantName: string;
   source: DataSource | null;
   gridSource?: GridSource;
+  sourceWarning?: string | null;
+  gridWarning?: string | null;
 };
 
-export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: HeaderProps) {
+const badgeToneClass = {
+  green: "bg-chart-3/15 text-chart-3",
+  amber: "bg-chart-1/15 text-chart-1",
+  muted: "bg-muted text-muted-foreground",
+} as const;
+
+export function DashboardHeader({
+  lastUpdated,
+  plantName,
+  source,
+  gridSource,
+  sourceWarning,
+  gridWarning,
+}: HeaderProps) {
   const [backlogOpen, setBacklogOpen] = useState(false);
   const taps = useRef({ count: 0, last: 0 });
 
@@ -53,23 +68,22 @@ export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: 
 
         <div className="flex items-center gap-2 sm:gap-3">
           {source ? (
-            <span
-              className={cn(
-                "hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex",
+            <StatusBadge
+              label={source === "fusionsolar" ? "FusionSolar" : "Simulation"}
+              tone={source === "fusionsolar" ? "green" : sourceWarning ? "amber" : "muted"}
+              detail={
                 source === "fusionsolar"
-                  ? "bg-chart-3/15 text-chart-3"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              <Radio className="size-3" />
-              {source === "fusionsolar" ? "FusionSolar" : "Simulation"}
-            </span>
+                  ? null
+                  : (sourceWarning ?? "FusionSolar liefert keine Livedaten. Angezeigt wird die Simulation.")
+              }
+            />
           ) : null}
-          {gridSource === "whatwatt" ? (
-            <span className="hidden items-center gap-1 rounded-full bg-chart-3/15 px-2 py-0.5 text-[11px] font-medium text-chart-3 sm:inline-flex">
-              <Radio className="size-3" />
-              whatwatt Go
-            </span>
+          {gridSource === "whatwatt" || gridWarning ? (
+            <StatusBadge
+              label="whatwatt Go"
+              tone={gridSource === "whatwatt" && !gridWarning ? "green" : "amber"}
+              detail={gridSource === "whatwatt" && !gridWarning ? null : gridWarning}
+            />
           ) : null}
           <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
             <span className="relative flex size-2">
@@ -97,5 +111,98 @@ export function DashboardHeader({ lastUpdated, plantName, source, gridSource }: 
         </div>
       </div>
     </header>
+  );
+}
+
+function StatusBadge({
+  label,
+  tone,
+  detail,
+}: {
+  label: string;
+  tone: keyof typeof badgeToneClass;
+  detail: string | null | undefined;
+}) {
+  const panelId = useId();
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const className = cn(
+    "hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex",
+    badgeToneClass[tone],
+  );
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    const button = buttonRef.current;
+    if (!open || !panel || !button) return;
+    if (!panel.matches(":popover-open")) panel.showPopover();
+    const rect = button.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const margin = 8;
+    const left = Math.max(margin, Math.min(rect.right - panelRect.width, window.innerWidth - margin - panelRect.width));
+    let top = rect.bottom + 6;
+    if (top + panelRect.height > window.innerHeight - margin) {
+      top = Math.max(margin, rect.top - 6 - panelRect.height);
+    }
+    panel.style.inset = "auto";
+    panel.style.margin = "0";
+    panel.style.top = `${top}px`;
+    panel.style.left = `${left}px`;
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  if (!detail) {
+    return (
+      <span className={className}>
+        <Radio className="size-3" />
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={className}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Radio className="size-3" />
+        {label}
+      </button>
+      {open ? (
+        <div
+          ref={panelRef}
+          id={panelId}
+          role="note"
+          popover="manual"
+          className="fixed z-50 m-0 w-72 rounded-xl border-0 bg-popover p-3 text-xs leading-snug text-popover-foreground shadow-card ring-1 ring-foreground/10"
+        >
+          {detail}
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -92,6 +92,8 @@ export type LiveDashboardPayload = {
   forecastTomorrowYieldMeta: OpenMeteoYieldMeta | null;
   /** Nutzerfreundliche Meldung, z. B. wenn FusionSolar konfiguriert, aber gerade nicht erreichbar ist. */
   warning: string | null;
+  sourceWarning: string | null;
+  gridWarning: string | null;
 };
 
 export type HistoryPayload = PvHistory & {
@@ -232,6 +234,8 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
     forecastedTomorrowYieldKwh: yieldForecast.tomorrow.kwh,
     forecastTomorrowYieldMeta: yieldForecast.tomorrow.meta,
     warning: base.warning ?? overlay.warning,
+    sourceWarning: base.warning,
+    gridWarning: overlay.warning,
   };
 }
 

@@ -10,6 +10,8 @@ export type PvStoreState = {
   forecastedTomorrowYieldKwh: number | null;
   forecastSolarError: string | null;
   warning: string | null;
+  sourceWarning: string | null;
+  gridWarning: string | null;
   /** Client-Zeitpunkt des letzten erfolgreichen Live-Abrufs (für „Aktualisiert“). */
   lastFetchedAt: number | null;
   history: PvHistory | null;
@@ -31,6 +33,8 @@ const INITIAL_STATE: PvStoreState = {
   forecastedTomorrowYieldKwh: null,
   forecastSolarError: null,
   warning: null,
+  sourceWarning: null,
+  gridWarning: null,
   lastFetchedAt: null,
   history: null,
   historySource: null,
@@ -47,6 +51,8 @@ type LiveResponse = {
   forecastedTomorrowYieldKwh: number | null;
   forecastSolarError: string | null;
   warning: string | null;
+  sourceWarning: string | null;
+  gridWarning: string | null;
 };
 
 type HistoryResponse = PvHistory & { source: DataSource };
@@ -89,6 +95,8 @@ class PvStore {
           forecastedTomorrowYieldKwh: payload.forecastedTomorrowYieldKwh ?? null,
           forecastSolarError: payload.forecastSolarError ?? null,
           warning: payload.warning,
+          sourceWarning: payload.sourceWarning ?? null,
+          gridWarning: payload.gridWarning ?? null,
           lastFetchedAt: Date.now(),
         };
       } catch {

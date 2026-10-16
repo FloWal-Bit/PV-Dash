@@ -25,6 +25,8 @@ export function Dashboard({ plantName }: { plantName: string }) {
     forecastedTomorrowYieldKwh,
     forecastSolarError,
     warning,
+    sourceWarning,
+    gridWarning,
     lastFetchedAt,
     history,
     historySource,
@@ -71,6 +73,8 @@ export function Dashboard({ plantName }: { plantName: string }) {
         plantName={plantName}
         source={source}
         gridSource={gridSource}
+        sourceWarning={sourceWarning}
+        gridWarning={gridWarning}
       />
 
       <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 py-4 sm:py-6">

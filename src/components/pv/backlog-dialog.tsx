@@ -9,9 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { backlogStore } from "@/lib/backlog-store";
 import { MAX_BACKLOG_TITLE_LENGTH } from "@/lib/backlog-shared";
+import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { pvStore } from "@/lib/pv-store";
 import { cn } from "@/lib/utils";
 
@@ -145,9 +148,36 @@ export function BacklogDialog({
             </>
           )}
         </div>
+        <HideSimulatedToggle />
         {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function HideSimulatedToggle() {
+  const hideSimulated = useSyncExternalStore(
+    hideSimulatedStore.subscribe,
+    hideSimulatedStore.getSnapshot,
+    hideSimulatedStore.getServerSnapshot,
+  );
+
+  return (
+    <div className="flex items-start justify-between gap-3 border-t border-border/70 px-5 py-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <Label htmlFor="hide-simulated">Simulierte Werte ausblenden</Label>
+        <span className="text-xs leading-relaxed text-muted-foreground">
+          Ertrag, Verbrauch und Verläufe ohne FusionSolar bleiben leer. Gemessene Netzwerte
+          von whatwatt Go bleiben sichtbar.
+        </span>
+      </div>
+      <Switch
+        id="hide-simulated"
+        checked={hideSimulated}
+        onCheckedChange={(checked) => hideSimulatedStore.set(checked)}
+        className="data-checked:bg-chart-3"
+      />
+    </div>
   );
 }
 
