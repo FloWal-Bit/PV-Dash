@@ -157,13 +157,35 @@ function sampleIntervalHours(points: HistoryPoint[]): number {
  * der Eigenverbrauch als zweite Fläche in einem helleren Grün.
  * Zukünftige Stunden bleiben leer (Kurve endet bei „jetzt“).
  */
+/** Einheit über der Y-Skala, rechtsbündig mit den Zahlen. */
+function YAxisUnit({
+  viewBox,
+  value,
+}: {
+  viewBox?: { x?: number; y?: number; width?: number };
+  value?: string;
+}) {
+  if (viewBox?.x == null || viewBox.y == null || viewBox.width == null || value == null) return null;
+  return (
+    <text
+      x={viewBox.x + viewBox.width}
+      y={viewBox.y - 14}
+      textAnchor="end"
+      fill="var(--muted-foreground)"
+      fontSize={11}
+    >
+      {value}
+    </text>
+  );
+}
+
 function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
   const hourTicks = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"];
   const chartData = useMemo(() => withIntersectionLabels(data), [data]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={chartData} margin={{ top: 22, right: 12, left: -8, bottom: 4 }}>
+      <ComposedChart data={chartData} margin={{ top: 28, right: 12, left: -8, bottom: 4 }}>
         <defs>
           <linearGradient id="fill-pv" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.45} />
@@ -188,15 +210,17 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
           width={40}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickFormatter={(v) => formatSwissNumber(Number(v), 1)}
-          label={{
-            value: "kW",
-            position: "insideTopLeft",
-            offset: -8,
-            style: { fill: "var(--muted-foreground)", fontSize: 11 },
-          }}
+          label={{ value: "kW", content: YAxisUnit }}
         />
         <Tooltip
           cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
+          itemSorter={(item) => {
+            const key = String(item.dataKey);
+            if (key === "productionKw") return 0;
+            if (key === "consumptionKw") return 1;
+            if (key === "consumedFromPvKw") return 2;
+            return 3;
+          }}
           formatter={(value, name) => {
             if (name === "crossY") return null;
             const label =
@@ -302,7 +326,7 @@ function YieldConsumptionChart({
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={chartData}
-        margin={{ top: unit === "MWh" ? 18 : 8, right: 8, left: -16, bottom: 0 }}
+        margin={{ top: unit === "MWh" ? 28 : 8, right: 8, left: -16, bottom: 0 }}
         barGap={2}
       >
         <defs>
@@ -333,16 +357,7 @@ function YieldConsumptionChart({
           width={unit === "MWh" ? 48 : 40}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickFormatter={(v) => formatSwissNumber(Number(v), fractionDigits)}
-          label={
-            unit === "MWh"
-              ? {
-                  value: "MWh",
-                  position: "insideTopLeft",
-                  offset: -4,
-                  style: { fill: "var(--muted-foreground)", fontSize: 11 },
-                }
-              : undefined
-          }
+          label={unit === "MWh" ? { value: "MWh", content: YAxisUnit } : undefined}
         />
         <Tooltip
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
