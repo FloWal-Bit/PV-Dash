@@ -165,7 +165,6 @@ function SunTimesDayCard({
           href={WETTERALARM_URL}
           value={waLoading && !dayWeather ? "…" : weatherLabel}
           accent="slate"
-          valueClassName="lowercase"
         />
         <SunStat
           icon={<Clock3 className="size-4" />}

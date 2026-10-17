@@ -153,7 +153,11 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+  }
+  *:focus,
+  *:focus-visible {
+    outline: none;
   }
   body {
     @apply bg-background text-foreground;
@@ -303,14 +307,19 @@
     top: 4%;
   }
 
-  /* Recharts setzt nach einem Tipp den Fokus auf die Zeichenfläche.
-     Der globale Fokusring (Amber) wirkt dann wie ein Rahmen und trägt keine Information. */
+  /* Ein Tipp setzt den Fokus auf die Zeichenfläche. Der Fokusring wäre nur ein leerer Rahmen. */
   .recharts-responsive-container,
-  .recharts-responsive-container:focus,
   .recharts-wrapper,
+  .recharts-surface,
+  .recharts-responsive-container:focus,
+  .recharts-responsive-container:focus-visible,
   .recharts-wrapper:focus,
-  .recharts-surface:focus {
+  .recharts-wrapper:focus-visible,
+  .recharts-surface:focus,
+  .recharts-surface:focus-visible {
     outline: none;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Tablet Hochformat: Kreise, Linien und die unteren Beschriftungen 0,8 cm

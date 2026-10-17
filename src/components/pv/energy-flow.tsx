@@ -331,15 +331,15 @@ function useDiagramGeometry(
 const STROMKONTO_COLOR_LEGEND = [
   {
     swatch: "bg-chart-3",
-    text: "Grün, wenn Strom einfliesst (Einspeisung).",
+    text: "Grün: Einspeisung",
   },
   {
     swatch: "bg-chart-1",
-    text: "Orange, wenn Strom ausfliesst (Bezug) und das Konto im Plus ist.",
+    text: "Orange: Bezug bei positivem Kontostand",
   },
   {
     swatch: "bg-chart-5",
-    text: "Rot, wenn Strom ausfliesst und der Kontostand negativ ist.",
+    text: "Rot: Bezug bei negativem Kontostand",
   },
 ] as const;
 

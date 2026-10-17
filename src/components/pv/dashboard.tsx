@@ -163,13 +163,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
       </main>
 
       <footer className="dashboard-container safe-bottom w-full text-xs text-muted-foreground">
-        <div className="flex items-center justify-between gap-3 py-6">
-          <span className="min-w-0 truncate">
-            {source === "fusionsolar"
-              ? "Live-Daten von FusionSolar"
-              : "Simulierte Anlagendaten"}
-            {gridSource === "whatwatt" ? " · Netzwerte von whatwatt Go" : ""}
-          </span>
+        <div className="flex items-center justify-end py-6">
           <span className="shrink-0 tabular-nums">
             {APP_NAME} {APP_VERSION_LABEL}
           </span>
