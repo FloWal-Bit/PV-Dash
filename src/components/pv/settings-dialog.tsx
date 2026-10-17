@@ -352,19 +352,35 @@ function StromkontoEditor() {
   );
 }
 
+/** Standort und Stromkonto, nur im versteckten Entwicklerbereich. */
+export function DeveloperPlantSettings() {
+  const { location, isCustom } = useSyncExternalStore(
+    siteLocationStore.subscribe,
+    siteLocationStore.getSnapshot,
+    siteLocationStore.getServerSnapshot,
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <StromkontoEditor />
+      <SiteLocationEditor
+        key={`${location.plz}:${location.name}:${location.latitude}:${location.longitude}`}
+        location={location}
+        isCustom={isCustom}
+      />
+    </div>
+  );
+}
+
 /**
- * Einstellungen-Dialog des Dashboards: Standort, Stromkonto und Benachrichtigungen.
+ * Einstellungen-Dialog: Anzeige und Benachrichtigungen.
+ * Standort und Stromkonto liegen im Entwicklerbereich (fünfmal auf «PV Dash» tippen).
  */
 export function SettingsDialog() {
   const { enabled, permission } = useSyncExternalStore(
     notificationSettingsStore.subscribe,
     notificationSettingsStore.getSnapshot,
     notificationSettingsStore.getServerSnapshot,
-  );
-  const { location, isCustom } = useSyncExternalStore(
-    siteLocationStore.subscribe,
-    siteLocationStore.getSnapshot,
-    siteLocationStore.getServerSnapshot,
   );
   const [pending, setPending] = useState(false);
 
@@ -400,7 +416,7 @@ export function SettingsDialog() {
           <DialogHeader className="gap-1.5">
             <DialogTitle className="text-lg">Einstellungen</DialogTitle>
             <DialogDescription>
-              Standort, Stromkonto und Benachrichtigungen für {APP_NAME}.
+              Anzeige und Benachrichtigungen für {APP_NAME}.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -429,14 +445,6 @@ export function SettingsDialog() {
               <ThemeModeSetting />
             </div>
           </SettingsSection>
-
-          <StromkontoEditor />
-
-          <SiteLocationEditor
-            key={`${location.plz}:${location.name}:${location.latitude}:${location.longitude}`}
-            location={location}
-            isCustom={isCustom}
-          />
 
           <SettingsSection
             icon={<Bell className="size-4" />}

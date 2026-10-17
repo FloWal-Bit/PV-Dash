@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { backlogStore } from "@/lib/backlog-store";
 import { MAX_BACKLOG_TITLE_LENGTH } from "@/lib/backlog-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { DeveloperPlantSettings } from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +98,7 @@ export function BacklogDialog({
         </form>
 
         <div className="flex max-h-[min(60dvh,28rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
+          <DeveloperPlantSettings />
           {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
 

@@ -388,6 +388,18 @@ function YieldConsumptionChart({
   );
 }
 
+function todayEnergyDataMissing(
+  points: TodayChartPoint[],
+  liveToday: ChartsSectionProps["liveToday"],
+): boolean {
+  const hasYield =
+    (liveToday?.yieldKwh ?? 0) > 0 || points.some((point) => (point.productionKw ?? 0) > 0);
+  const hasConsumption =
+    (liveToday?.consumptionKwh ?? 0) > 0 ||
+    points.some((point) => point.consumptionKw != null && point.consumptionKw > 0);
+  return !hasYield && !hasConsumption;
+}
+
 function lifetimeWithout2021(points: DailyEnergyPoint[]): DailyEnergyPoint[] {
   return points.filter((point) => point.label !== "2021");
 }
@@ -536,6 +548,7 @@ export function ChartsSection({
         : range === "jahr"
           ? year
           : lifetimeWithout2021(lifetime);
+  const todayEnergyMissing = range === "heute" && todayEnergyDataMissing(todayChartData, liveToday);
 
   return (
     <Card className="shadow-card rounded-2xl">
@@ -569,6 +582,10 @@ export function ChartsSection({
               {hidePv ? (
                 <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
                   Keine gemessenen Verlaufsdaten.
+                </div>
+              ) : todayEnergyMissing ? (
+                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                  Für heute liegen noch keine Ertrags- und Verbrauchsdaten vor.
                 </div>
               ) : range === "heute" ? (
                 <TodayPowerChart data={todayChartData} />
