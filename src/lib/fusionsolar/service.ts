@@ -10,9 +10,11 @@
  * Aufrufe/Tag = Aufrund(Anlagen/100) + 24. Ohne Cache würde ein Browser, der
  * alle 15 Sekunden pollt, das Tageslimit binnen Minuten aufbrauchen und die
  * Anlage für den Rest des Tages mit Fehlercode 407 sperren. Live-KPIs werden
- * höchstens alle 6 Minuten geholt. Die heutige Stundenreihe einmal pro Stunde,
- * Woche, Monat, Jahr und Laufzeit zweimal täglich. Ein Fehlversuch wartet
- * genauso lange wie der nächste planmässige Abruf.
+ * höchstens alle 6 Minuten geholt. Die heutige Kurve kommt aus der
+ * 5-Minuten-Reihe des Wechselrichters (eigenes Limit, 25 Aufrufe am Tag):
+ * tagsüber alle 50 Minuten, von 23:00 bis 05:00 alle 3 Stunden. Woche, Monat,
+ * Jahr und Laufzeit zweimal täglich. Ein Fehlversuch wartet genauso lange
+ * wie der nächste planmässige Abruf.
  */
 
 import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
@@ -30,6 +32,7 @@ import {
   mapBatteries,
   mapDaySeriesToMonth,
   mapDaySeriesToWeek,
+  mapFiveMinutesToToday,
   mapHourSeriesToToday,
   mapMonthSeriesToYear,
   mapStationRealKpi,
@@ -48,7 +51,8 @@ export type FusionSolarDashboardData = {
 };
 
 const LIVE_TTL_MS = 6 * 60 * 1000; // real-time station/device KPIs (~1 Slot / 5 Min laut Huawei)
-const TODAY_HISTORY_TTL_MS = 60 * 60 * 1000; // Stundenreihe einmal pro Stunde
+const TODAY_HISTORY_DAY_TTL_MS = 50 * 60 * 1000; // 05:00–23:00, etwa 22 Aufrufe
+const TODAY_HISTORY_NIGHT_TTL_MS = 3 * 60 * 60 * 1000; // 23:00–05:00, 2 Aufrufe
 const SLOW_HISTORY_TTL_MS = 12 * 60 * 60 * 1000; // Woche/Monat/Jahr/Laufzeit, zweimal täglich
 const DEV_LIST_TTL_MS = 6 * 60 * 60 * 1000; // Gerätezuordnung ändert sich praktisch nie
 const STATION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -171,6 +175,19 @@ async function fetchLiveSnapshot(): Promise<PvSnapshot> {
   });
 }
 
+/** Tagsüber alle 50 Minuten, nachts alle 3 Stunden. Zusammen unter 25 Aufrufen. */
+export function todayHistoryTtlMs(now = Date.now()): number {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Zurich",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date(now)),
+  );
+  if (hour >= 23 || hour < 5) return TODAY_HISTORY_NIGHT_TTL_MS;
+  return TODAY_HISTORY_DAY_TTL_MS;
+}
+
 function zurichDayKey(date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "Europe/Zurich" });
 }
@@ -195,8 +212,18 @@ function shiftDayKey(dayKey: string, days: number): string {
 
 async function fetchTodayHistory(): Promise<HistoryPoint[]> {
   const { stationCode } = await resolveStationInfo();
-  const hourSeries = await api.getStationHourKpi([stationCode], zurichMidnight(zurichDayKey()));
-  return mapHourSeriesToToday(hourSeries);
+  const devices = await resolveDevices(stationCode);
+  const collectTime = zurichMidnight(zurichDayKey());
+  if (devices.inverterIds.length === 0) {
+    const hourSeries = await api.getStationHourKpi([stationCode], collectTime);
+    return mapHourSeriesToToday(hourSeries);
+  }
+  const series = await api.getDevFiveMinutes(
+    devices.inverterTypeId,
+    devices.inverterIds,
+    collectTime,
+  );
+  return mapFiveMinutesToToday(series);
 }
 
 async function fetchRangeHistory(): Promise<{
@@ -279,12 +306,12 @@ export async function loadFusionSolarFresh(): Promise<{
   }
 
   if (todayResult.status === "fulfilled") {
-    todayHistoryCache = { value: todayResult.value, expiresAt: Date.now() + TODAY_HISTORY_TTL_MS };
+    todayHistoryCache = { value: todayResult.value, expiresAt: Date.now() + todayHistoryTtlMs() };
     todayHistoryFailure = null;
   } else {
     todayHistoryFailure = {
       value: asError(todayResult.reason),
-      expiresAt: Date.now() + TODAY_HISTORY_TTL_MS,
+      expiresAt: Date.now() + todayHistoryTtlMs(),
     };
   }
 
@@ -352,13 +379,13 @@ async function getTodayHistory(): Promise<HistoryPoint[]> {
   if (!todayHistoryInFlight) {
     todayHistoryInFlight = fetchTodayHistory()
       .then((today) => {
-        todayHistoryCache = { value: today, expiresAt: Date.now() + TODAY_HISTORY_TTL_MS };
+        todayHistoryCache = { value: today, expiresAt: Date.now() + todayHistoryTtlMs() };
         todayHistoryFailure = null;
         return today;
       })
       .catch((err: unknown) => {
         const error = asError(err);
-        todayHistoryFailure = { value: error, expiresAt: Date.now() + TODAY_HISTORY_TTL_MS };
+        todayHistoryFailure = { value: error, expiresAt: Date.now() + todayHistoryTtlMs() };
         throw error;
       })
       .finally(() => {

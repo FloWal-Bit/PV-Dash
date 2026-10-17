@@ -20,7 +20,8 @@ export type PvStoreState = {
 };
 
 const LIVE_INTERVAL_MS = 15_000;
-const HISTORY_INTERVAL_MS = 60 * 60 * 1000;
+/** Oft genug, damit der Server die 5-Minuten-Reihe tagsüber alle 50 Minuten neu holen kann. */
+const HISTORY_INTERVAL_MS = 15 * 60 * 1000;
 /** Beim Wechsel des Diagramm-Zeitraums neu laden, wenn der Stand älter ist. */
 const HISTORY_RANGE_MIN_AGE_MS = 60_000;
 

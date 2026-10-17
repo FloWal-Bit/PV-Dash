@@ -220,7 +220,7 @@ export function SunTimesCard({
   }, [referenceDate]);
 
   return (
-    <Card className={cn("shadow-card rounded-2xl", className)}>
+    <Card data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
       <SwipeCarousel labels={["Heute", "Morgen"]} className="min-w-0 gap-3 pb-1">
         <SunTimesDayCard
           date={referenceDate}

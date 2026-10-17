@@ -444,7 +444,7 @@ function StromkontoFocus({
         >
           <div
             className={cn(
-              "flex size-48 flex-col items-center justify-center gap-2 rounded-full border-[3px] bg-gradient-to-br shadow-inner",
+              "stromkonto-focus-circle flex size-48 flex-col items-center justify-center gap-2 rounded-full border-[3px] bg-gradient-to-br shadow-inner",
               muted
                 ? "border-border text-muted-foreground/60"
                 : cn(ACCENT_RING[accent], ACCENT_BG[accent]),
@@ -495,11 +495,45 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       ? "rose"
       : "amber";
 
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pvCircleRef = useRef<HTMLDivElement | null>(null);
   const pvLabelRef = useRef<HTMLSpanElement | null>(null);
   const verbrauchCircleRef = useRef<HTMLDivElement | null>(null);
   const stromkontoCircleRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const phone = window.matchMedia("(max-width: 767px)");
+    const frame = frameRef.current;
+
+    const matchWeatherCard = () => {
+      if (!frame) return;
+      if (!phone.matches) {
+        frame.style.height = "";
+        return;
+      }
+      const weather = document.querySelector<HTMLElement>("[data-sun-times-card]");
+      if (!weather) {
+        frame.style.height = "";
+        return;
+      }
+      frame.style.height = `${Math.round(weather.getBoundingClientRect().height)}px`;
+    };
+
+    matchWeatherCard();
+    phone.addEventListener("change", matchWeatherCard);
+    window.addEventListener("resize", matchWeatherCard);
+    const weather = document.querySelector("[data-sun-times-card]");
+    const weatherObserver = new ResizeObserver(matchWeatherCard);
+    if (weather) weatherObserver.observe(weather);
+
+    return () => {
+      phone.removeEventListener("change", matchWeatherCard);
+      window.removeEventListener("resize", matchWeatherCard);
+      weatherObserver.disconnect();
+      if (frame) frame.style.height = "";
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const query = window.matchMedia(
@@ -570,13 +604,15 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   const flowLabels = ["Stromkonto", "Energiefluss"];
 
   return (
+    <div ref={frameRef} className={cn("flex min-w-0 flex-col", className)}>
     <SwipeCarousel
       labels={flowLabels}
       page={flowPage}
       onPageChange={setFlowPage}
       showDots={false}
       stretch
-      className={cn("energy-flow-carousel min-w-0", className)}
+      fillHeight
+      className="energy-flow-carousel min-h-0 min-w-0 flex-1"
     >
       <StromkontoFocus
         value={stromkontoValue}
@@ -595,7 +631,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       />
       <Card className="shadow-card flex h-full flex-1 flex-col rounded-2xl">
       <EnergyFlowTitle />
-      <CardContent className="flex-1 pt-0 pb-3">
+      <CardContent className="flex min-h-0 flex-1 flex-col pt-0 pb-3">
         <div
           ref={containerRef}
           className="energy-flow-diagram relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"
@@ -682,5 +718,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       />
     </Card>
     </SwipeCarousel>
+    </div>
   );
 }

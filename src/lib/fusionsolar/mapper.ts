@@ -1,6 +1,7 @@
 import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
 import type {
   BatteryRealKpiItem,
+  DevFiveMinutesItem,
   InverterRealKpiItem,
   MeterRealKpiItem,
   StationKpiTimeseriesItem,
@@ -184,6 +185,55 @@ function stationHourConsumptionKwh(map: StationKpiTimeseriesItem["dataItemMap"])
   if (use != null) return round(use);
   const self = num(map.selfProvide);
   return self == null ? null : round(self);
+}
+
+const FIVE_MIN_MS = 5 * 60 * 1000;
+
+function floorFiveMinutes(minute: string): string {
+  const floored = Math.floor(Number(minute) / 5) * 5;
+  return String(floored).padStart(2, "0");
+}
+
+/**
+ * 5-Minuten-Punkte des Wechselrichters. `productionKw` ist die mittlere
+ * Leistung im Intervall (kWh-Differenz des Tagesertrags durch die Dauer),
+ * damit die Kurve und die Tagessumme zusammenpassen.
+ */
+export function mapFiveMinutesToToday(items: DevFiveMinutesItem[]): HistoryPoint[] {
+  const byTime = new Map<number, { dayCap: number; activePower: number }>();
+  for (const item of items) {
+    const current = byTime.get(item.collectTime) ?? { dayCap: 0, activePower: 0 };
+    current.dayCap += num(item.dataItemMap.day_cap) ?? 0;
+    current.activePower += num(item.dataItemMap.active_power) ?? 0;
+    byTime.set(item.collectTime, current);
+  }
+
+  const points: HistoryPoint[] = [];
+  let previousCap: number | null = null;
+  let previousTime: number | null = null;
+  for (const [time, value] of [...byTime.entries()].sort((a, b) => a[0] - b[0])) {
+    const parts = zurichParts(time);
+    const label = `${parts.hour}:${floorFiveMinutes(parts.minute)}`;
+    if (points.some((point) => point.time === label)) continue;
+
+    let productionKw = value.activePower;
+    if (previousCap != null && previousTime != null) {
+      const hours = (time - previousTime) / (60 * 60 * 1000);
+      const yieldKwh = value.dayCap - previousCap;
+      if (hours > 0 && hours <= (2 * FIVE_MIN_MS) / (60 * 60 * 1000) && yieldKwh >= 0) {
+        productionKw = yieldKwh / hours;
+      }
+    }
+    points.push({
+      time: label,
+      label,
+      productionKw: round(Math.max(0, productionKw)),
+      consumptionKw: null,
+    });
+    previousCap = value.dayCap;
+    previousTime = time;
+  }
+  return points;
 }
 
 export function mapHourSeriesToToday(items: StationKpiTimeseriesItem[]): HistoryPoint[] {

@@ -93,6 +93,18 @@ export type MeterRealKpiItem = {
   };
 };
 
+/** Antwort von thirdData/getDevFiveMinutes. Ein Punkt pro Gerät und 5 Minuten. */
+export type DevFiveMinutesItem = {
+  devId: number;
+  collectTime: number;
+  dataItemMap: {
+    /** Momentanleistung, kW */
+    active_power?: number | string | null;
+    /** Tagesertrag bis zu diesem Zeitpunkt, kWh */
+    day_cap?: number | string | null;
+  };
+};
+
 /**
  * Antwort von thirdData/getKpiStationHour|getKpiStationDay|getKpiStationMonth.
  * Diese Anlage liefert die Intervallwerte bereits in kWh.

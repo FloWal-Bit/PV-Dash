@@ -283,6 +283,19 @@
     }
   }
 
+  /* Smartphone: Diagramm füllt die Karte, deren Höhe an die Wetterkarte gebunden ist. */
+  @media (max-width: 767px) {
+    .energy-flow-diagram.energy-flow-diagram {
+      height: auto;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .stromkonto-focus-circle {
+      width: 9rem;
+      height: 9rem;
+    }
+  }
+
   .energy-flow-node-side {
     top: 80%;
   }

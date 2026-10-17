@@ -110,6 +110,7 @@ export function SwipeCarousel({
   onPageChange,
   stretch = false,
   showDots = true,
+  fillHeight = false,
 }: {
   labels: string[];
   children: ReactNode[];
@@ -120,6 +121,8 @@ export function SwipeCarousel({
   stretch?: boolean;
   /** Punkte rendert der Aufrufer selbst, innerhalb der Karte. */
   showDots?: boolean;
+  /** Fills a parent that already has a height, including below the md breakpoint. */
+  fillHeight?: boolean;
 }) {
   const pageCount = children.length;
   const [internalPage, setInternalPage] = useState(0);
@@ -151,9 +154,9 @@ export function SwipeCarousel({
   };
 
   return (
-    <div className={cn("flex flex-col gap-2", stretch && "md:h-full", className)}>
+    <div className={cn("flex flex-col gap-2", stretch && "md:h-full", fillHeight && "h-full min-h-0", className)}>
       <div
-        className={cn("touch-pan-y overflow-hidden", stretch && "md:min-h-0 md:flex-1")}
+        className={cn("touch-pan-y overflow-hidden", stretch && "md:min-h-0 md:flex-1", fillHeight && "min-h-0 flex-1")}
         onTouchStart={(e) => onTouchStart(e.changedTouches[0]?.clientX ?? 0)}
         onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
         onPointerDown={(e) => {
@@ -167,13 +170,14 @@ export function SwipeCarousel({
           className={cn(
             "flex transition-transform duration-300 ease-out",
             stretch && "md:h-full",
+            fillHeight && "h-full",
           )}
           style={{ transform: `translateX(-${page * 100}%)` }}
         >
           {children.map((child, index) => (
             <div
               key={labels[index] ?? index}
-              className={cn("flex w-full shrink-0 flex-col", stretch && "md:h-full")}
+              className={cn("flex w-full shrink-0 flex-col", stretch && "md:h-full", fillHeight && "h-full")}
             >
               {child}
             </div>

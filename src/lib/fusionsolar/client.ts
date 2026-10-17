@@ -24,6 +24,7 @@ import type {
   FusionSolarEnvelope,
   InverterRealKpiItem,
   MeterRealKpiItem,
+  DevFiveMinutesItem,
   StationKpiTimeseriesItem,
   StationListItem,
   StationRealKpiItem,
@@ -237,6 +238,19 @@ export async function getMeterRealKpi(
   return request<MeterRealKpiItem[]>("/thirdData/getDevRealKpi", {
     devTypeId,
     devIds: devIds.join(","),
+  });
+}
+
+/** 5-Minuten-Werte eines Gerätetyps für den Tag von collectTime. Eigenes Tageslimit. */
+export async function getDevFiveMinutes(
+  devTypeId: number,
+  devIds: number[],
+  collectTimeMs: number,
+): Promise<DevFiveMinutesItem[]> {
+  return request<DevFiveMinutesItem[]>("/thirdData/getDevFiveMinutes", {
+    devIds: devIds.join(","),
+    devTypeId,
+    collectTime: collectTimeMs,
   });
 }
 
