@@ -41,6 +41,7 @@ import {
   getOpenMeteoTodayAndTomorrowYieldKwh,
   type OpenMeteoYieldMeta,
 } from "@/lib/open-meteo-yield/service";
+import { applyWhatWattHourConsumption } from "@/lib/whatwatt/hour-samples";
 import { getLatestWhatWattMeterTotals, getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
 
 export type PvHistory = {
@@ -276,7 +277,13 @@ export async function getHistoryPayload(): Promise<HistoryPayload> {
 
   if (fusionSolarDevCacheEnabled()) {
     const cached = await readFusionSolarDevHistory();
-    if (cached) return { source: "fusionsolar", ...cached };
+    if (cached) {
+      return {
+        source: "fusionsolar",
+        ...cached,
+        today: await applyWhatWattHourConsumption(cached.today),
+      };
+    }
     if (!fusionSolarDevFetchEnabled() || (await fusionSolarDevCooldownActive())) {
       return { source: "simulation", ...simulateHistory() };
     }
@@ -289,7 +296,11 @@ export async function getHistoryPayload(): Promise<HistoryPayload> {
     ]);
     const payload = { ...history, lifetime };
     if (fusionSolarDevCacheEnabled()) await saveFusionSolarDevHistory(payload);
-    return { source: "fusionsolar", ...payload };
+    return {
+      source: "fusionsolar",
+      ...payload,
+      today: await applyWhatWattHourConsumption(history.today),
+    };
   } catch (err) {
     await rememberDevRateLimit(err);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";

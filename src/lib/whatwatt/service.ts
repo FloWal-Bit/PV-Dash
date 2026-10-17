@@ -17,6 +17,7 @@
 import mqtt, { type MqttClient } from "mqtt";
 import { randomUUID } from "crypto";
 import { getWhatWattConfig } from "./config";
+import { noteWhatWattHourSample } from "./hour-samples";
 import { mapMqttMessageToGridSnapshot, type WhatWattGridSnapshot } from "./mapper";
 import { parseWhatWattMqttPayload } from "./parse";
 
@@ -81,6 +82,7 @@ function ensureClient(): State {
         energyInKwh: message.energyInKwh,
         energyOutKwh: message.energyOutKwh,
       };
+      noteWhatWattHourSample(message.energyInKwh, message.energyOutKwh);
       newState.lastError = null;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unbekannter Fehler";

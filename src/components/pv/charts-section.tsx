@@ -409,10 +409,8 @@ function formatRangeTotal(
       0,
     );
     const measured = todayChartData.filter((point) => point.consumptionKw != null);
-    const consumptionKwh =
-      measured.length > 0
-        ? measured.reduce((sum, point) => sum + (point.consumptionKw ?? 0) * hours, 0)
-        : liveToday?.consumptionKwh ?? null;
+    const summedKwh = measured.reduce((sum, point) => sum + (point.consumptionKw ?? 0) * hours, 0);
+    const consumptionKwh = liveToday?.consumptionKwh ?? (measured.length > 0 ? summedKwh : null);
     const consumption =
       consumptionKwh == null ? "–" : formatYieldKwh(consumptionKwh, 1);
     return `Heute, ${formatYieldKwh(yieldKwh, 1)} / ${consumption}`;

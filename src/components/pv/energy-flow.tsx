@@ -6,7 +6,7 @@ import {
   Sun,
 } from "lucide-react";
 import { InfoPopover } from "@/components/pv/info-popover";
-import { SwipeCarousel } from "@/components/pv/swipe-carousel";
+import { SwipeCarousel, SwipePageDots } from "@/components/pv/swipe-carousel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
@@ -422,6 +422,7 @@ function StromkontoFocus({
   simulated,
   valueClassName,
   direction,
+  footer,
 }: {
   value: string;
   accent: Accent;
@@ -429,11 +430,12 @@ function StromkontoFocus({
   simulated?: boolean;
   valueClassName?: string;
   direction: StromkontoFlow;
+  footer?: ReactNode;
 }) {
   return (
     <Card className="shadow-card h-full flex-1 rounded-2xl">
       <EnergyFlowTitle showInfo />
-      <CardContent className="flex flex-1 items-center justify-center pt-2 pb-6">
+      <CardContent className="flex flex-1 items-center justify-center pt-2 pb-4">
         <div
           className={cn(
             "flex flex-col items-center gap-2",
@@ -461,6 +463,7 @@ function StromkontoFocus({
           <span className="text-sm font-medium text-muted-foreground">Stromkonto</span>
         </div>
       </CardContent>
+      {footer}
     </Card>
   );
 }
@@ -563,12 +566,17 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       : isGridImport
         ? "out"
         : "idle";
+  const [flowPage, setFlowPage] = useState(0);
+  const flowLabels = ["Stromkonto", "Energiefluss"];
 
   return (
     <SwipeCarousel
-      labels={["Stromkonto", "Energiefluss"]}
+      labels={flowLabels}
+      page={flowPage}
+      onPageChange={setFlowPage}
+      showDots={false}
       stretch
-      className={cn("energy-flow-carousel min-w-0 gap-1", className)}
+      className={cn("energy-flow-carousel min-w-0", className)}
     >
       <StromkontoFocus
         value={stromkontoValue}
@@ -576,10 +584,18 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         muted={hideGrid || (!isGridImport && !isGridExport)}
         simulated={!hideGrid && gridSimulated}
         direction={stromkontoDirection}
+        footer={
+          <SwipePageDots
+            labels={flowLabels}
+            page={flowPage}
+            onPageChange={setFlowPage}
+            className="pb-3"
+          />
+        }
       />
-      <Card className="shadow-card h-full flex-1 rounded-2xl">
+      <Card className="shadow-card flex h-full flex-1 flex-col rounded-2xl">
       <EnergyFlowTitle />
-      <CardContent className="pt-0 pb-3">
+      <CardContent className="flex-1 pt-0 pb-3">
         <div
           ref={containerRef}
           className="energy-flow-diagram relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"
@@ -658,6 +674,12 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
           />
         </div>
       </CardContent>
+      <SwipePageDots
+        labels={flowLabels}
+        page={flowPage}
+        onPageChange={setFlowPage}
+        className="pb-3"
+      />
     </Card>
     </SwipeCarousel>
   );

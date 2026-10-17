@@ -300,21 +300,6 @@
     outline: none;
   }
 
-  /* Tablet Hochformat: die Punkte liegen in der Kachel, damit Energiefluss
-     genauso hoch ist wie Ertrag heute und Stromkonto heute übereinander. */
-  @media (orientation: portrait) and (min-width: 768px) {
-    .energy-flow-carousel {
-      position: relative;
-      gap: 0;
-    }
-    .energy-flow-carousel > .swipe-carousel-dots {
-      position: absolute;
-      inset-inline: 0;
-      bottom: 0.75rem;
-      z-index: 10;
-    }
-  }
-
   /* Tablet Hochformat: Kreise, Linien und die unteren Beschriftungen 0,8 cm
      nach unten. Das PV-Label bleibt auf Höhe von „Ertrag heute“ /
      „Verbrauch heute“. */

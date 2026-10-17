@@ -109,6 +109,7 @@ export function SwipeCarousel({
   page: controlledPage,
   onPageChange,
   stretch = false,
+  showDots = true,
 }: {
   labels: string[];
   children: ReactNode[];
@@ -117,6 +118,8 @@ export function SwipeCarousel({
   onPageChange?: (page: number) => void;
   /** Fills a stretched parent from the md breakpoint up; dots stay below the slides. */
   stretch?: boolean;
+  /** Punkte rendert der Aufrufer selbst, innerhalb der Karte. */
+  showDots?: boolean;
 }) {
   const pageCount = children.length;
   const [internalPage, setInternalPage] = useState(0);
@@ -177,22 +180,24 @@ export function SwipeCarousel({
           ))}
         </div>
       </div>
-      <div className="swipe-carousel-dots flex items-center justify-center gap-2" role="tablist">
-        {labels.map((label, index) => (
-          <button
-            key={label}
-            type="button"
-            role="tab"
-            aria-selected={page === index}
-            aria-label={label}
-            onClick={() => goTo(index)}
-            className={cn(
-              "size-2 rounded-full transition-colors",
-              page === index ? "bg-pager-dot" : "bg-muted-foreground/30",
-            )}
-          />
-        ))}
-      </div>
+      {showDots ? (
+        <div className="swipe-carousel-dots flex items-center justify-center gap-2" role="tablist">
+          {labels.map((label, index) => (
+            <button
+              key={label}
+              type="button"
+              role="tab"
+              aria-selected={page === index}
+              aria-label={label}
+              onClick={() => goTo(index)}
+              className={cn(
+                "size-2 rounded-full transition-colors",
+                page === index ? "bg-pager-dot" : "bg-muted-foreground/30",
+              )}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

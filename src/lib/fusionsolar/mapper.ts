@@ -175,10 +175,15 @@ function stationConsumptionKwh(map: StationKpiTimeseriesItem["dataItemMap"]): nu
   return round(num(map.use_power) ?? num(map.selfProvide) ?? 0);
 }
 
-/** Stundenreihe: nur echter Verbrauch. Eigenverbrauch ist nachts 0 und würde eine leere Kurve vortäuschen. */
+/**
+ * Stundenreihe: Haushaltsverbrauch, sonst der Eigenverbrauch aus derselben
+ * Antwort. Ein fehlendes Feld bleibt leer, eine gemeldete 0 bleibt 0.
+ */
 function stationHourConsumptionKwh(map: StationKpiTimeseriesItem["dataItemMap"]): number | null {
   const use = num(map.use_power);
-  return use == null ? null : round(use);
+  if (use != null) return round(use);
+  const self = num(map.selfProvide);
+  return self == null ? null : round(self);
 }
 
 export function mapHourSeriesToToday(items: StationKpiTimeseriesItem[]): HistoryPoint[] {
