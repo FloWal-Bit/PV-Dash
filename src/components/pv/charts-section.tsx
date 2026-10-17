@@ -162,10 +162,11 @@ function YAxisUnit({
   viewBox,
   value,
 }: {
-  viewBox?: { x?: number; y?: number; width?: number };
-  value?: string;
+  viewBox?: { x?: number; y?: number; width?: number; cx?: number };
+  value?: string | number | boolean | null;
 }) {
-  if (viewBox?.x == null || viewBox.y == null || viewBox.width == null || value == null) return null;
+  if (viewBox?.x == null || viewBox.y == null || viewBox.width == null) return <text />;
+  if (typeof value !== "string" && typeof value !== "number") return <text />;
   return (
     <text
       x={viewBox.x + viewBox.width}
