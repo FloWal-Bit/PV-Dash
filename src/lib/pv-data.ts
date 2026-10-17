@@ -71,7 +71,8 @@ export type HistoryPoint = {
   time: string;
   label: string;
   productionKw: number;
-  consumptionKw: number;
+  /** Haushaltsverbrauch in kWh dieser Stunde. `null`, wenn die Quelle ihn nicht meldet. */
+  consumptionKw: number | null;
 };
 
 export type DailyEnergyPoint = {

@@ -175,6 +175,12 @@ function stationConsumptionKwh(map: StationKpiTimeseriesItem["dataItemMap"]): nu
   return round(num(map.use_power) ?? num(map.selfProvide) ?? 0);
 }
 
+/** Stundenreihe: nur echter Verbrauch. Eigenverbrauch ist nachts 0 und würde eine leere Kurve vortäuschen. */
+function stationHourConsumptionKwh(map: StationKpiTimeseriesItem["dataItemMap"]): number | null {
+  const use = num(map.use_power);
+  return use == null ? null : round(use);
+}
+
 export function mapHourSeriesToToday(items: StationKpiTimeseriesItem[]): HistoryPoint[] {
   return [...items]
     .sort((a, b) => a.collectTime - b.collectTime)
@@ -185,7 +191,7 @@ export function mapHourSeriesToToday(items: StationKpiTimeseriesItem[]): History
         time: label,
         label,
         productionKw: stationYieldKwh(item.dataItemMap),
-        consumptionKw: stationConsumptionKwh(item.dataItemMap),
+        consumptionKw: stationHourConsumptionKwh(item.dataItemMap),
       };
     });
 }
@@ -204,6 +210,26 @@ const WEEKDAYS_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
  */
 const HISTORY_DIRECT_OVERLAP = 0.65;
 const HISTORY_BATTERY_SHARE_OF_REST = 0.4;
+
+/** Tagesbalken „Heute“ an den Live-Zähler hängen, ohne die langsame Tagesreihe neu abzufragen. */
+export function withLiveDayTotals(
+  point: DailyEnergyPoint,
+  yieldKwh: number,
+  consumptionKwh: number,
+): DailyEnergyPoint {
+  const directSolarKwh = Math.min(yieldKwh, consumptionKwh) * HISTORY_DIRECT_OVERLAP;
+  const batteryKwh =
+    point.batteryKwh > 0
+      ? Math.max(0, consumptionKwh - directSolarKwh) * HISTORY_BATTERY_SHARE_OF_REST
+      : 0;
+  return {
+    ...point,
+    yieldKwh: round(yieldKwh),
+    consumptionKwh: round(consumptionKwh),
+    directSolarKwh: round(directSolarKwh),
+    batteryKwh: round(batteryKwh),
+  };
+}
 
 function splitConsumptionApprox(
   yieldKwh: number,

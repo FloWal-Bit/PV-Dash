@@ -146,6 +146,14 @@ export function Dashboard({ plantName }: { plantName: string }) {
                 year={history.year}
                 lifetime={history.lifetime}
                 source={historySource ?? dataSource}
+                liveToday={
+                  dataSource === "fusionsolar" && (historySource ?? dataSource) === "fusionsolar"
+                    ? {
+                        yieldKwh: snapshot.todayYieldKwh,
+                        consumptionKwh: snapshot.todayConsumptionKwh,
+                      }
+                    : null
+                }
               />
             ) : (
               <ChartHistoryPlaceholder error={historyError} />

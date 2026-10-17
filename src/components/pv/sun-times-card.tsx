@@ -146,7 +146,7 @@ function SunTimesDayCard({
     dayWeather?.sunHours != null ? dayWeather.sunHours : null;
 
   return (
-    <Card className="shadow-card rounded-2xl">
+    <>
       <CardHeader>
         <CardTitle className="text-sm font-medium text-muted-foreground capitalize">
           {formatDayHeading(date)}
@@ -198,7 +198,7 @@ function SunTimesDayCard({
           accent="slate"
         />
       </CardContent>
-    </Card>
+    </>
   );
 }
 
@@ -220,17 +220,19 @@ export function SunTimesCard({
   }, [referenceDate]);
 
   return (
-    <SwipeCarousel labels={["Heute", "Morgen"]} className={cn("min-w-0 gap-1", className)}>
-      <SunTimesDayCard
-        date={referenceDate}
-        forecastedYieldKwh={forecastedTodayYieldKwh}
-        showLiveClock
-      />
-      <SunTimesDayCard
-        date={tomorrowDate}
-        forecastedYieldKwh={forecastedTomorrowYieldKwh}
-        showLiveClock={false}
-      />
-    </SwipeCarousel>
+    <Card className={cn("shadow-card rounded-2xl", className)}>
+      <SwipeCarousel labels={["Heute", "Morgen"]} className="min-w-0 gap-3 pb-1">
+        <SunTimesDayCard
+          date={referenceDate}
+          forecastedYieldKwh={forecastedTodayYieldKwh}
+          showLiveClock
+        />
+        <SunTimesDayCard
+          date={tomorrowDate}
+          forecastedYieldKwh={forecastedTomorrowYieldKwh}
+          showLiveClock={false}
+        />
+      </SwipeCarousel>
+    </Card>
   );
 }

@@ -18,6 +18,7 @@ import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { pvStore } from "@/lib/pv-store";
+import { withLiveDayTotals } from "@/lib/fusionsolar/mapper";
 import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
 import { formatKw, formatSwissNumber, formatYieldKwh, formatYieldMwh } from "@/lib/format";
@@ -30,6 +31,8 @@ type ChartsSectionProps = {
   year: DailyEnergyPoint[];
   lifetime: DailyEnergyPoint[];
   source: DataSource;
+  /** Live-Tageszähler. Ersetzt nur den Balken „Heute“, ohne FusionSolar erneut abzufragen. */
+  liveToday: { yieldKwh: number; consumptionKwh: number | null } | null;
 };
 
 type Range = "heute" | "woche" | "monat" | "jahr" | "lebensdauer";
@@ -397,14 +400,22 @@ function formatRangeTotal(
   month: DailyEnergyPoint[],
   year: DailyEnergyPoint[],
   lifetime: DailyEnergyPoint[],
+  liveToday: ChartsSectionProps["liveToday"],
 ): string {
   if (range === "heute") {
     const hours = sampleIntervalHours(today);
-    const kwh = todayChartData.reduce(
+    const yieldKwh = todayChartData.reduce(
       (sum, point) => sum + (point.productionKw ?? 0) * hours,
       0,
     );
-    return `Heute, ${formatYieldKwh(kwh, 1)}`;
+    const measured = todayChartData.filter((point) => point.consumptionKw != null);
+    const consumptionKwh =
+      measured.length > 0
+        ? measured.reduce((sum, point) => sum + (point.consumptionKw ?? 0) * hours, 0)
+        : liveToday?.consumptionKwh ?? null;
+    const consumption =
+      consumptionKwh == null ? "–" : formatYieldKwh(consumptionKwh, 1);
+    return `Heute, ${formatYieldKwh(yieldKwh, 1)} / ${consumption}`;
   }
   const points =
     range === "woche"
@@ -414,7 +425,8 @@ function formatRangeTotal(
         : range === "jahr"
           ? year
           : lifetimeWithout2021(lifetime);
-  const kwh = points.reduce((sum, p) => sum + p.yieldKwh, 0);
+  const yieldKwh = points.reduce((sum, point) => sum + point.yieldKwh, 0);
+  const consumptionKwh = points.reduce((sum, point) => sum + point.consumptionKwh, 0);
   const periodLabel: Record<Exclude<Range, "heute">, string> = {
     woche: "Diese Woche",
     monat: "Dieser Monat",
@@ -423,9 +435,29 @@ function formatRangeTotal(
   };
   const label = periodLabel[range as Exclude<Range, "heute">];
   if (range === "jahr" || range === "lebensdauer") {
-    return `${label}, ${formatYieldMwh(kwh, mwhFractionDigits(kwh / 1000))}`;
+    return `${label}, ${formatYieldMwh(yieldKwh, mwhFractionDigits(yieldKwh / 1000))} / ${formatYieldMwh(consumptionKwh, mwhFractionDigits(consumptionKwh / 1000))}`;
   }
-  return `${label}, ${formatYieldKwh(kwh, 0)}`;
+  return `${label}, ${formatYieldKwh(yieldKwh, 0)} / ${formatYieldKwh(consumptionKwh, 0)}`;
+}
+
+function zurichDayLabel(date = new Date()): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Zurich",
+    day: "2-digit",
+  }).format(date);
+}
+
+function applyLiveToday(
+  points: DailyEnergyPoint[],
+  liveToday: ChartsSectionProps["liveToday"],
+  isToday: (point: DailyEnergyPoint) => boolean,
+): DailyEnergyPoint[] {
+  if (!liveToday) return points;
+  return points.map((point) =>
+    isToday(point)
+      ? withLiveDayTotals(point, liveToday.yieldKwh, liveToday.consumptionKwh ?? point.consumptionKwh)
+      : point,
+  );
 }
 
 export function ChartsSection({
@@ -435,6 +467,7 @@ export function ChartsSection({
   year,
   lifetime,
   source,
+  liveToday,
 }: ChartsSectionProps) {
   const [page, setPage] = useState(0);
   const range = RANGE_ORDER[page] ?? "heute";
@@ -464,22 +497,44 @@ export function ChartsSection({
         label: point.label,
         productionKw: point.productionKw,
         consumptionKw: point.consumptionKw,
-        consumedFromPvKw: Math.min(point.productionKw, point.consumptionKw),
+        consumedFromPvKw:
+          point.consumptionKw == null
+            ? null
+            : Math.min(point.productionKw, point.consumptionKw),
       };
     });
   }, [today]);
 
+  const todayDayLabel = zurichDayLabel();
+  const weekWithLive = useMemo(
+    () => applyLiveToday(week, liveToday, (point) => point.label === "Heute"),
+    [week, liveToday],
+  );
+  const monthWithLive = useMemo(
+    () => applyLiveToday(month, liveToday, (point) => point.label === todayDayLabel),
+    [month, liveToday, todayDayLabel],
+  );
+
   const total = useMemo(
     () =>
-      formatRangeTotal(range, today, todayChartData, week, month, year, lifetime),
-    [range, today, todayChartData, week, month, year, lifetime],
+      formatRangeTotal(
+        range,
+        today,
+        todayChartData,
+        weekWithLive,
+        monthWithLive,
+        year,
+        lifetime,
+        liveToday,
+      ),
+    [range, today, todayChartData, weekWithLive, monthWithLive, year, lifetime, liveToday],
   );
 
   const barData =
     range === "woche"
-      ? week
+      ? weekWithLive
       : range === "monat"
-        ? month
+        ? monthWithLive
         : range === "jahr"
           ? year
           : lifetimeWithout2021(lifetime);
@@ -504,6 +559,7 @@ export function ChartsSection({
             setPage(next);
             if (next !== page) pvStore.refreshHistory();
           }}
+          className="pb-1"
         >
           <div className="flex flex-col gap-3">
             <div
