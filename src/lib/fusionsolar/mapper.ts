@@ -322,6 +322,7 @@ export function mapDaySeriesToWeek(
         // Der aktuelle Tag heißt "Heute" statt des Wochentagskürzels, analog
         // zur Verlaufsansicht in gängigen PV-Monitoring-Apps.
         label: isToday ? "Heute" : WEEKDAYS_DE[WEEKDAY_INDEX[parts.weekday] ?? 0],
+        dayKey: `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`,
         yieldKwh: yieldKwhRounded,
         consumptionKwh: consumptionKwhRounded,
         directSolarKwh,

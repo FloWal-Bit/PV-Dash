@@ -111,6 +111,7 @@ export function SwipeCarousel({
   stretch = false,
   showDots = true,
   fillHeight = false,
+  framed = false,
 }: {
   labels: string[];
   children: ReactNode[];
@@ -123,6 +124,11 @@ export function SwipeCarousel({
   showDots?: boolean;
   /** Fills a parent that already has a height, including below the md breakpoint. */
   fillHeight?: boolean;
+  /**
+   * Schatten und Ecken liegen auf dem Wischrahmen. Ein Schatten auf der
+   * inneren Karte würde unten vom Überlauf abgeschnitten.
+   */
+  framed?: boolean;
 }) {
   const pageCount = children.length;
   const [internalPage, setInternalPage] = useState(0);
@@ -156,7 +162,12 @@ export function SwipeCarousel({
   return (
     <div className={cn("flex flex-col gap-2", stretch && "md:h-full", fillHeight && "h-full min-h-0", className)}>
       <div
-        className={cn("touch-pan-y overflow-hidden", stretch && "md:min-h-0 md:flex-1", fillHeight && "min-h-0 flex-1")}
+        className={cn(
+          "touch-pan-y overflow-hidden",
+          framed && "rounded-2xl shadow-card ring-1 ring-foreground/10",
+          stretch && "md:min-h-0 md:flex-1",
+          fillHeight && "min-h-0 flex-1",
+        )}
         onTouchStart={(e) => onTouchStart(e.changedTouches[0]?.clientX ?? 0)}
         onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
         onPointerDown={(e) => {

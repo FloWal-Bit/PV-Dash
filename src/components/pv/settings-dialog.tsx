@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { BatteryFull, Bell, EyeOff, Info, MapPin, Settings2 } from "lucide-react";
+import { BatteryFull, Bell, EyeOff, Info, MapPin, Settings2, Smartphone } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,12 @@ import {
 import { formatYieldKwh } from "@/lib/format";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
+import {
+  homeScreenHint,
+  isInstalledApp,
+  isIosBrowser,
+  promptHomeScreenInstall,
+} from "@/lib/install-prompt";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +55,46 @@ function StatusBarSwitch() {
       }}
       className="data-checked:bg-chart-3"
     />
+  );
+}
+
+function HomeScreenSetting() {
+  const [installed, setInstalled] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    setInstalled(isInstalledApp());
+    if (isIosBrowser()) setHint(homeScreenHint());
+  }, []);
+
+  async function handleInstall() {
+    const outcome = await promptHomeScreenInstall();
+    if (outcome === "accepted") {
+      setInstalled(true);
+      setHint(null);
+      return;
+    }
+    setHint(homeScreenHint());
+  }
+
+  if (installed) {
+    return (
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        PV Dash läuft auf diesem Gerät bereits als App.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Legt PV Dash auf den Home-Bildschirm. Danach startet es ohne Browserleiste.
+      </p>
+      <Button type="button" variant="outline" size="sm" onClick={() => void handleInstall()}>
+        Als App speichern
+      </Button>
+      {hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
+    </div>
   );
 }
 
@@ -444,6 +490,14 @@ export function SettingsDialog() {
               <span className="text-sm font-medium">Farbschema</span>
               <ThemeModeSetting />
             </div>
+          </SettingsSection>
+
+          <SettingsSection
+            icon={<Smartphone className="size-4" />}
+            iconClassName="bg-muted text-foreground/70"
+            title="Home-Bildschirm"
+          >
+            <HomeScreenSetting />
           </SettingsSection>
 
           <SettingsSection

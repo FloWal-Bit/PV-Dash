@@ -83,6 +83,8 @@ export type DailyEnergyPoint = {
   directSolarKwh: number;
   /** Anteil von `consumptionKwh`, der aus dem Speicher (Batterie) entladen wurde (kWh). */
   batteryKwh: number;
+  /** Kalendertag YYYY-MM-DD, nur für den Wochentooltip. Die Achse nutzt weiter `label`. */
+  dayKey?: string;
 };
 
 const SYSTEM_PEAK_KWP = 8.4;
@@ -312,6 +314,7 @@ export function getWeekHistory(now: Date = new Date()): DailyEnergyPoint[] {
       // Der aktuelle Tag heißt "Heute" statt des Wochentagskürzels, analog
       // zur Verlaufsansicht in gängigen PV-Monitoring-Apps.
       label: i === 0 ? "Heute" : WEEKDAYS_DE[day.getDay()],
+      dayKey: `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`,
       yieldKwh: round(yieldKwh),
       consumptionKwh,
       directSolarKwh,

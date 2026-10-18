@@ -433,7 +433,7 @@ function StromkontoFocus({
   footer?: ReactNode;
 }) {
   return (
-    <Card className="shadow-card h-full flex-1 rounded-2xl">
+    <Card className="h-full flex-1 rounded-2xl shadow-none ring-0">
       <EnergyFlowTitle showInfo />
       <CardContent className="flex flex-1 items-center justify-center pt-2 pb-4">
         <div
@@ -612,6 +612,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       showDots={false}
       stretch
       fillHeight
+      framed
       className="energy-flow-carousel min-h-0 min-w-0 flex-1"
     >
       <StromkontoFocus
@@ -629,7 +630,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
           />
         }
       />
-      <Card className="shadow-card flex h-full flex-1 flex-col rounded-2xl">
+      <Card className="flex h-full flex-1 flex-col rounded-2xl shadow-none ring-0">
       <EnergyFlowTitle />
       <CardContent className="flex min-h-0 flex-1 flex-col pt-0 pb-3">
         <div

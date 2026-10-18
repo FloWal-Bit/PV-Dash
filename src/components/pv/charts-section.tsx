@@ -226,7 +226,7 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
             if (name === "crossY") return null;
             const label =
               name === "productionKw"
-                ? "PV"
+                ? "Ertrag"
                 : name === "consumptionKw"
                   ? "Verbrauch"
                   : "Eigenverbrauch";
@@ -299,13 +299,87 @@ function mwhFractionDigits(valueMwh: number): number {
   return valueMwh < 10 ? 2 : 1;
 }
 
+function zurichYearMonth(now = new Date()): { year: number; month: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(now);
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+  };
+}
+
+/** Tooltip: „Samstag, 3. Oktober“. */
+function calendarDayTitle(year: number, month: number, day: number): string {
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  return new Intl.DateTimeFormat("de-CH", {
+    timeZone: "Europe/Zurich",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+}
+
+/** Tooltip in der Monatsansicht: „3“ wird zu „Samstag, 3. Oktober“. */
+function monthDayTooltipTitle(dayLabel: string, now = new Date()): string {
+  if (!/^\d{1,2}$/.test(dayLabel)) return dayLabel;
+  const { year, month } = zurichYearMonth(now);
+  return calendarDayTitle(year, month, Number(dayLabel));
+}
+
+function weekDayTooltipTitle(dayKey: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey);
+  if (!match) return null;
+  return calendarDayTitle(Number(match[1]), Number(match[2]), Number(match[3]));
+}
+
+const WEEKDAY_FULL: Record<string, string> = {
+  Mo: "Montag",
+  Di: "Dienstag",
+  Mi: "Mittwoch",
+  Do: "Donnerstag",
+  Fr: "Freitag",
+  Sa: "Samstag",
+  So: "Sonntag",
+};
+
+/** Tooltip in der Jahresansicht: „Mär“ wird zu „März“. */
+const MONTH_FULL: Record<string, string> = {
+  Jan: "Januar",
+  Feb: "Februar",
+  Mär: "März",
+  Apr: "April",
+  Mai: "Mai",
+  Jun: "Juni",
+  Jul: "Juli",
+  Aug: "August",
+  Sep: "September",
+  Okt: "Oktober",
+  Nov: "November",
+  Dez: "Dezember",
+};
+
 /** Drei Säulen pro Tag: Ertrag, Verbrauch, Eigenverbrauch (PV + Speicheranteil). */
 function YieldConsumptionChart({
   data,
   unit = "kWh",
+  trimDecimal = false,
+  expandWeekdayLabel = false,
+  expandMonthDayLabel = false,
+  expandMonthNameLabel = false,
 }: {
   data: DailyEnergyPoint[];
   unit?: EnergyUnit;
+  /** Eine Nachkommastelle weniger, nur für „Dieses Jahr“. */
+  trimDecimal?: boolean;
+  /** Tooltip-Titel: Mo wird zu Montag. Die Achse bleibt kurz. */
+  expandWeekdayLabel?: boolean;
+  /** Tooltip-Titel: 3 wird zu Samstag, 3. Oktober. Die Achse bleibt die Zahl. */
+  expandMonthDayLabel?: boolean;
+  /** Tooltip-Titel: Mär wird zu März. Die Achse bleibt kurz. */
+  expandMonthNameLabel?: boolean;
 }) {
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
@@ -322,12 +396,13 @@ function YieldConsumptionChart({
     (max, point) => Math.max(max, point.yieldKwh, point.consumptionKwh, point.eigenverbrauchKwh),
     0,
   );
-  const fractionDigits = unit === "MWh" ? mwhFractionDigits(maxValue) : 0;
+  const fractionDigits =
+    unit === "MWh" ? Math.max(0, mwhFractionDigits(maxValue) - (trimDecimal ? 1 : 0)) : 0;
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={chartData}
-        margin={{ top: unit === "MWh" ? 28 : 8, right: 8, left: -16, bottom: 0 }}
+        margin={{ top: 28, right: 8, left: -16, bottom: 0 }}
         barGap={2}
       >
         <defs>
@@ -358,10 +433,23 @@ function YieldConsumptionChart({
           width={unit === "MWh" ? 48 : 40}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickFormatter={(v) => formatSwissNumber(Number(v), fractionDigits)}
-          label={unit === "MWh" ? { value: "MWh", content: YAxisUnit } : undefined}
+          label={{ value: unit, content: YAxisUnit }}
         />
         <Tooltip
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+          labelFormatter={(label, payload) => {
+            const text = String(label ?? "");
+            if (expandWeekdayLabel) {
+              const dayKey = payload?.[0]?.payload?.dayKey;
+              if (typeof dayKey === "string") {
+                return weekDayTooltipTitle(dayKey) ?? (WEEKDAY_FULL[text] ?? text);
+              }
+              return WEEKDAY_FULL[text] ?? text;
+            }
+            if (expandMonthDayLabel) return monthDayTooltipTitle(text);
+            if (expandMonthNameLabel) return MONTH_FULL[text] ?? text;
+            return text;
+          }}
           formatter={(value, name) => {
             const label =
               name === "yieldKwh"
@@ -374,7 +462,7 @@ function YieldConsumptionChart({
             const amount = Number(value);
             const text =
               unit === "MWh"
-                ? `${formatSwissNumber(amount, mwhFractionDigits(amount))} MWh`
+                ? `${formatSwissNumber(amount, Math.max(0, mwhFractionDigits(amount) - (trimDecimal ? 1 : 0)))} MWh`
                 : formatYieldKwh(amount, 1);
             return [text, label];
           }}
@@ -461,7 +549,10 @@ function formatRangeTotal(
   };
   const label = periodLabel[range as Exclude<Range, "heute">];
   if (range === "jahr" || range === "lebensdauer") {
-    return `${label}, ${formatYieldMwh(yieldKwh, mwhFractionDigits(yieldKwh / 1000))} / ${formatYieldMwh(consumptionKwh, mwhFractionDigits(consumptionKwh / 1000))}`;
+    const trim = range === "jahr" ? 1 : 0;
+    const yieldDigits = Math.max(0, mwhFractionDigits(yieldKwh / 1000) - trim);
+    const consumptionDigits = Math.max(0, mwhFractionDigits(consumptionKwh / 1000) - trim);
+    return `${label}, ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)}`;
   }
   return `${label}, ${formatYieldKwh(yieldKwh, 0)} / ${formatYieldKwh(consumptionKwh, 0)}`;
 }
@@ -609,6 +700,10 @@ export function ChartsSection({
                 <YieldConsumptionChart
                   data={barData}
                   unit={range === "jahr" || range === "lebensdauer" ? "MWh" : "kWh"}
+                  trimDecimal={range === "jahr"}
+                  expandWeekdayLabel={range === "woche"}
+                  expandMonthDayLabel={range === "monat"}
+                  expandMonthNameLabel={range === "jahr"}
                 />
               )}
             </div>
