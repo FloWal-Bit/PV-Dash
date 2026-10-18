@@ -30,3 +30,7 @@ export function formatSignedSwissNumber(value: number, fractionDigits = 1): stri
 export function formatSignedKwh(value: number, fractionDigits = 1): string {
   return `${formatSignedSwissNumber(value, fractionDigits)} kWh`;
 }
+
+export function formatSignedMwh(valueKwh: number, fractionDigits = 1): string {
+  return `${formatSignedSwissNumber(valueKwh / 1000, fractionDigits)} MWh`;
+}

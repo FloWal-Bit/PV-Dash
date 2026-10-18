@@ -48,6 +48,13 @@ type PersistedState = {
   baseline: MeterBaseline | null;
   today: TodayEntry | null;
   dayBaseline: DayMeterBaseline | null;
+  /**
+   * Kalenderjahr der letzten Nacht vom 3. auf den 4. August, in der der
+   * Kontostand auf 0 gesetzt wurde. Fehlt der Wert, gilt das laufende
+   * Kontojahr als bereits berücksichtigt, damit ein bestehender Stand
+   * nicht nachträglich gelöscht wird.
+   */
+  lastAugustResetYear: number | null;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -98,7 +105,18 @@ function emptyState(): PersistedState {
     baseline: null,
     today: null,
     dayBaseline: null,
+    lastAugustResetYear: latestAugustResetYear(new Date()),
   };
+}
+
+/**
+ * Jahr der letzten Nacht vom 3. auf den 4. August, die zu diesem Zeitpunkt
+ * schon begonnen hat. Am 4. August um 00:00 Uhr Schweizer Zeit wechselt das Jahr.
+ */
+export function latestAugustResetYear(date: Date): number {
+  const [year, month, day] = appDayKey(date).split("-").map(Number);
+  const resetHasStarted = month > 8 || (month === 8 && day >= 4);
+  return resetHasStarted ? year : year - 1;
 }
 
 /** Kalendertag in Europe/Zurich. Unabhängig von der Zeitzone des Servers. */
@@ -147,7 +165,7 @@ function loadState(): PersistedState {
             exportKwh: todayRaw.exportKwh == null ? null : Number(todayRaw.exportKwh),
           }
         : null;
-      return {
+      return rememberResetYear({
         configuredBalanceKwh: Number.isFinite(configuredBalanceKwh)
           ? configuredBalanceKwh
           : defaultConfiguredBalance(),
@@ -160,7 +178,8 @@ function loadState(): PersistedState {
               exportKwh: Number(v.dayBaseline.exportKwh),
             }
           : null,
-      };
+        lastAugustResetYear: resetYearFrom(v.lastAugustResetYear),
+      });
     }
 
     // Altes Format migrieren: { balanceKwh, importBaseline, exportBaseline, … }
@@ -173,18 +192,38 @@ function loadState(): PersistedState {
       Number.isFinite(importBaseline) &&
       Number.isFinite(exportBaseline)
     ) {
-      return {
+      return rememberResetYear({
         configuredBalanceKwh: balanceKwh,
         baseline: { importBaseline, exportBaseline, establishedAt },
         today: null,
         dayBaseline: null,
-      };
+        lastAugustResetYear: null,
+      });
     }
   } catch {
     // fall through
   }
 
-  return emptyState();
+  return rememberResetYear(emptyState());
+}
+
+function resetYearFrom(value: unknown): number | null {
+  const year = Number(value);
+  return Number.isInteger(year) && year >= 2000 && year <= 3000 ? year : null;
+}
+
+/**
+ * Ein fehlendes Reset-Jahr wird auf das laufende Kontojahr gesetzt und
+ * gespeichert. Der Kontostand bleibt dabei unverändert.
+ */
+function rememberResetYear(state: PersistedState): PersistedState {
+  if (state.lastAugustResetYear != null) return state;
+  const stamped: PersistedState = {
+    ...state,
+    lastAugustResetYear: latestAugustResetYear(new Date()),
+  };
+  saveState(stamped);
+  return stamped;
 }
 
 function saveState(state: PersistedState): void {
@@ -229,6 +268,7 @@ export function setStromkontoBaseBalance(
       : null,
     today: previous.today,
     dayBaseline: previous.dayBaseline,
+    lastAugustResetYear: previous.lastAugustResetYear,
   };
   saveState(state);
   return state;
@@ -305,7 +345,22 @@ export function computeStromkonto(
   gridFeedInTodayKwh: number,
   now: Date = new Date(),
 ): StromkontoSnapshot {
-  const state = loadState();
+  let state = loadState();
+  const dueYear = latestAugustResetYear(now);
+  if (state.lastAugustResetYear != null && state.lastAugustResetYear < dueYear) {
+    state = {
+      ...state,
+      configuredBalanceKwh: 0,
+      baseline: {
+        importBaseline: cumulativeImportKwh,
+        exportBaseline: cumulativeExportKwh,
+        establishedAt: now.toISOString(),
+      },
+      lastAugustResetYear: dueYear,
+    };
+    saveState(state);
+  }
+
   let baseline = state.baseline;
 
   if (!baseline) {

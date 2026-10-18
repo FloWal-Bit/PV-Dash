@@ -21,7 +21,7 @@ import { pvStore } from "@/lib/pv-store";
 import { withLiveDayTotals } from "@/lib/fusionsolar/mapper";
 import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
 import type { DataSource } from "@/lib/pv-source";
-import { formatKw, formatSwissNumber, formatYieldKwh, formatYieldMwh } from "@/lib/format";
+import { formatKw, formatSignedKwh, formatSignedMwh, formatSwissNumber, formatYieldKwh, formatYieldMwh } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ChartsSectionProps = {
@@ -33,6 +33,8 @@ type ChartsSectionProps = {
   source: DataSource;
   /** Live-Tageszähler. Ersetzt nur den Balken „Heute“, ohne FusionSolar erneut abzufragen. */
   liveToday: { yieldKwh: number; consumptionKwh: number | null } | null;
+  /** Veränderung des Stromkontos heute, kWh. `null`, wenn sie nicht gemessen ist. */
+  stromkontoChangeTodayKwh: number | null;
 };
 
 type Range = "heute" | "woche" | "monat" | "jahr" | "lebensdauer";
@@ -46,9 +48,6 @@ type TodayChartPoint = {
   productionKw: number | null;
   consumptionKw: number | null;
   consumedFromPvKw: number | null;
-  crossLabel?: string;
-  crossY?: number | null;
-  crossLane?: number;
 };
 
 function parseTimeToMinutes(time: string): number {
@@ -56,96 +55,7 @@ function parseTimeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-function formatMinutesAsTime(totalMinutes: number): string {
-  const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(totalMinutes)));
-  const hours = Math.floor(clamped / 60);
-  const minutes = clamped % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-}
-
-/**
- * Schnittpunkte von PV-Ausgabe und Leistungsaufnahme: Vorzeichenwechsel von
- * (Erzeugung − Verbrauch), Uhrzeit linear zwischen den Samples interpoliert.
- */
-function withIntersectionLabels(data: TodayChartPoint[]): TodayChartPoint[] {
-  const byIndex = new Map<number, string[]>();
-
-  for (let i = 1; i < data.length; i++) {
-    const prev = data[i - 1];
-    const curr = data[i];
-    if (prev.productionKw == null || prev.consumptionKw == null) continue;
-    if (curr.productionKw == null || curr.consumptionKw == null) continue;
-
-    const d0 = prev.productionKw - prev.consumptionKw;
-    const d1 = curr.productionKw - curr.consumptionKw;
-    const peak = Math.max(
-      prev.productionKw,
-      prev.consumptionKw,
-      curr.productionKw,
-      curr.consumptionKw,
-    );
-    if (peak < 0.05) continue;
-    if (d0 === 0 || d0 * d1 >= 0) continue;
-
-    const t = Math.abs(d0) / (Math.abs(d0) + Math.abs(d1));
-    const minutes =
-      parseTimeToMinutes(prev.time) + t * (parseTimeToMinutes(curr.time) - parseTimeToMinutes(prev.time));
-    const index = t < 0.5 ? i - 1 : i;
-    const times = byIndex.get(index) ?? [];
-    times.push(formatMinutesAsTime(minutes));
-    byIndex.set(index, times);
-  }
-
-  let lane = 0;
-  return data.map((point, index) => {
-    const times = byIndex.get(index);
-    if (!times) return point;
-    return {
-      ...point,
-      crossLabel: times[0],
-      crossY: point.productionKw ?? point.consumptionKw,
-      crossLane: lane++ % 2,
-    };
-  });
-}
-
-function IntersectionDot({
-  cx,
-  cy,
-  payload,
-}: {
-  cx?: number;
-  cy?: number;
-  payload?: TodayChartPoint;
-}) {
-  if (cx == null || cy == null || payload?.crossLabel == null) return null;
-  const labelY = cy + (payload.crossLane === 1 ? 16 : -12);
-  return (
-    <g>
-      <circle
-        cx={cx}
-        cy={cy}
-        r={3.5}
-        fill="var(--background)"
-        stroke="var(--foreground)"
-        strokeWidth={1.5}
-      />
-      <text
-        x={cx}
-        y={labelY}
-        textAnchor="middle"
-        dominantBaseline={payload.crossLane === 1 ? "hanging" : "auto"}
-        fontSize={10}
-        fontWeight={600}
-        fill="var(--foreground)"
-      >
-        {payload.crossLabel}
-      </text>
-    </g>
-  );
-}
-
-function sampleIntervalHours(points: HistoryPoint[]): number {
+function sampleIntervalHours(points: { time: string }[]): number {
   if (points.length < 2) return 1;
   const delta = parseTimeToMinutes(points[1].time) - parseTimeToMinutes(points[0].time);
   return delta > 0 ? delta / 60 : 1;
@@ -180,13 +90,51 @@ function YAxisUnit({
   );
 }
 
+/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde, sonst überlagern sich die Zeiten auf dem Handy. */
+function halfHourTicks(): string[] {
+  const ticks: string[] = [];
+  for (let hour = 0; hour < 24; hour++) {
+    const hh = String(hour).padStart(2, "0");
+    ticks.push(`${hh}:00`, `${hh}:30`);
+  }
+  return ticks;
+}
+
+function TodayAxisTick({
+  x = 0,
+  y = 0,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  const value = String(payload?.value ?? "");
+  const [hour = "00", minute = "00"] = value.split(":");
+  const halfHour = minute === "30";
+  const showLabel = !halfHour && Number(hour) % 2 === 0;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <line
+        y2={halfHour ? 4 : 6}
+        stroke="var(--muted-foreground)"
+        strokeOpacity={halfHour ? 0.55 : 0.85}
+      />
+      {showLabel ? (
+        <text y={14} textAnchor="middle" fill="var(--muted-foreground)" fontSize={10}>
+          {hour}
+        </text>
+      ) : null}
+    </g>
+  );
+}
+
 function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
-  const hourTicks = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"];
-  const chartData = useMemo(() => withIntersectionLabels(data), [data]);
+  const hourTicks = halfHourTicks().filter((tick) => data.some((point) => point.label === tick));
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={chartData} margin={{ top: 28, right: 12, left: -8, bottom: 4 }}>
+      <ComposedChart data={data} margin={{ top: 28, right: 12, left: -8, bottom: 4 }}>
         <defs>
           <linearGradient id="fill-pv" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.45} />
@@ -197,13 +145,14 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
             <stop offset="100%" stopColor="var(--eigenverbrauch)" stopOpacity={0.12} />
           </linearGradient>
         </defs>
-        <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 6" />
+        <CartesianGrid vertical={false} stroke="var(--border)" />
         <XAxis
           dataKey="label"
           ticks={hourTicks}
+          interval={0}
           tickLine={false}
           axisLine={false}
-          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+          tick={TodayAxisTick}
         />
         <YAxis
           tickLine={false}
@@ -215,29 +164,35 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
         />
         <Tooltip
           cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
-          itemSorter={(item) => {
-            const key = String(item.dataKey);
-            if (key === "productionKw") return 0;
-            if (key === "consumptionKw") return 1;
-            if (key === "consumedFromPvKw") return 2;
-            return 3;
-          }}
-          formatter={(value, name) => {
-            if (name === "crossY") return null;
-            const label =
-              name === "productionKw"
-                ? "Ertrag"
-                : name === "consumptionKw"
-                  ? "Verbrauch"
-                  : "Eigenverbrauch";
-            return [formatKw(Number(value), 2), label];
-          }}
-          contentStyle={{
-            background: "var(--popover)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            fontSize: 12,
-            color: "var(--popover-foreground)",
+          content={(props) => {
+            if (!props.active || !props.payload?.length) return null;
+            const row = props.payload[0]?.payload as TodayChartPoint | undefined;
+            if (!row) return null;
+            const hours = sampleIntervalHours(data);
+            const stromkonto =
+              row.productionKw == null || row.consumptionKw == null
+                ? "–"
+                : formatSignedKwh((row.productionKw - row.consumptionKw) * hours, 2);
+            return (
+              <DetailTooltip
+                title={String(props.label ?? row.label)}
+                rows={[
+                  {
+                    label: "Ertrag",
+                    value: row.productionKw == null ? "–" : formatKw(row.productionKw, 2),
+                  },
+                  {
+                    label: "Verbrauch",
+                    value: row.consumptionKw == null ? "–" : formatKw(row.consumptionKw, 2),
+                  },
+                  {
+                    label: "Eigenverbrauch",
+                    value: row.consumedFromPvKw == null ? "–" : formatKw(row.consumedFromPvKw, 2),
+                  },
+                  { label: "Stromkonto", value: stromkonto },
+                ]}
+              />
+            );
           }}
         />
         <Area
@@ -271,17 +226,6 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
           dot={false}
           activeDot={{ r: 3 }}
           connectNulls={false}
-        />
-        <Line
-          type="linear"
-          dataKey="crossY"
-          name="crossY"
-          stroke="none"
-          legendType="none"
-          tooltipType="none"
-          isAnimationActive={false}
-          dot={<IntersectionDot />}
-          activeDot={false}
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -361,6 +305,68 @@ const MONTH_FULL: Record<string, string> = {
   Dez: "Dezember",
 };
 
+const tooltipBoxStyle = {
+  background: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  fontSize: 12,
+  color: "var(--popover-foreground)",
+  padding: "8px 10px",
+};
+
+function DetailTooltip({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { label: string; value: string }[];
+}) {
+  return (
+    <div style={tooltipBoxStyle}>
+      {title ? <div style={{ marginBottom: 4 }}>{title}</div> : null}
+      {rows.map((row) => (
+        <div key={row.label}>
+          {row.label} : {row.value}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatDetailEnergy(amount: number, unit: EnergyUnit, trimDecimal: boolean): string {
+  if (unit === "MWh") {
+    const digits = Math.max(0, mwhFractionDigits(Math.abs(amount)) - (trimDecimal ? 1 : 0));
+    return `${formatSwissNumber(amount, digits)} MWh`;
+  }
+  return formatYieldKwh(amount, 1);
+}
+
+function formatDetailStromkonto(kwh: number, unit: EnergyUnit, trimDecimal: boolean): string {
+  if (unit === "MWh") {
+    const digits = Math.max(0, mwhFractionDigits(Math.abs(kwh) / 1000) - (trimDecimal ? 1 : 0));
+    return formatSignedMwh(kwh, digits);
+  }
+  return formatSignedKwh(kwh, 1);
+}
+function barTooltipTitle(
+  label: unknown,
+  row: { dayKey?: string },
+  options: {
+    expandWeekdayLabel: boolean;
+    expandMonthDayLabel: boolean;
+    expandMonthNameLabel: boolean;
+  },
+): string {
+  const text = String(label ?? "");
+  if (options.expandWeekdayLabel) {
+    if (typeof row.dayKey === "string") return weekDayTooltipTitle(row.dayKey) ?? (WEEKDAY_FULL[text] ?? text);
+    return WEEKDAY_FULL[text] ?? text;
+  }
+  if (options.expandMonthDayLabel) return monthDayTooltipTitle(text);
+  if (options.expandMonthNameLabel) return MONTH_FULL[text] ?? text;
+  return text;
+}
+
 /** Drei Säulen pro Tag: Ertrag, Verbrauch, Eigenverbrauch (PV + Speicheranteil). */
 function YieldConsumptionChart({
   data,
@@ -369,6 +375,7 @@ function YieldConsumptionChart({
   expandWeekdayLabel = false,
   expandMonthDayLabel = false,
   expandMonthNameLabel = false,
+  showStromkonto = true,
 }: {
   data: DailyEnergyPoint[];
   unit?: EnergyUnit;
@@ -380,12 +387,15 @@ function YieldConsumptionChart({
   expandMonthDayLabel?: boolean;
   /** Tooltip-Titel: Mär wird zu März. Die Achse bleibt kurz. */
   expandMonthNameLabel?: boolean;
+  /** Laufzeit zeigt keine Stromkonto-Zeile. */
+  showStromkonto?: boolean;
 }) {
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
     () =>
       data.map((point) => ({
         ...point,
+        stromkontoKwh: point.yieldKwh - point.consumptionKwh,
         yieldKwh: toDisplayEnergy(point.yieldKwh, unit),
         consumptionKwh: toDisplayEnergy(point.consumptionKwh, unit),
         eigenverbrauchKwh: toDisplayEnergy(point.directSolarKwh + point.batteryKwh, unit),
@@ -437,41 +447,53 @@ function YieldConsumptionChart({
         />
         <Tooltip
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
-          labelFormatter={(label, payload) => {
-            const text = String(label ?? "");
-            if (expandWeekdayLabel) {
-              const dayKey = payload?.[0]?.payload?.dayKey;
-              if (typeof dayKey === "string") {
-                return weekDayTooltipTitle(dayKey) ?? (WEEKDAY_FULL[text] ?? text);
-              }
-              return WEEKDAY_FULL[text] ?? text;
-            }
-            if (expandMonthDayLabel) return monthDayTooltipTitle(text);
-            if (expandMonthNameLabel) return MONTH_FULL[text] ?? text;
-            return text;
-          }}
-          formatter={(value, name) => {
-            const label =
-              name === "yieldKwh"
-                ? "Ertrag"
-                : name === "consumptionKwh"
-                  ? "Verbrauch"
-                  : name === "eigenverbrauchKwh"
-                    ? "Eigenverbrauch"
-                    : String(name);
-            const amount = Number(value);
-            const text =
-              unit === "MWh"
-                ? `${formatSwissNumber(amount, Math.max(0, mwhFractionDigits(amount) - (trimDecimal ? 1 : 0)))} MWh`
-                : formatYieldKwh(amount, 1);
-            return [text, label];
-          }}
-          contentStyle={{
-            background: "var(--popover)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            fontSize: 12,
-            color: "var(--popover-foreground)",
+          content={(props) => {
+            if (!props.active || !props.payload?.length) return null;
+            const row = props.payload[0]?.payload as
+              | {
+                  dayKey?: string;
+                  yieldKwh?: number;
+                  consumptionKwh?: number;
+                  eigenverbrauchKwh?: number;
+                  stromkontoKwh?: number;
+                }
+              | undefined;
+            if (!row) return null;
+            return (
+              <DetailTooltip
+                title={barTooltipTitle(props.label, row, {
+                  expandWeekdayLabel,
+                  expandMonthDayLabel,
+                  expandMonthNameLabel,
+                })}
+                rows={[
+                  {
+                    label: "Ertrag",
+                    value: formatDetailEnergy(Number(row.yieldKwh ?? 0), unit, trimDecimal),
+                  },
+                  {
+                    label: "Verbrauch",
+                    value: formatDetailEnergy(Number(row.consumptionKwh ?? 0), unit, trimDecimal),
+                  },
+                  {
+                    label: "Eigenverbrauch",
+                    value: formatDetailEnergy(Number(row.eigenverbrauchKwh ?? 0), unit, trimDecimal),
+                  },
+                  ...(showStromkonto
+                    ? [
+                        {
+                          label: "Stromkonto",
+                          value: formatDetailStromkonto(
+                            Number(row.stromkontoKwh ?? 0),
+                            unit,
+                            trimDecimal,
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            );
           }}
         />
         <Bar dataKey="yieldKwh" fill="url(#bar-yield)" radius={[6, 6, 6, 6]} maxBarSize={16} />
@@ -517,6 +539,7 @@ function formatRangeTotal(
   year: DailyEnergyPoint[],
   lifetime: DailyEnergyPoint[],
   liveToday: ChartsSectionProps["liveToday"],
+  stromkontoChangeTodayKwh: number | null,
 ): string {
   if (range === "heute") {
     const hours = sampleIntervalHours(today);
@@ -529,7 +552,9 @@ function formatRangeTotal(
     const consumptionKwh = liveToday?.consumptionKwh ?? (measured.length > 0 ? summedKwh : null);
     const consumption =
       consumptionKwh == null ? "–" : formatYieldKwh(consumptionKwh, 1);
-    return `Heute, ${formatYieldKwh(yieldKwh, 1)} / ${consumption}`;
+    const stromkonto =
+      stromkontoChangeTodayKwh == null ? "–" : formatSignedKwh(stromkontoChangeTodayKwh, 1);
+    return `Heute, ${formatYieldKwh(yieldKwh, 1)} / ${consumption} / ${stromkonto}`;
   }
   const points =
     range === "woche"
@@ -548,13 +573,20 @@ function formatRangeTotal(
     lebensdauer: "Laufzeit",
   };
   const label = periodLabel[range as Exclude<Range, "heute">];
-  if (range === "jahr" || range === "lebensdauer") {
-    const trim = range === "jahr" ? 1 : 0;
+  if (range === "lebensdauer") {
+    const yieldDigits = mwhFractionDigits(yieldKwh / 1000);
+    const consumptionDigits = mwhFractionDigits(consumptionKwh / 1000);
+    return `${label}, ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)} / -`;
+  }
+  const stromkontoKwh = yieldKwh - consumptionKwh;
+  if (range === "jahr") {
+    const trim = 1;
     const yieldDigits = Math.max(0, mwhFractionDigits(yieldKwh / 1000) - trim);
     const consumptionDigits = Math.max(0, mwhFractionDigits(consumptionKwh / 1000) - trim);
-    return `${label}, ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)}`;
+    const stromkontoDigits = Math.max(0, mwhFractionDigits(Math.abs(stromkontoKwh) / 1000) - trim);
+    return `${label}, ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)} / ${formatSignedMwh(stromkontoKwh, stromkontoDigits)}`;
   }
-  return `${label}, ${formatYieldKwh(yieldKwh, 0)} / ${formatYieldKwh(consumptionKwh, 0)}`;
+  return `${label}, ${formatYieldKwh(yieldKwh, 0)} / ${formatYieldKwh(consumptionKwh, 0)} / ${formatSignedKwh(stromkontoKwh, 0)}`;
 }
 
 function zurichDayLabel(date = new Date()): string {
@@ -585,6 +617,7 @@ export function ChartsSection({
   lifetime,
   source,
   liveToday,
+  stromkontoChangeTodayKwh,
 }: ChartsSectionProps) {
   const [page, setPage] = useState(0);
   const range = RANGE_ORDER[page] ?? "heute";
@@ -643,8 +676,9 @@ export function ChartsSection({
         year,
         lifetime,
         liveToday,
+        stromkontoChangeTodayKwh,
       ),
-    [range, today, todayChartData, weekWithLive, monthWithLive, year, lifetime, liveToday],
+    [range, today, todayChartData, weekWithLive, monthWithLive, year, lifetime, liveToday, stromkontoChangeTodayKwh],
   );
 
   const barData =
@@ -662,7 +696,7 @@ export function ChartsSection({
       <CardHeader>
         <div className="flex flex-col gap-1">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Ertrag &amp; Verbrauch
+            Ertrag, Verbrauch, Stromkonto
           </CardTitle>
           <span className="text-xs text-muted-foreground">
             {hidePv ? "Simulierte Verläufe sind ausgeblendet" : total}
@@ -704,6 +738,7 @@ export function ChartsSection({
                   expandWeekdayLabel={range === "woche"}
                   expandMonthDayLabel={range === "monat"}
                   expandMonthNameLabel={range === "jahr"}
+                  showStromkonto={range !== "lebensdauer"}
                 />
               )}
             </div>

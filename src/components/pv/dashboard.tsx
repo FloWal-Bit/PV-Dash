@@ -154,6 +154,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
                       }
                     : null
                 }
+                stromkontoChangeTodayKwh={snapshot.stromkontoChangeTodayKwh}
               />
             ) : (
               <ChartHistoryPlaceholder error={historyError} />

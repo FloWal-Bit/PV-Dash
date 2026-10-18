@@ -389,7 +389,8 @@ function StromkontoEditor() {
 
       <p className="text-xs leading-relaxed text-muted-foreground">
         Stromkonto heute wird um 00:00 Uhr Schweizer Zeit auf 0 gesetzt und zählt
-        ab dann Einspeisung minus Bezug.
+        ab dann Einspeisung minus Bezug. Der Kontostand selbst wird in der Nacht
+        vom 3. auf den 4. August auf 0 gesetzt und zählt ab dann neu.
       </p>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
