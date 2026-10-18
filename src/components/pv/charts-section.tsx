@@ -12,6 +12,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  type XAxisTickContentProps,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SwipePageSurface } from "@/components/pv/swipe-carousel";
@@ -100,21 +101,13 @@ function halfHourTicks(): string[] {
   return ticks;
 }
 
-function TodayAxisTick({
-  x = 0,
-  y = 0,
-  payload,
-}: {
-  x?: number;
-  y?: number;
-  payload?: { value?: string };
-}) {
+function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
   const value = String(payload?.value ?? "");
   const [hour = "00", minute = "00"] = value.split(":");
   const halfHour = minute === "30";
   const showLabel = !halfHour && Number(hour) % 2 === 0;
   return (
-    <g transform={`translate(${x},${y})`}>
+    <g transform={`translate(${Number(x)},${Number(y)})`}>
       <line
         y2={halfHour ? 4 : 6}
         stroke="var(--muted-foreground)"
