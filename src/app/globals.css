@@ -298,6 +298,29 @@
       width: 9rem;
       height: 9rem;
     }
+    /* Heute-Kurven halb so dick, damit sie auf dem schmalen Display lesbar bleiben. */
+    .today-ertrag .recharts-area-curve,
+    .today-verbrauch .recharts-line-curve {
+      stroke-width: 1px;
+    }
+    .today-eigenverbrauch .recharts-area-curve {
+      stroke-width: 0.75px;
+    }
+    /* Dieselbe Kartenhöhe wie Wetter und Energiefluss. Die Kurve füllt den Rest. */
+    .yield-chart-body,
+    .yield-chart-surface,
+    .yield-chart-surface > div:first-child,
+    .yield-chart-stack {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .yield-chart-plot {
+      height: auto !important;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
   }
 
   .energy-flow-node-side {

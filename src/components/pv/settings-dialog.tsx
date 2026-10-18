@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { BatteryFull, Bell, EyeOff, Info, MapPin, Settings2, Smartphone } from "lucide-react";
+import { BatteryFull, Bell, EyeOff, Info, MapPin, Settings2, Smartphone, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,12 @@ import {
   YIELD_NOTIFICATION_THRESHOLD_KWH,
 } from "@/lib/notifications";
 import type { PlzLocality, PlzLookupResponse } from "@/lib/plz-types";
-import { DEFAULT_SITE_LOCATION, siteLocationStore } from "@/lib/site-location";
+import { siteLocationStore } from "@/lib/site-location";
+import { pvStore } from "@/lib/pv-store";
+import {
+  parseYieldForecastInput,
+  yieldForecastStore,
+} from "@/lib/yield-forecast-settings";
 import {
   DEFAULT_STROMKONTO_BALANCE_KWH,
   parseStromkontoBalanceInput,
@@ -98,7 +103,7 @@ function HomeScreenSetting() {
   );
 }
 
-function SettingsSection({
+export function SettingsSection({
   icon,
   iconClassName,
   title,
@@ -198,17 +203,14 @@ function SiteLocationEditor({
       setLocationError("Bitte zuerst PLZ laden und einen Ort wählen.");
       return;
     }
-    siteLocationStore.save({
+    void siteLocationStore.save({
       plz: plz.trim(),
       name: entry.name,
       latitude: entry.latitude,
       longitude: entry.longitude,
+    }).catch(() => {
+      setLocationError("Standort konnte nicht gespeichert werden.");
     });
-    setLocationError(null);
-  }
-
-  function handleResetLocation() {
-    siteLocationStore.resetToDefault();
     setLocationError(null);
   }
 
@@ -222,23 +224,27 @@ function SiteLocationEditor({
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
         Wetter und Sonnenzeiten kommen von Wetter-Alarm. Wähle PLZ und Ort aus dem
-        Schweizer PLZ-Verzeichnis. Standard: PLZ {DEFAULT_SITE_LOCATION.plz}{" "}
-        {DEFAULT_SITE_LOCATION.name}.
+        Schweizer PLZ-Verzeichnis.
         {isCustom ? " Du verwendest einen angepassten Standort." : null}
       </p>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="site-plz">PLZ</Label>
-        <input
-          id="site-plz"
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          className={inputClassName}
-          value={plz}
-          onChange={(e) => setPlz(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          placeholder="3315"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            id="site-plz"
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            className={cn(inputClassName, "min-w-0 flex-1")}
+            value={plz}
+            onChange={(e) => setPlz(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="3315"
+          />
+          <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={handleSaveLocation}>
+            Standort speichern
+          </Button>
+        </div>
       </div>
 
       {plz.length === 4 ? (
@@ -271,15 +277,6 @@ function SiteLocationEditor({
       ) : null}
 
       {locationError ? <p className="text-xs text-destructive">{locationError}</p> : null}
-
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={handleSaveLocation}>
-          Standort speichern
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={handleResetLocation}>
-          Standard ({DEFAULT_SITE_LOCATION.plz} {DEFAULT_SITE_LOCATION.name})
-        </Button>
-      </div>
     </SettingsSection>
   );
 }
@@ -358,34 +355,38 @@ function StromkontoEditor() {
       title="Stromkonto"
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Gespeicherter Startstand in kWh. Er gilt ab sofort als Stand Stromkonto.
         {APP_NAME} addiert oder subtrahiert laufende Netto-Veränderungen
-        (Einspeisung minus Bezug), sobald whatwatt Go misst.
+        (Einspeisung minus Bezug), sobald whatwatt Go misst. Als Basis muss
+        einmalig der mit der Stromkonto App abgestimmte Kontostand übertragen
+        werden. Dies geschieht idealerweise in Zeiten wo kaum Einspeisung oder
+        Bezug bestehen.
       </p>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="stromkonto-balance">Basiskontostand (kWh)</Label>
-        <input
-          id="stromkonto-balance"
-          type="text"
-          inputMode="decimal"
-          className={inputClassName}
-          value={balanceInput}
-          disabled={loading || saving}
-          onChange={(e) => setBalanceInput(e.target.value)}
-          placeholder="516"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            id="stromkonto-balance"
+            type="text"
+            inputMode="decimal"
+            className={cn(inputClassName, "min-w-0 flex-1")}
+            value={balanceInput}
+            disabled={loading || saving}
+            onChange={(e) => setBalanceInput(e.target.value)}
+            placeholder="516"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            disabled={loading || saving}
+            onClick={() => void handleSaveBalance()}
+          >
+            {saving ? "Speichern…" : "Basiskontostand speichern"}
+          </Button>
+        </div>
       </div>
-
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        disabled={loading || saving}
-        onClick={() => void handleSaveBalance()}
-      >
-        {saving ? "Speichern…" : "Basiskontostand speichern"}
-      </Button>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
         Stromkonto heute wird um 00:00 Uhr Schweizer Zeit auf 0 gesetzt und zählt
@@ -396,6 +397,152 @@ function StromkontoEditor() {
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       {success ? <p className="text-xs text-chart-3">{success}</p> : null}
     </SettingsSection>
+  );
+}
+
+function YieldForecastEditor() {
+  const plant = useSyncExternalStore(
+    yieldForecastStore.subscribe,
+    yieldForecastStore.getSnapshot,
+    yieldForecastStore.getServerSnapshot,
+  );
+  const [latitude, setLatitude] = useState(String(plant.latitude));
+  const [longitude, setLongitude] = useState(String(plant.longitude));
+  const [tilt, setTilt] = useState(String(plant.tiltDeg));
+  const [azimuth, setAzimuth] = useState(String(plant.azimuthDeg));
+  const [peakKwp, setPeakKwp] = useState(String(plant.peakKwp));
+  const [performanceRatio, setPerformanceRatio] = useState(String(plant.performanceRatio));
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLatitude(String(plant.latitude));
+    setLongitude(String(plant.longitude));
+    setTilt(String(plant.tiltDeg));
+    setAzimuth(String(plant.azimuthDeg));
+    setPeakKwp(String(plant.peakKwp));
+    setPerformanceRatio(String(plant.performanceRatio));
+  }, [plant]);
+
+  function handleSave() {
+    const next = {
+      latitude: parseYieldForecastInput(latitude),
+      longitude: parseYieldForecastInput(longitude),
+      tiltDeg: parseYieldForecastInput(tilt),
+      azimuthDeg: parseYieldForecastInput(azimuth),
+      peakKwp: parseYieldForecastInput(peakKwp),
+      performanceRatio: parseYieldForecastInput(performanceRatio),
+    };
+    if (next.latitude == null || next.latitude < -90 || next.latitude > 90) {
+      setError("Breite muss zwischen −90 und 90 liegen.");
+      setSuccess(null);
+      return;
+    }
+    if (next.longitude == null || next.longitude < -180 || next.longitude > 180) {
+      setError("Länge muss zwischen −180 und 180 liegen.");
+      setSuccess(null);
+      return;
+    }
+    if (next.tiltDeg == null || next.tiltDeg < 0 || next.tiltDeg > 90) {
+      setError("Neigung muss zwischen 0 und 90 Grad liegen.");
+      setSuccess(null);
+      return;
+    }
+    if (next.azimuthDeg == null || next.azimuthDeg < -180 || next.azimuthDeg > 180) {
+      setError("Azimut muss zwischen −180 und 180 Grad liegen.");
+      setSuccess(null);
+      return;
+    }
+    if (next.peakKwp == null || next.peakKwp <= 0 || next.peakKwp > 1000) {
+      setError("Leistung muss grösser als 0 und höchstens 1000 kWp sein.");
+      setSuccess(null);
+      return;
+    }
+    if (next.performanceRatio == null || next.performanceRatio <= 0 || next.performanceRatio > 1.2) {
+      setError("Leistungsfaktor muss grösser als 0 und höchstens 1.2 sein.");
+      setSuccess(null);
+      return;
+    }
+    yieldForecastStore.save({
+      latitude: next.latitude,
+      longitude: next.longitude,
+      tiltDeg: next.tiltDeg,
+      azimuthDeg: next.azimuthDeg,
+      peakKwp: next.peakKwp,
+      performanceRatio: next.performanceRatio,
+    }).then(() => {
+      pvStore.refresh();
+      setError(null);
+      setSuccess("Gespeichert.");
+    }).catch(() => {
+      setSuccess(null);
+      setError("Prognose konnte nicht gespeichert werden.");
+    });
+  }
+
+  return (
+    <SettingsSection
+      icon={<Zap className="size-4" />}
+      iconClassName="bg-chart-1/12 text-chart-1"
+      title="Ertragsprognose"
+    >
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Stundenweise Einstrahlung am Standort, mal Leistung, mal Leistungsfaktor. Neigung
+        beschreibt die Module, Azimut 0° ist Süden.
+      </p>
+      <ForecastField id="forecast-lat" label="Breite" value={latitude} onChange={setLatitude} />
+      <ForecastField id="forecast-lon" label="Länge" value={longitude} onChange={setLongitude} />
+      <ForecastField id="forecast-tilt" label="Neigung (°)" value={tilt} onChange={setTilt} />
+      <ForecastField id="forecast-azimuth" label="Azimut (°)" value={azimuth} onChange={setAzimuth} />
+      <ForecastField id="forecast-kwp" label="Leistung (kWp)" value={peakKwp} onChange={setPeakKwp} />
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="forecast-pr">Leistungsfaktor</Label>
+        <div className="flex items-center gap-2">
+          <input
+            id="forecast-pr"
+            type="text"
+            inputMode="decimal"
+            className={cn(inputClassName, "min-w-0 flex-1")}
+            value={performanceRatio}
+            onChange={(event) => {
+              setPerformanceRatio(event.target.value);
+              setSuccess(null);
+            }}
+          />
+          <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={handleSave}>
+            Prognose speichern
+          </Button>
+        </div>
+      </div>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {success ? <p className="text-xs text-chart-3">{success}</p> : null}
+    </SettingsSection>
+  );
+}
+
+function ForecastField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <input
+        id={id}
+        type="text"
+        inputMode="decimal"
+        className={inputClassName}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
   );
 }
 
@@ -415,6 +562,7 @@ export function DeveloperPlantSettings() {
         location={location}
         isCustom={isCustom}
       />
+      <YieldForecastEditor />
     </div>
   );
 }

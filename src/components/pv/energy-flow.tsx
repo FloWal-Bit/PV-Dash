@@ -451,13 +451,18 @@ function StromkontoFocus({
             )}
           >
             <StromkontoBattery direction={direction} className="size-10" />
-            <span
-              className={cn(
-                "text-[1.75rem] font-semibold tabular-nums leading-none",
-                valueClassName,
-              )}
-            >
-              {value}
+            <span className="flex items-baseline gap-x-1 whitespace-nowrap">
+              <span
+                className={cn(
+                  "text-[1.75rem] font-semibold tracking-tight tabular-nums leading-none",
+                  valueClassName,
+                )}
+              >
+                {value.endsWith(" kW") ? value.slice(0, -3) : value}
+              </span>
+              {value.endsWith(" kW") ? (
+                <span className="text-sm font-medium leading-none">kW</span>
+              ) : null}
             </span>
           </div>
           <span className="text-sm font-medium text-muted-foreground">Stromkonto</span>

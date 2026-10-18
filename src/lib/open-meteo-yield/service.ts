@@ -4,15 +4,14 @@
  */
 
 import {
-  OPEN_METEO_AZIMUTH_DEG,
-  OPEN_METEO_LATITUDE,
-  OPEN_METEO_LONGITUDE,
-  OPEN_METEO_TILT_DEG,
   OPEN_METEO_TIMEZONE,
-  resolveOpenMeteoPerformanceRatio,
 } from "@/lib/open-meteo-yield/config";
 import { todayDateKeyInZurich } from "@/lib/forecast-solar/service";
 import { OPEN_METEO_YIELD_UNAVAILABLE } from "@/lib/service-unavailable-messages";
+import {
+  defaultYieldForecastPlant,
+  type YieldForecastPlant,
+} from "@/lib/yield-forecast-settings";
 
 export type OpenMeteoYieldMeta = {
   source: "open-meteo";
@@ -79,13 +78,13 @@ function sumGtiWhPerM2ForDay(
   return sum;
 }
 
-function buildForecastUrl(): string {
+function buildForecastUrl(plant: YieldForecastPlant): string {
   const params = new URLSearchParams({
-    latitude: String(OPEN_METEO_LATITUDE),
-    longitude: String(OPEN_METEO_LONGITUDE),
+    latitude: String(plant.latitude),
+    longitude: String(plant.longitude),
     hourly: "global_tilted_irradiance",
-    tilt: String(OPEN_METEO_TILT_DEG),
-    azimuth: String(OPEN_METEO_AZIMUTH_DEG),
+    tilt: String(plant.tiltDeg),
+    azimuth: String(plant.azimuthDeg),
     timezone: OPEN_METEO_TIMEZONE,
   });
   return `${API_BASE}?${params.toString()}`;
@@ -129,8 +128,8 @@ function yieldFromHourly(
   return { kwh, error: null, meta };
 }
 
-async function loadForecastHourly(): Promise<HourlyGti | null> {
-  const url = buildForecastUrl();
+async function loadForecastHourly(plant: YieldForecastPlant): Promise<HourlyGti | null> {
+  const url = buildForecastUrl(plant);
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
     next: { revalidate: 0 },
@@ -156,7 +155,7 @@ export type OpenMeteoDayForecasts = {
 };
 
 export async function getOpenMeteoTodayAndTomorrowYieldKwh(
-  peakKwp: number,
+  plant: YieldForecastPlant = defaultYieldForecastPlant(),
   date = new Date(),
 ): Promise<OpenMeteoDayForecasts> {
   const empty: OpenMeteoDayForecasts = {
@@ -164,21 +163,30 @@ export async function getOpenMeteoTodayAndTomorrowYieldKwh(
     tomorrow: { kwh: null, error: null, meta: null },
     error: null,
   };
+  const peakKwp = plant.peakKwp;
+  const performanceRatio = plant.performanceRatio;
   if (!Number.isFinite(peakKwp) || peakKwp <= 0) {
     return empty;
   }
 
   const todayKey = todayDateKeyInZurich(date);
   const tomorrowKey = dateKeyPlusDaysInZurich(date, 1);
-  const performanceRatio = resolveOpenMeteoPerformanceRatio();
-  const key = `${todayKey}:${peakKwp}:${performanceRatio}`;
+  const key = [
+    todayKey,
+    plant.latitude,
+    plant.longitude,
+    plant.tiltDeg,
+    plant.azimuthDeg,
+    peakKwp,
+    performanceRatio,
+  ].join(":");
 
   let hourly: HourlyGti | null = null;
   if (cache && cacheKey === key && cache.expiresAt > Date.now()) {
     hourly = cache.hourly;
   } else {
     try {
-      hourly = await loadForecastHourly();
+      hourly = await loadForecastHourly(plant);
       if (!hourly) {
         return {
           ...empty,
@@ -214,7 +222,8 @@ export async function getOpenMeteoForecastedTodayYieldKwh(
   peakKwp: number,
   date = new Date(),
 ): Promise<OpenMeteoYieldResult> {
-  const { today, error } = await getOpenMeteoTodayAndTomorrowYieldKwh(peakKwp, date);
+  const plant = { ...defaultYieldForecastPlant(), peakKwp };
+  const { today, error } = await getOpenMeteoTodayAndTomorrowYieldKwh(plant, date);
   if (today.kwh == null && error) {
     return { kwh: null, error, meta: null };
   }

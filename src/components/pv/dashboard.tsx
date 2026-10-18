@@ -53,8 +53,8 @@ export function Dashboard({ plantName }: { plantName: string }) {
   ].filter((message): message is string => message != null);
 
   useEffect(() => {
-    void weatherStore.refresh(location.name);
-  }, [location.name]);
+    void weatherStore.refresh(location);
+  }, [location.name, location.latitude, location.longitude]);
 
   useEffect(() => {
     if (!snapshot) return;

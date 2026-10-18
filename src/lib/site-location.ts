@@ -1,10 +1,6 @@
 /**
- * Standort für Sonnenauf-/-untergang und Sonnenstunden-Prognose.
- *
- * Standard ist die Anlage in Bätterkinden (CH). Nutzer können den Standort
- * in den Einstellungen anpassen (persistiert in localStorage). Deployments
- * können zusätzlich NEXT_PUBLIC_SITE_LATITUDE/LONGITUDE setzen – diese
- * gelten nur, solange der Nutzer keinen eigenen Standort gespeichert hat.
+ * Standort für Wetter, Sonnenzeiten und Sonnenstunden.
+ * Gespeicherte Angaben liegen auf dem Server und gelten für alle Geräte.
  */
 
 export type SiteLocation = {
@@ -118,9 +114,9 @@ export const siteLocationStore = {
   getServerSnapshot(): SiteLocationState {
     return SERVER_STATE;
   },
-  save(location: SiteLocation): SiteLocationState {
+  save(location: SiteLocation): Promise<SiteLocationState> {
     if (!isValidCoordinate(location.latitude, location.longitude)) {
-      return state;
+      return Promise.resolve(state);
     }
     const normalized: SiteLocation = {
       plz: /^\d{4}$/.test(location.plz.trim()) ? location.plz.trim() : "",
@@ -128,9 +124,24 @@ export const siteLocationStore = {
       latitude: Math.round(location.latitude * 1_000_000) / 1_000_000,
       longitude: Math.round(location.longitude * 1_000_000) / 1_000_000,
     };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    refreshState();
-    return state;
+    return import("@/lib/dev-settings-sync").then(({ putDevSettings }) =>
+      putDevSettings({ siteLocation: normalized }).then(() => state),
+    );
+  },
+  applyRemote(location: SiteLocation, isCustom: boolean): void {
+    if (!isValidCoordinate(location.latitude, location.longitude)) return;
+    const normalized: SiteLocation = {
+      plz: /^\d{4}$/.test(location.plz.trim()) ? location.plz.trim() : "",
+      name: location.name.trim() || "Eigener Standort",
+      latitude: Math.round(location.latitude * 1_000_000) / 1_000_000,
+      longitude: Math.round(location.longitude * 1_000_000) / 1_000_000,
+    };
+    if (typeof window !== "undefined") {
+      if (isCustom) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      else window.localStorage.removeItem(STORAGE_KEY);
+    }
+    state = { location: isCustom ? normalized : normalized, isCustom };
+    emit();
   },
   resetToDefault(): SiteLocationState {
     window.localStorage.removeItem(STORAGE_KEY);

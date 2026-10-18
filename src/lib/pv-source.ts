@@ -36,7 +36,8 @@ import {
 } from "@/lib/fusionsolar/service";
 import { applyStromkontoToSnapshot, computeStromkonto } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
-import { resolveOpenMeteoPeakKwp } from "@/lib/open-meteo-yield/config";
+import type { SharedDevSettings } from "@/lib/dev-settings-shared";
+import { getSharedDevSettings } from "@/lib/dev-settings";
 import {
   getOpenMeteoTodayAndTomorrowYieldKwh,
   type OpenMeteoYieldMeta,
@@ -95,6 +96,7 @@ export type LiveDashboardPayload = {
   warning: string | null;
   sourceWarning: string | null;
   gridWarning: string | null;
+  devSettings: SharedDevSettings;
 };
 
 export type HistoryPayload = PvHistory & {
@@ -220,8 +222,9 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
     }
   }
 
+  const devSettings = getSharedDevSettings();
   const yieldForecast = await getOpenMeteoTodayAndTomorrowYieldKwh(
-    resolveOpenMeteoPeakKwp(),
+    devSettings.yieldForecast,
     new Date(snapshot.timestamp),
   );
 
@@ -237,6 +240,7 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
     warning: base.warning ?? overlay.warning,
     sourceWarning: base.warning,
     gridWarning: overlay.warning,
+    devSettings,
   };
 }
 

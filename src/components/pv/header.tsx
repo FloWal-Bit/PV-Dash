@@ -11,6 +11,26 @@ import type { DataSource, GridSource } from "@/lib/pv-source";
 const BACKLOG_TAP_COUNT = 5;
 const BACKLOG_TAP_GAP_MS = 1500;
 
+/** Weiteres Tippen auf den Titel soll das schon offene Backlog nicht schliessen. */
+function pointerHitsTitle(event: Event): boolean {
+  const point =
+    event instanceof TouchEvent
+      ? (event.changedTouches[0] ?? event.touches[0])
+      : "clientX" in event
+        ? event
+        : null;
+  if (!point) return false;
+  const title = document.querySelector("[data-backlog-trigger]");
+  if (!title) return false;
+  const rect = title.getBoundingClientRect();
+  return (
+    point.clientX >= rect.left &&
+    point.clientX <= rect.right &&
+    point.clientY >= rect.top &&
+    point.clientY <= rect.bottom
+  );
+}
+
 type HeaderProps = {
   lastUpdated: Date | null;
   plantName: string;
@@ -36,9 +56,11 @@ export function DashboardHeader({
 }: HeaderProps) {
   const [backlogOpen, setBacklogOpen] = useState(false);
   const taps = useRef({ count: 0, last: 0 });
+  const backlogOpenedAt = useRef(0);
 
   function handleTitleTap() {
     const now = Date.now();
+    if (backlogOpen) return;
     if (now - taps.current.last > BACKLOG_TAP_GAP_MS) {
       taps.current.count = 0;
     }
@@ -46,8 +68,21 @@ export function DashboardHeader({
     taps.current.count += 1;
     if (taps.current.count >= BACKLOG_TAP_COUNT) {
       taps.current.count = 0;
+      backlogOpenedAt.current = now;
       setBacklogOpen(true);
     }
+  }
+
+  function handleBacklogOpenChange(
+    open: boolean,
+    details: { reason: string; event: Event; cancel: () => void },
+  ) {
+    const burstStillRunning = Date.now() - backlogOpenedAt.current < BACKLOG_TAP_GAP_MS;
+    if (!open && details.reason === "outside-press" && (burstStillRunning || pointerHitsTitle(details.event))) {
+      details.cancel();
+      return;
+    }
+    setBacklogOpen(open);
   }
 
   return (
@@ -57,6 +92,7 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={handleTitleTap}
+            data-backlog-trigger=""
             className="truncate text-left text-base font-semibold leading-tight"
           >
             PV Dash
@@ -105,7 +141,7 @@ export function DashboardHeader({
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-chart-3/70" />
             <span className="relative inline-flex size-2 rounded-full bg-chart-3" />
           </span>
-          <BacklogDialog open={backlogOpen} onOpenChange={setBacklogOpen} />
+          <BacklogDialog open={backlogOpen} onOpenChange={handleBacklogOpenChange} />
           <SettingsDialog />
           <ShareDashboardButton plantName={plantName} />
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Area,
   Bar,
@@ -73,8 +73,11 @@ function sampleIntervalHours(points: { time: string }[]): number {
 const CHART_MARGIN = { top: 28, right: 12, left: 0, bottom: 0 };
 const Y_AXIS_WIDTH = 48;
 const X_AXIS_HEIGHT = 28;
+/** „MWh“ ist die breiteste Einheitenbeschriftung. So weit rückt das Diagramm nach links, damit sie mit „Diese Woche“ abschließt. */
+const Y_UNIT_LABEL_WIDTH = 25;
+const CHART_PULL_LEFT = Y_AXIS_WIDTH - Y_UNIT_LABEL_WIDTH;
 
-/** Einheit über der Y-Skala, rechtsbündig mit den Zahlen. */
+/** Einheit über der Y-Skala, links bündig mit der Zeile „Diese Woche“. */
 function YAxisUnit({
   viewBox,
   value,
@@ -86,9 +89,9 @@ function YAxisUnit({
   if (typeof value !== "string" && typeof value !== "number") return <text />;
   return (
     <text
-      x={viewBox.x + viewBox.width}
+      x={viewBox.x + viewBox.width - Y_UNIT_LABEL_WIDTH}
       y={viewBox.y - 14}
-      textAnchor="end"
+      textAnchor="start"
       fill="var(--muted-foreground)"
       fontSize={11}
     >
@@ -114,21 +117,34 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
   const showLabel = !halfHour && Number(hour) % 2 === 0;
   return (
     <g transform={`translate(${Number(x)},${Number(y)})`}>
-      <line
-        y2={halfHour ? 4 : 6}
-        stroke="var(--muted-foreground)"
-        strokeOpacity={halfHour ? 0.55 : 0.85}
-      />
       {showLabel ? (
         <text y={8} textAnchor="middle" fill="var(--muted-foreground)" fontSize={11}>
-          {hour}
+          {hour}:00
         </text>
-      ) : null}
+      ) : (
+        <line
+          y2={halfHour ? 4 : 6}
+          stroke="var(--muted-foreground)"
+          strokeOpacity={halfHour ? 0.55 : 0.85}
+        />
+      )}
     </g>
   );
 }
 
-function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
+type ChartSeriesVisibility = {
+  ertrag: boolean;
+  verbrauch: boolean;
+  eigenverbrauch: boolean;
+};
+
+function TodayPowerChart({
+  data,
+  series,
+}: {
+  data: TodayChartPoint[];
+  series: ChartSeriesVisibility;
+}) {
   const hourTicks = halfHourTicks().filter((tick) => data.some((point) => point.label === tick));
 
   return (
@@ -179,56 +195,78 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
               <DetailTooltip
                 title={String(props.label ?? row.label)}
                 rows={[
-                  {
-                    label: "Ertrag",
-                    value: row.productionKw == null ? "–" : formatKw(row.productionKw, 2),
-                  },
-                  {
-                    label: "Verbrauch",
-                    value: row.consumptionKw == null ? "–" : formatKw(row.consumptionKw, 2),
-                  },
-                  {
-                    label: "Eigenverbrauch",
-                    value: row.consumedFromPvKw == null ? "–" : formatKw(row.consumedFromPvKw, 2),
-                  },
+                  ...(series.ertrag
+                    ? [
+                        {
+                          label: "Ertrag",
+                          value: row.productionKw == null ? "–" : formatKw(row.productionKw, 2),
+                        },
+                      ]
+                    : []),
+                  ...(series.verbrauch
+                    ? [
+                        {
+                          label: "Verbrauch",
+                          value: row.consumptionKw == null ? "–" : formatKw(row.consumptionKw, 2),
+                        },
+                      ]
+                    : []),
+                  ...(series.eigenverbrauch
+                    ? [
+                        {
+                          label: "Eigenverbrauch",
+                          value:
+                            row.consumedFromPvKw == null ? "–" : formatKw(row.consumedFromPvKw, 2),
+                        },
+                      ]
+                    : []),
                   { label: "Stromkonto", value: stromkonto },
                 ]}
               />
             );
           }}
         />
-        <Area
-          type="monotone"
-          dataKey="productionKw"
-          name="productionKw"
-          stroke="var(--chart-3)"
-          strokeWidth={2}
-          fill="url(#fill-pv)"
-          dot={false}
-          activeDot={{ r: 3 }}
-          connectNulls={false}
-        />
-        <Area
-          type="monotone"
-          dataKey="consumedFromPvKw"
-          name="consumedFromPvKw"
-          stroke="var(--eigenverbrauch)"
-          strokeWidth={1.5}
-          fill="url(#fill-from-pv)"
-          dot={false}
-          activeDot={{ r: 3 }}
-          connectNulls={false}
-        />
-        <Line
-          type="linear"
-          dataKey="consumptionKw"
-          name="consumptionKw"
-          stroke="var(--chart-5)"
-          strokeWidth={2}
-          dot={false}
-          activeDot={{ r: 3 }}
-          connectNulls={false}
-        />
+        {series.ertrag ? (
+          <Area
+            className="today-ertrag"
+            type="monotone"
+            dataKey="productionKw"
+            name="productionKw"
+            stroke="var(--chart-3)"
+            strokeWidth={2}
+            fill="url(#fill-pv)"
+            dot={false}
+            activeDot={{ r: 3 }}
+            connectNulls={false}
+          />
+        ) : null}
+        {series.eigenverbrauch ? (
+          <Area
+            className="today-eigenverbrauch"
+            type="monotone"
+            dataKey="consumedFromPvKw"
+            name="consumedFromPvKw"
+            stroke="var(--eigenverbrauch)"
+            strokeWidth={1.5}
+            fill="url(#fill-from-pv)"
+            dot={false}
+            activeDot={{ r: 3 }}
+            connectNulls={false}
+          />
+        ) : null}
+        {series.verbrauch ? (
+          <Line
+            className="today-verbrauch"
+            type="linear"
+            dataKey="consumptionKw"
+            name="consumptionKw"
+            stroke="var(--chart-5)"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 3 }}
+            connectNulls={false}
+          />
+        ) : null}
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -378,6 +416,7 @@ function YieldConsumptionChart({
   expandMonthDayLabel = false,
   expandMonthNameLabel = false,
   showStromkonto = true,
+  series,
 }: {
   data: DailyEnergyPoint[];
   unit?: EnergyUnit;
@@ -391,6 +430,7 @@ function YieldConsumptionChart({
   expandMonthNameLabel?: boolean;
   /** Laufzeit zeigt keine Stromkonto-Zeile. */
   showStromkonto?: boolean;
+  series: ChartSeriesVisibility;
 }) {
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
@@ -404,10 +444,14 @@ function YieldConsumptionChart({
       })),
     [data, unit],
   );
-  const maxValue = chartData.reduce(
-    (max, point) => Math.max(max, point.yieldKwh, point.consumptionKwh, point.eigenverbrauchKwh),
-    0,
-  );
+  const maxValue = chartData.reduce((max, point) => {
+    const values = [
+      series.ertrag ? point.yieldKwh : 0,
+      series.verbrauch ? point.consumptionKwh : 0,
+      series.eigenverbrauch ? point.eigenverbrauchKwh : 0,
+    ];
+    return Math.max(max, ...values);
+  }, 0);
   const fractionDigits =
     unit === "MWh" ? Math.max(0, mwhFractionDigits(maxValue) - (trimDecimal ? 1 : 0)) : 0;
   return (
@@ -472,18 +516,34 @@ function YieldConsumptionChart({
                   expandMonthNameLabel,
                 })}
                 rows={[
-                  {
-                    label: "Ertrag",
-                    value: formatDetailEnergy(Number(row.yieldKwh ?? 0), unit, trimDecimal),
-                  },
-                  {
-                    label: "Verbrauch",
-                    value: formatDetailEnergy(Number(row.consumptionKwh ?? 0), unit, trimDecimal),
-                  },
-                  {
-                    label: "Eigenverbrauch",
-                    value: formatDetailEnergy(Number(row.eigenverbrauchKwh ?? 0), unit, trimDecimal),
-                  },
+                  ...(series.ertrag
+                    ? [
+                        {
+                          label: "Ertrag",
+                          value: formatDetailEnergy(Number(row.yieldKwh ?? 0), unit, trimDecimal),
+                        },
+                      ]
+                    : []),
+                  ...(series.verbrauch
+                    ? [
+                        {
+                          label: "Verbrauch",
+                          value: formatDetailEnergy(Number(row.consumptionKwh ?? 0), unit, trimDecimal),
+                        },
+                      ]
+                    : []),
+                  ...(series.eigenverbrauch
+                    ? [
+                        {
+                          label: "Eigenverbrauch",
+                          value: formatDetailEnergy(
+                            Number(row.eigenverbrauchKwh ?? 0),
+                            unit,
+                            trimDecimal,
+                          ),
+                        },
+                      ]
+                    : []),
                   ...(showStromkonto
                     ? [
                         {
@@ -501,19 +561,25 @@ function YieldConsumptionChart({
             );
           }}
         />
-        <Bar dataKey="yieldKwh" fill="url(#bar-yield)" radius={[6, 6, 6, 6]} maxBarSize={16} />
-        <Bar
-          dataKey="consumptionKwh"
-          fill="url(#bar-consumption)"
-          radius={[6, 6, 6, 6]}
-          maxBarSize={16}
-        />
-        <Bar
-          dataKey="eigenverbrauchKwh"
-          fill="url(#bar-eigenverbrauch)"
-          radius={[6, 6, 6, 6]}
-          maxBarSize={16}
-        />
+        {series.ertrag ? (
+          <Bar dataKey="yieldKwh" fill="url(#bar-yield)" radius={[6, 6, 6, 6]} maxBarSize={16} />
+        ) : null}
+        {series.verbrauch ? (
+          <Bar
+            dataKey="consumptionKwh"
+            fill="url(#bar-consumption)"
+            radius={[6, 6, 6, 6]}
+            maxBarSize={16}
+          />
+        ) : null}
+        {series.eigenverbrauch ? (
+          <Bar
+            dataKey="eigenverbrauchKwh"
+            fill="url(#bar-eigenverbrauch)"
+            radius={[6, 6, 6, 6]}
+            maxBarSize={16}
+          />
+        ) : null}
       </BarChart>
     </ResponsiveContainer>
   );
@@ -625,6 +691,11 @@ export function ChartsSection({
   stromkontoChangeTodayKwh,
 }: ChartsSectionProps) {
   const [page, setPage] = useState(0);
+  const [series, setSeries] = useState<ChartSeriesVisibility>({
+    ertrag: true,
+    verbrauch: true,
+    eigenverbrauch: true,
+  });
   const range = RANGE_ORDER[page] ?? "heute";
   const pvSimulated = isPvSimulated(source);
   const hideSimulated = useSyncExternalStore(
@@ -695,9 +766,43 @@ export function ChartsSection({
           ? year
           : lifetimeWithout2021(lifetime);
   const todayEnergyMissing = range === "heute" && todayEnergyDataMissing(todayChartData, liveToday);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const phone = window.matchMedia("(max-width: 767px)");
+    const card = cardRef.current;
+
+    const matchWeatherCard = () => {
+      if (!card) return;
+      if (!phone.matches) {
+        card.style.height = "";
+        return;
+      }
+      const weather = document.querySelector<HTMLElement>("[data-sun-times-card]");
+      if (!weather) {
+        card.style.height = "";
+        return;
+      }
+      card.style.height = `${Math.round(weather.getBoundingClientRect().height)}px`;
+    };
+
+    matchWeatherCard();
+    phone.addEventListener("change", matchWeatherCard);
+    window.addEventListener("resize", matchWeatherCard);
+    const weather = document.querySelector("[data-sun-times-card]");
+    const weatherObserver = new ResizeObserver(matchWeatherCard);
+    if (weather) weatherObserver.observe(weather);
+
+    return () => {
+      phone.removeEventListener("change", matchWeatherCard);
+      window.removeEventListener("resize", matchWeatherCard);
+      weatherObserver.disconnect();
+      if (card) card.style.height = "";
+    };
+  }, []);
 
   return (
-    <Card className="shadow-card rounded-2xl">
+    <Card ref={cardRef} className="yield-chart-card shadow-card rounded-2xl">
       <CardHeader>
         <div className="flex flex-col gap-1">
           <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -708,7 +813,7 @@ export function ChartsSection({
           </span>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="yield-chart-body">
         <SwipePageSurface
           labels={RANGE_LABELS}
           page={page}
@@ -716,14 +821,19 @@ export function ChartsSection({
             setPage(next);
             if (next !== page) pvStore.refreshHistory();
           }}
-          className="pb-1"
+          className="yield-chart-surface pb-1"
         >
-          <div className="flex flex-col gap-3">
+          <div className="yield-chart-stack flex flex-col gap-3">
             <div
               className={cn(
-                "h-56 min-w-0 landscape:h-64 sm:h-72 transition-opacity",
+                "yield-chart-plot h-56 min-w-0 landscape:h-64 sm:h-72 transition-opacity",
                 !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
               )}
+              style={
+                hidePv || todayEnergyMissing
+                  ? undefined
+                  : { marginLeft: -CHART_PULL_LEFT, width: `calc(100% + ${CHART_PULL_LEFT}px)` }
+              }
             >
               {hidePv ? (
                 <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
@@ -734,7 +844,7 @@ export function ChartsSection({
                   Für heute liegen noch keine Ertrags- und Verbrauchsdaten vor.
                 </div>
               ) : range === "heute" ? (
-                <TodayPowerChart data={todayChartData} />
+                <TodayPowerChart data={todayChartData} series={series} />
               ) : (
                 <YieldConsumptionChart
                   data={barData}
@@ -744,6 +854,7 @@ export function ChartsSection({
                   expandMonthDayLabel={range === "monat"}
                   expandMonthNameLabel={range === "jahr"}
                   showStromkonto={range !== "lebensdauer"}
+                  series={series}
                 />
               )}
             </div>
@@ -754,18 +865,29 @@ export function ChartsSection({
                 hidePv && "invisible",
               )}
             >
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-chart-3" />
-                Ertrag
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-chart-5" />
-                Verbrauch
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-eigenverbrauch" />
-                Eigenverbrauch
-              </span>
+              {(
+                [
+                  ["ertrag", "Ertrag", "bg-chart-3", "border-chart-3"],
+                  ["verbrauch", "Verbrauch", "bg-chart-5", "border-chart-5"],
+                  ["eigenverbrauch", "Eigenverbrauch", "bg-eigenverbrauch", "border-eigenverbrauch"],
+                ] as const
+              ).map(([key, label, fill, ring]) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={series[key]}
+                  onClick={() => setSeries((current) => ({ ...current, [key]: !current[key] }))}
+                  className="flex cursor-pointer items-center gap-1.5"
+                >
+                  <span
+                    className={cn(
+                      "size-2 rounded-full box-border",
+                      series[key] ? fill : `border ${ring}`,
+                    )}
+                  />
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </SwipePageSurface>

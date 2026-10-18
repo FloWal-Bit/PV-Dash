@@ -2,7 +2,7 @@
 
 import type { PvSnapshot } from "@/lib/pv-data";
 import { APP_TIME_ZONE, lastDailyCheckpointMs, msUntilNextDailyCheckpoint } from "@/lib/daily-checkpoint";
-import { DEFAULT_SITE_LOCATION } from "@/lib/site-location";
+import { DEFAULT_SITE_LOCATION, type SiteLocation } from "@/lib/site-location";
 import { WETTER_ALARM_UNAVAILABLE } from "@/lib/service-unavailable-messages";
 
 export type WeatherPayload = {
@@ -50,6 +50,12 @@ let state: WeatherState = SERVER_STATE;
 let inflight: Promise<void> | null = null;
 let dailyTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let hydrated = false;
+let activeLocation: Pick<SiteLocation, "name" | "latitude" | "longitude"> = DEFAULT_SITE_LOCATION;
+
+function locationKey(location: Pick<SiteLocation, "name" | "latitude" | "longitude">): string {
+  const name = location.name.trim() || DEFAULT_SITE_LOCATION.name;
+  return `${name}|${location.latitude}|${location.longitude}`;
+}
 
 function emit() {
   for (const listener of listeners) listener();
@@ -122,10 +128,15 @@ function needsNetworkFetch(locationKey: string, force: boolean): boolean {
 }
 
 async function fetchWeatherDay(
-  locationName: string,
+  location: Pick<SiteLocation, "name" | "latitude" | "longitude">,
   dateKey: string,
 ): Promise<WeatherPayload> {
-  const params = new URLSearchParams({ location: locationName, date: dateKey });
+  const params = new URLSearchParams({
+    location: location.name.trim() || DEFAULT_SITE_LOCATION.name,
+    date: dateKey,
+    latitude: String(location.latitude),
+    longitude: String(location.longitude),
+  });
   const res = await fetch(`/api/weather?${params}`, { cache: "no-store" });
   const body: unknown = await res.json();
   if (!res.ok) {
@@ -134,12 +145,14 @@ async function fetchWeatherDay(
   return body as WeatherPayload;
 }
 
-async function fetchTodayAndTomorrow(locationName: string): Promise<void> {
+async function fetchTodayAndTomorrow(
+  location: Pick<SiteLocation, "name" | "latitude" | "longitude">,
+): Promise<void> {
   const todayKey = weatherDateKey();
   const tomorrowKey = tomorrowDateKey();
   const results = await Promise.allSettled([
-    fetchWeatherDay(locationName, todayKey),
-    fetchWeatherDay(locationName, tomorrowKey),
+    fetchWeatherDay(location, todayKey),
+    fetchWeatherDay(location, tomorrowKey),
   ]);
 
   const byDate = { ...state.byDate };
@@ -163,7 +176,7 @@ async function fetchTodayAndTomorrow(locationName: string): Promise<void> {
 
   if (anyOk && lastFetchAt != null) {
     writePersistedCache({
-      locationKey: locationName,
+      locationKey: locationKey(location),
       lastFetchAt,
       byDate,
     });
@@ -174,7 +187,7 @@ function scheduleDailyRefresh() {
   if (typeof window === "undefined") return;
   if (dailyTimer != null) globalThis.clearTimeout(dailyTimer);
   dailyTimer = globalThis.setTimeout(() => {
-    void weatherStore.refresh(state.locationKey, { force: true });
+    void weatherStore.refresh(activeLocation, { force: true });
     scheduleDailyRefresh();
   }, msUntilNextDailyCheckpoint());
 }
@@ -199,8 +212,12 @@ export const weatherStore = {
   getWeatherForDate(dateKey: string): WeatherPayload | null {
     return state.byDate[dateKey] ?? null;
   },
-  async refresh(locationName: string, options?: { force?: boolean }): Promise<void> {
-    const key = locationName.trim() || DEFAULT_SITE_LOCATION.name;
+  async refresh(
+    location: Pick<SiteLocation, "name" | "latitude" | "longitude">,
+    options?: { force?: boolean },
+  ): Promise<void> {
+    activeLocation = location;
+    const key = locationKey(location);
     const force = options?.force === true;
 
     if (inflight && state.locationKey === key && !force) {
@@ -225,7 +242,7 @@ export const weatherStore = {
     };
     emit();
 
-    inflight = fetchTodayAndTomorrow(key)
+    inflight = fetchTodayAndTomorrow(location)
       .catch(() => {
         state = {
           ...state,

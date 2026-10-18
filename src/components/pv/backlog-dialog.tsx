@@ -1,21 +1,19 @@
 "use client";
 
 import { useState, useSyncExternalStore, type FormEvent } from "react";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Check, EyeOff, ListTodo, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { backlogStore } from "@/lib/backlog-store";
 import { MAX_BACKLOG_TITLE_LENGTH } from "@/lib/backlog-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
-import { DeveloperPlantSettings } from "@/components/pv/settings-dialog";
+import { DeveloperPlantSettings, SettingsSection } from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +25,10 @@ export function BacklogDialog({
   onOpenChange,
 }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (
+    open: boolean,
+    eventDetails: { reason: string; event: Event; cancel: () => void },
+  ) => void;
 }) {
   const { items, loading, error } = useSyncExternalStore(
     backlogStore.subscribe,
@@ -66,92 +67,100 @@ export function BacklogDialog({
       <DialogContent className="max-h-[90dvh] gap-0 overflow-hidden p-0 sm:max-w-md">
         <div className="border-b border-border/70 bg-muted/40 px-5 py-4">
           <DialogHeader className="gap-1.5">
-            <DialogTitle className="text-lg">Backlog</DialogTitle>
-            <DialogDescription>
-              Ideen für PV Dash schnell einkippen. Offene Punkte bleiben gespeichert,
-              bis du sie erledigst oder löschst.
-            </DialogDescription>
+            <DialogTitle className="text-lg">Dev Settings</DialogTitle>
           </DialogHeader>
         </div>
 
-        <form
-          onSubmit={(event) => void handleAdd(event)}
-          className="flex items-center gap-2 border-b border-border/70 px-5 py-3"
-        >
-          <input
-            type="text"
-            className={inputClassName}
-            value={draft}
-            maxLength={MAX_BACKLOG_TITLE_LENGTH}
-            disabled={saving}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              if (formError) setFormError(null);
-            }}
-            placeholder="Idee einkippen…"
-            aria-label="Neue Backlog-Idee"
-          />
-          <Button type="submit" variant="secondary" size="sm" disabled={saving}>
-            <Plus className="size-3.5" />
-            {saving ? "…" : "Hinzufügen"}
-          </Button>
-        </form>
+        <div className="flex max-h-[min(70dvh,36rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
+          <SettingsSection
+            icon={<ListTodo className="size-4" />}
+            iconClassName="bg-chart-1/12 text-chart-1"
+            title="Backlog"
+          >
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Ideen für PV Dash schnell einkippen. Offene Punkte bleiben gespeichert,
+              bis du sie erledigst oder löschst.
+            </p>
 
-        <div className="flex max-h-[min(60dvh,28rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
-          <DeveloperPlantSettings />
-          {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
-          {error ? <p className="text-xs text-destructive">{error}</p> : null}
+            <form
+              onSubmit={(event) => void handleAdd(event)}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                className={inputClassName}
+                value={draft}
+                maxLength={MAX_BACKLOG_TITLE_LENGTH}
+                disabled={saving}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  if (formError) setFormError(null);
+                }}
+                placeholder="Idee einkippen…"
+                aria-label="Neue Backlog-Idee"
+              />
+              <Button type="submit" variant="secondary" size="sm" className="shrink-0" disabled={saving}>
+                <Plus className="size-3.5" />
+                {saving ? "…" : "Hinzufügen"}
+              </Button>
+            </form>
 
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Backlog wird geladen…</p>
-          ) : items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center">
-              <p className="text-sm font-medium">Noch keine Ideen</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Tippe oben eine Idee ein und füge sie dem Backlog hinzu.
-              </p>
-            </div>
-          ) : (
-            <>
-              {openItems.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Keine offenen Punkte.</p>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {openItems.map((item) => (
-                    <BacklogRow
-                      key={item.id}
-                      title={item.title}
-                      done={false}
-                      onToggle={() => void backlogStore.toggle(item.id, true)}
-                      onRemove={() => void backlogStore.remove(item.id)}
-                    />
-                  ))}
-                </ul>
-              )}
+            {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
+            {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
-              {doneItems.length > 0 ? (
-                <div className="flex flex-col gap-2 pt-1">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Erledigt
-                  </p>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Backlog wird geladen…</p>
+            ) : items.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center">
+                <p className="text-sm font-medium">Noch keine Ideen</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tippe oben eine Idee ein und füge sie dem Backlog hinzu.
+                </p>
+              </div>
+            ) : (
+              <>
+                {openItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Keine offenen Punkte.</p>
+                ) : (
                   <ul className="flex flex-col gap-2">
-                    {doneItems.map((item) => (
+                    {openItems.map((item) => (
                       <BacklogRow
                         key={item.id}
                         title={item.title}
-                        done
-                        onToggle={() => void backlogStore.toggle(item.id, false)}
+                        done={false}
+                        onToggle={() => void backlogStore.toggle(item.id, true)}
                         onRemove={() => void backlogStore.remove(item.id)}
                       />
                     ))}
                   </ul>
-                </div>
-              ) : null}
-            </>
-          )}
+                )}
+
+                {doneItems.length > 0 ? (
+                  <div className="flex flex-col gap-2 pt-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Erledigt
+                    </p>
+                    <ul className="flex flex-col gap-2">
+                      {doneItems.map((item) => (
+                        <BacklogRow
+                          key={item.id}
+                          title={item.title}
+                          done
+                          onToggle={() => void backlogStore.toggle(item.id, false)}
+                          onRemove={() => void backlogStore.remove(item.id)}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </SettingsSection>
+
+          <DeveloperPlantSettings />
+          <HideSimulatedToggle />
+          {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
         </div>
-        <HideSimulatedToggle />
-        {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -165,21 +174,25 @@ function HideSimulatedToggle() {
   );
 
   return (
-    <div className="flex items-start justify-between gap-3 border-t border-border/70 px-5 py-3">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <Label htmlFor="hide-simulated">Simulierte Werte ausblenden</Label>
+    <SettingsSection
+      icon={<EyeOff className="size-4" />}
+      iconClassName="bg-muted text-foreground/70"
+      title="Simulierte Werte ausblenden"
+    >
+      <div className="flex items-start justify-between gap-3">
         <span className="text-xs leading-relaxed text-muted-foreground">
           Ertrag, Verbrauch und Verläufe ohne FusionSolar bleiben leer. Gemessene Netzwerte
           von whatwatt Go bleiben sichtbar.
         </span>
+        <Switch
+          id="hide-simulated"
+          aria-label="Simulierte Werte ausblenden"
+          checked={hideSimulated}
+          onCheckedChange={(checked) => hideSimulatedStore.set(checked)}
+          className="data-checked:bg-chart-3"
+        />
       </div>
-      <Switch
-        id="hide-simulated"
-        checked={hideSimulated}
-        onCheckedChange={(checked) => hideSimulatedStore.set(checked)}
-        className="data-checked:bg-chart-3"
-      />
-    </div>
+    </SettingsSection>
   );
 }
 
@@ -211,22 +224,23 @@ function DevFusionRefresh() {
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">FusionSolar nachladen</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Einmal von Huawei holen und lokal behalten.
-          </p>
-        </div>
-        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => void reload()}>
+    <SettingsSection
+      icon={<RefreshCcw className="size-4" />}
+      iconClassName="bg-muted text-foreground/70"
+      title="FusionSolar nachladen"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Einmal von Huawei holen und lokal behalten.
+        </p>
+        <Button type="button" variant="secondary" size="sm" className="shrink-0" disabled={pending} onClick={() => void reload()}>
           {pending ? "…" : "Nachladen"}
         </Button>
       </div>
       {message ? (
         <p className={cn("text-xs", failed ? "text-destructive" : "text-muted-foreground")}>{message}</p>
       ) : null}
-    </div>
+    </SettingsSection>
   );
 }
 

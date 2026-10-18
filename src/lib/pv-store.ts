@@ -1,5 +1,7 @@
 import type { DataSource, GridSource, PvHistory } from "@/lib/pv-source";
 import type { PvSnapshot } from "@/lib/pv-data";
+import { applyLiveDevSettings, ensureDevSettingsReady } from "@/lib/dev-settings-sync";
+import type { SharedDevSettings } from "@/lib/dev-settings-shared";
 
 export type PvStoreState = {
   snapshot: PvSnapshot | null;
@@ -54,6 +56,7 @@ type LiveResponse = {
   warning: string | null;
   sourceWarning: string | null;
   gridWarning: string | null;
+  devSettings?: SharedDevSettings;
 };
 
 type HistoryResponse = PvHistory & { source: DataSource };
@@ -83,9 +86,11 @@ class PvStore {
     if (this.liveInflight) return this.liveInflight;
     this.liveInflight = (async () => {
       try {
+        await ensureDevSettingsReady();
         const res = await fetch("/api/pv", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const payload = (await res.json()) as LiveResponse;
+        applyLiveDevSettings(payload.devSettings);
         this.state = {
           ...this.state,
           snapshot: payload.snapshot,

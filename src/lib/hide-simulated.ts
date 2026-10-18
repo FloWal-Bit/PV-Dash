@@ -1,7 +1,6 @@
 /**
- * Blendet simulierte Anlagenwerte aus. Standard ist ausblenden, damit ohne
- * FusionSolar keine erfundenen Ertrags- und Verbrauchszahlen dastehen.
- * Die Wahl liegt in localStorage.
+ * Blendet simulierte Anlagenwerte aus. Standard ist ausblenden.
+ * Die Wahl liegt auf dem Server und gilt für alle Geräte.
  */
 
 const STORAGE_KEY = "pv-dash:hide-simulated";
@@ -39,9 +38,21 @@ export const hideSimulatedStore = {
   getServerSnapshot(): boolean {
     return true;
   },
-  set(hide: boolean): void {
+  set(hide: boolean): Promise<void> {
     hideSimulated = hide;
-    window.localStorage.setItem(STORAGE_KEY, hide ? "1" : "0");
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, hide ? "1" : "0");
+    }
+    emit();
+    return import("@/lib/dev-settings-sync").then(({ putDevSettings }) =>
+      putDevSettings({ hideSimulated: hide }).then(() => undefined),
+    );
+  },
+  applyRemote(hide: boolean): void {
+    hideSimulated = hide;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, hide ? "1" : "0");
+    }
     emit();
   },
 };
