@@ -13,12 +13,7 @@ const BACKLOG_TAP_GAP_MS = 1500;
 
 /** Weiteres Tippen auf den Titel soll das schon offene Backlog nicht schliessen. */
 function pointerHitsTitle(event: Event): boolean {
-  const point =
-    event instanceof TouchEvent
-      ? (event.changedTouches[0] ?? event.touches[0])
-      : "clientX" in event
-        ? event
-        : null;
+  const point = pointerPoint(event);
   if (!point) return false;
   const title = document.querySelector("[data-backlog-trigger]");
   if (!title) return false;
@@ -29,6 +24,19 @@ function pointerHitsTitle(event: Event): boolean {
     point.clientY >= rect.top &&
     point.clientY <= rect.bottom
   );
+}
+
+function pointerPoint(event: Event): { clientX: number; clientY: number } | null {
+  if (typeof TouchEvent !== "undefined" && event instanceof TouchEvent) {
+    const touch = event.changedTouches[0] ?? event.touches[0];
+    if (!touch) return null;
+    return { clientX: touch.clientX, clientY: touch.clientY };
+  }
+  if (!("clientX" in event) || !("clientY" in event)) return null;
+  const clientX = event.clientX;
+  const clientY = event.clientY;
+  if (typeof clientX !== "number" || typeof clientY !== "number") return null;
+  return { clientX, clientY };
 }
 
 type HeaderProps = {
