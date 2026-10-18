@@ -68,6 +68,12 @@ function sampleIntervalHours(points: { time: string }[]): number {
  * der Eigenverbrauch als zweite Fläche in einem helleren Grün.
  * Zukünftige Stunden bleiben leer (Kurve endet bei „jetzt“).
  */
+
+/** Gleiche Achsenlage in allen Tabs: Einzug links, Höhe der Zeitachse, Abstand oben. */
+const CHART_MARGIN = { top: 28, right: 12, left: 0, bottom: 0 };
+const Y_AXIS_WIDTH = 48;
+const X_AXIS_HEIGHT = 28;
+
 /** Einheit über der Y-Skala, rechtsbündig mit den Zahlen. */
 function YAxisUnit({
   viewBox,
@@ -114,7 +120,7 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
         strokeOpacity={halfHour ? 0.55 : 0.85}
       />
       {showLabel ? (
-        <text y={14} textAnchor="middle" fill="var(--muted-foreground)" fontSize={10}>
+        <text y={8} textAnchor="middle" fill="var(--muted-foreground)" fontSize={11}>
           {hour}
         </text>
       ) : null}
@@ -127,7 +133,7 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={data} margin={{ top: 28, right: 12, left: -8, bottom: 4 }}>
+      <ComposedChart data={data} margin={CHART_MARGIN}>
         <defs>
           <linearGradient id="fill-pv" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.45} />
@@ -143,14 +149,17 @@ function TodayPowerChart({ data }: { data: TodayChartPoint[] }) {
           dataKey="label"
           ticks={hourTicks}
           interval={0}
+          height={X_AXIS_HEIGHT}
           tickLine={false}
           axisLine={false}
           tick={TodayAxisTick}
+          padding={{ left: 0, right: 0 }}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={40}
+          width={Y_AXIS_WIDTH}
+          padding={{ top: 0, bottom: 0 }}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickFormatter={(v) => formatSwissNumber(Number(v), 1)}
           label={{ value: "kW", content: YAxisUnit }}
@@ -405,7 +414,7 @@ function YieldConsumptionChart({
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={chartData}
-        margin={{ top: 28, right: 8, left: -16, bottom: 0 }}
+        margin={CHART_MARGIN}
         barGap={2}
       >
         <defs>
@@ -427,13 +436,16 @@ function YieldConsumptionChart({
           dataKey="label"
           tickLine={false}
           axisLine={false}
+          height={X_AXIS_HEIGHT}
           interval={tickInterval}
+          padding={{ left: 0, right: 0 }}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={unit === "MWh" ? 48 : 40}
+          width={Y_AXIS_WIDTH}
+          padding={{ top: 0, bottom: 0 }}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickFormatter={(v) => formatSwissNumber(Number(v), fractionDigits)}
           label={{ value: unit, content: YAxisUnit }}
