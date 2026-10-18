@@ -20,7 +20,6 @@ import {
 } from "@/lib/notifications";
 import type { PlzLocality, PlzLookupResponse } from "@/lib/plz-types";
 import { siteLocationStore } from "@/lib/site-location";
-import { pvStore } from "@/lib/pv-store";
 import {
   parseYieldForecastInput,
   yieldForecastStore,
@@ -203,13 +202,11 @@ function SiteLocationEditor({
       setLocationError("Bitte zuerst PLZ laden und einen Ort wählen.");
       return;
     }
-    void siteLocationStore.save({
+    siteLocationStore.save({
       plz: plz.trim(),
       name: entry.name,
       latitude: entry.latitude,
       longitude: entry.longitude,
-    }).catch(() => {
-      setLocationError("Standort konnte nicht gespeichert werden.");
     });
     setLocationError(null);
   }
@@ -470,14 +467,9 @@ function YieldForecastEditor() {
       azimuthDeg: next.azimuthDeg,
       peakKwp: next.peakKwp,
       performanceRatio: next.performanceRatio,
-    }).then(() => {
-      pvStore.refresh();
-      setError(null);
-      setSuccess("Gespeichert.");
-    }).catch(() => {
-      setSuccess(null);
-      setError("Prognose konnte nicht gespeichert werden.");
     });
+    setError(null);
+    setSuccess("Gespeichert. Die Prognose rechnet vorerst mit den festen Anlagenwerten.");
   }
 
   return (

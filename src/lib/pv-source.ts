@@ -38,6 +38,7 @@ import { applyStromkontoToSnapshot, computeStromkonto } from "@/lib/stromkonto";
 import { isWhatWattConfigured } from "@/lib/whatwatt/config";
 import type { SharedDevSettings } from "@/lib/dev-settings-shared";
 import { getSharedDevSettings } from "@/lib/dev-settings";
+import { defaultYieldForecastPlant } from "@/lib/yield-forecast-settings";
 import {
   getOpenMeteoTodayAndTomorrowYieldKwh,
   type OpenMeteoYieldMeta,
@@ -224,7 +225,7 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
 
   const devSettings = getSharedDevSettings();
   const yieldForecast = await getOpenMeteoTodayAndTomorrowYieldKwh(
-    devSettings.yieldForecast,
+    defaultYieldForecastPlant(),
     new Date(snapshot.timestamp),
   );
 

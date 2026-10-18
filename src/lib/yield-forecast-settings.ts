@@ -115,13 +115,7 @@ export const yieldForecastStore = {
       performanceRatio: DEFAULT_OPEN_METEO_PERFORMANCE_RATIO,
     };
   },
-  save(plant: YieldForecastPlant): Promise<void> {
-    const normalized = normalizeYieldForecastPlant(plant);
-    return import("@/lib/dev-settings-sync").then(({ putDevSettings }) =>
-      putDevSettings({ yieldForecast: normalized }).then(() => undefined),
-    );
-  },
-  applyRemote(plant: YieldForecastPlant): void {
+  save(plant: YieldForecastPlant): void {
     const normalized = normalizeYieldForecastPlant(plant);
     state = normalized;
     if (typeof window !== "undefined") {

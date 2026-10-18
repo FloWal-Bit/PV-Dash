@@ -1,6 +1,6 @@
 /**
  * Standort für Wetter, Sonnenzeiten und Sonnenstunden.
- * Gespeicherte Angaben liegen auf dem Server und gelten für alle Geräte.
+ * Die PLZ bleibt auf diesem Gerät und wird nicht an den Server geschickt.
  */
 
 export type SiteLocation = {
@@ -114,9 +114,9 @@ export const siteLocationStore = {
   getServerSnapshot(): SiteLocationState {
     return SERVER_STATE;
   },
-  save(location: SiteLocation): Promise<SiteLocationState> {
+  save(location: SiteLocation): SiteLocationState {
     if (!isValidCoordinate(location.latitude, location.longitude)) {
-      return Promise.resolve(state);
+      return state;
     }
     const normalized: SiteLocation = {
       plz: /^\d{4}$/.test(location.plz.trim()) ? location.plz.trim() : "",
@@ -124,24 +124,9 @@ export const siteLocationStore = {
       latitude: Math.round(location.latitude * 1_000_000) / 1_000_000,
       longitude: Math.round(location.longitude * 1_000_000) / 1_000_000,
     };
-    return import("@/lib/dev-settings-sync").then(({ putDevSettings }) =>
-      putDevSettings({ siteLocation: normalized }).then(() => state),
-    );
-  },
-  applyRemote(location: SiteLocation, isCustom: boolean): void {
-    if (!isValidCoordinate(location.latitude, location.longitude)) return;
-    const normalized: SiteLocation = {
-      plz: /^\d{4}$/.test(location.plz.trim()) ? location.plz.trim() : "",
-      name: location.name.trim() || "Eigener Standort",
-      latitude: Math.round(location.latitude * 1_000_000) / 1_000_000,
-      longitude: Math.round(location.longitude * 1_000_000) / 1_000_000,
-    };
-    if (typeof window !== "undefined") {
-      if (isCustom) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-      else window.localStorage.removeItem(STORAGE_KEY);
-    }
-    state = { location: isCustom ? normalized : normalized, isCustom };
-    emit();
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    refreshState();
+    return state;
   },
   resetToDefault(): SiteLocationState {
     window.localStorage.removeItem(STORAGE_KEY);

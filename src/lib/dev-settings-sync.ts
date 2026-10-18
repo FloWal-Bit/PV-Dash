@@ -2,8 +2,6 @@
 
 import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
-import { siteLocationStore, type SiteLocation } from "@/lib/site-location";
-import { yieldForecastStore, type YieldForecastPlant } from "@/lib/yield-forecast-settings";
 
 let inflightSaves = 0;
 let lastUpdatedAt: string | null = null;
@@ -11,8 +9,6 @@ let ready = false;
 
 export function applySharedDevSettings(data: SharedDevSettings): void {
   lastUpdatedAt = data.updatedAt;
-  siteLocationStore.applyRemote(data.siteLocation, data.siteLocationCustom);
-  yieldForecastStore.applyRemote(data.yieldForecast);
   hideSimulatedStore.applyRemote(data.hideSimulated);
 }
 
@@ -37,29 +33,9 @@ export async function putDevSettings(update: DevSettingsUpdate): Promise<SharedD
 
 function readLocalSeed(): DevSettingsUpdate | null {
   if (typeof window === "undefined") return null;
-  const update: DevSettingsUpdate = {};
-  try {
-    const locationRaw = window.localStorage.getItem("pv-dash:site-location");
-    if (locationRaw) {
-      const parsed = JSON.parse(locationRaw) as SiteLocation;
-      if (parsed && typeof parsed.name === "string") update.siteLocation = parsed;
-    }
-  } catch {
-    // ungültiger Zwischenspeicher
-  }
-  try {
-    const forecastRaw = window.localStorage.getItem("pv-dash:yield-forecast");
-    if (forecastRaw) {
-      update.yieldForecast = JSON.parse(forecastRaw) as YieldForecastPlant;
-    }
-  } catch {
-    // ungültiger Zwischenspeicher
-  }
   const hideRaw = window.localStorage.getItem("pv-dash:hide-simulated");
-  if (hideRaw === "0" || hideRaw === "1") update.hideSimulated = hideRaw === "1";
-  return update.siteLocation || update.yieldForecast || typeof update.hideSimulated === "boolean"
-    ? update
-    : null;
+  if (hideRaw !== "0" && hideRaw !== "1") return null;
+  return { hideSimulated: hideRaw === "1" };
 }
 
 export async function pullDevSettings(): Promise<void> {
@@ -78,7 +54,7 @@ export async function pullDevSettings(): Promise<void> {
   applySharedDevSettings(data);
 }
 
-/** Einmal lokale Werte hochladen, danach gilt die Serverdatei. */
+/** Einmal die lokale Anzeige-Wahl hochladen, danach gilt die Serverdatei. */
 export async function ensureDevSettingsReady(): Promise<void> {
   if (ready) return;
   await pullDevSettings();
