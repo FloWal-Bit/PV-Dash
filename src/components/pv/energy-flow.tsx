@@ -624,7 +624,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         direction={stromkontoDirection}
       />
       <Card className="flex h-full flex-1 flex-col rounded-2xl pt-0 shadow-none ring-0">
-      <CardContent className="flex min-h-0 flex-1 flex-col pt-0 pb-3">
+      <CardContent className="flex min-h-0 flex-1 flex-col pt-11 pb-3">
         <div
           ref={containerRef}
           className="energy-flow-diagram relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"

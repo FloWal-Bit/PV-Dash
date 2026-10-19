@@ -162,11 +162,83 @@ export function SwipeCarousel({
     else if (delta >= SWIPE_THRESHOLD_PX) goTo(page - 1);
   };
 
+  const track = (
+    <div
+      className={cn(
+        "touch-pan-y overflow-hidden",
+        !header && framed && "rounded-2xl shadow-card ring-1 ring-foreground/10",
+        stretch && "md:min-h-0 md:flex-1",
+        fillHeight && "min-h-0 flex-1",
+      )}
+      onTouchStart={(e) => onTouchStart(e.changedTouches[0]?.clientX ?? 0)}
+      onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
+      onPointerDown={(e) => {
+        if (e.pointerType === "mouse") onTouchStart(e.clientX);
+      }}
+      onPointerUp={(e) => {
+        if (e.pointerType === "mouse") onTouchEnd(e.clientX);
+      }}
+    >
+      <div
+        className={cn(
+          "flex transition-transform duration-300 ease-out",
+          stretch && "md:h-full",
+          fillHeight && "h-full",
+        )}
+        style={{ transform: `translateX(-${page * 100}%)` }}
+      >
+        {children.map((child, index) => (
+          <div
+            key={labels[index] ?? index}
+            className={cn("flex w-full shrink-0 flex-col", stretch && "md:h-full", fillHeight && "h-full")}
+          >
+            {child}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const dots = showDots ? (
+    <div
+      className={cn(
+        "flex items-center justify-center gap-2",
+        header ? framed && "pb-3" : "swipe-carousel-dots",
+      )}
+      role="tablist"
+    >
+      {labels.map((label, index) => (
+        <button
+          key={label}
+          type="button"
+          role="tab"
+          aria-selected={page === index}
+          aria-label={label}
+          onClick={() => goTo(index)}
+          className={cn(
+            "size-2 rounded-full transition-colors",
+            page === index ? "bg-pager-dot" : "bg-muted-foreground/30",
+          )}
+        />
+      ))}
+    </div>
+  ) : null;
+
+  if (!header) {
+    return (
+      <div className={cn("flex flex-col gap-2", stretch && "md:h-full", fillHeight && "h-full min-h-0", className)}>
+        {track}
+        {dots}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "flex flex-col gap-2",
-        framed && "overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-foreground/10 [--card-spacing:--spacing(4)]",
+        "flex flex-col gap-(--card-spacing) pt-(--card-spacing)",
+        framed &&
+          "overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-foreground/10 [--card-spacing:--spacing(4)]",
         stretch && "md:h-full",
         fillHeight && "h-full min-h-0",
         className,
@@ -175,55 +247,14 @@ export function SwipeCarousel({
       {header}
       <div
         className={cn(
-          "touch-pan-y overflow-hidden",
+          "flex flex-col gap-2",
           stretch && "md:min-h-0 md:flex-1",
           fillHeight && "min-h-0 flex-1",
         )}
-        onTouchStart={(e) => onTouchStart(e.changedTouches[0]?.clientX ?? 0)}
-        onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
-        onPointerDown={(e) => {
-          if (e.pointerType === "mouse") onTouchStart(e.clientX);
-        }}
-        onPointerUp={(e) => {
-          if (e.pointerType === "mouse") onTouchEnd(e.clientX);
-        }}
       >
-        <div
-          className={cn(
-            "flex transition-transform duration-300 ease-out",
-            stretch && "md:h-full",
-            fillHeight && "h-full",
-          )}
-          style={{ transform: `translateX(-${page * 100}%)` }}
-        >
-          {children.map((child, index) => (
-            <div
-              key={labels[index] ?? index}
-              className={cn("flex w-full shrink-0 flex-col", stretch && "md:h-full", fillHeight && "h-full")}
-            >
-              {child}
-            </div>
-          ))}
-        </div>
+        {track}
+        {dots}
       </div>
-      {showDots ? (
-        <div className={cn("flex items-center justify-center gap-2", framed && "pb-3")} role="tablist">
-          {labels.map((label, index) => (
-            <button
-              key={label}
-              type="button"
-              role="tab"
-              aria-selected={page === index}
-              aria-label={label}
-              onClick={() => goTo(index)}
-              className={cn(
-                "size-2 rounded-full transition-colors",
-                page === index ? "bg-pager-dot" : "bg-muted-foreground/30",
-              )}
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

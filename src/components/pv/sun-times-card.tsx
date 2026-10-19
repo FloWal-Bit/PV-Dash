@@ -13,7 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SwipePageSurface } from "@/components/pv/swipe-carousel";
+import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { cn } from "@/lib/utils";
 import { formatSwissNumber } from "@/lib/format";
 import { weatherDateKey, weatherStore } from "@/lib/weather-store";
@@ -212,28 +212,26 @@ export function SunTimesCard({
   forecastedTomorrowYieldKwh?: number | null;
   className?: string;
 }) {
-  const [page, setPage] = useState(0);
   const tomorrowDate = useMemo(() => {
     const d = new Date(referenceDate);
     d.setDate(d.getDate() + 1);
     return d;
   }, [referenceDate]);
-  const isToday = page === 0;
 
   return (
     <Card data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
-      <SwipePageSurface
-        labels={["Heute", "Morgen"]}
-        page={page}
-        onPageChange={setPage}
-        className="min-w-0 gap-3 pb-1"
-      >
+      <SwipeCarousel labels={["Heute", "Morgen"]} className="min-w-0 gap-3 pb-1">
         <SunTimesDayCard
-          date={isToday ? referenceDate : tomorrowDate}
-          forecastedYieldKwh={isToday ? forecastedTodayYieldKwh : forecastedTomorrowYieldKwh}
-          showLiveClock={isToday}
+          date={referenceDate}
+          forecastedYieldKwh={forecastedTodayYieldKwh}
+          showLiveClock
         />
-      </SwipePageSurface>
+        <SunTimesDayCard
+          date={tomorrowDate}
+          forecastedYieldKwh={forecastedTomorrowYieldKwh}
+          showLiveClock={false}
+        />
+      </SwipeCarousel>
     </Card>
   );
 }
