@@ -236,7 +236,7 @@ export function SwipeCarousel({
   return (
     <div
       className={cn(
-        "flex flex-col gap-(--card-spacing) pt-(--card-spacing)",
+        "relative flex flex-col",
         framed &&
           "overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-foreground/10 [--card-spacing:--spacing(4)]",
         stretch && "md:h-full",
@@ -244,7 +244,19 @@ export function SwipeCarousel({
         className,
       )}
     >
-      {header}
+      <div
+        className="absolute inset-x-0 top-(--card-spacing) z-10"
+        onTouchStart={(e) => onTouchStart(e.changedTouches[0]?.clientX ?? 0)}
+        onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
+        onPointerDown={(e) => {
+          if (e.pointerType === "mouse") onTouchStart(e.clientX);
+        }}
+        onPointerUp={(e) => {
+          if (e.pointerType === "mouse") onTouchEnd(e.clientX);
+        }}
+      >
+        {header}
+      </div>
       <div
         className={cn(
           "flex flex-col gap-2",

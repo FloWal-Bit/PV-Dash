@@ -11,6 +11,12 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw } from "@/lib/format";
+
+/** Zweistellige kW-Werte im Diagramm nur mit einer Nachkommastelle, sonst mit zwei. */
+function formatFlowKw(value: number): string {
+  const wholeDigits = Math.trunc(Math.abs(value)).toString().length;
+  return formatKw(value, wholeDigits === 2 ? 1 : 2);
+}
 import { cn } from "@/lib/utils";
 import type { PvSnapshot } from "@/lib/pv-data";
 import type { DataSource, GridSource } from "@/lib/pv-source";
@@ -431,7 +437,10 @@ function StromkontoFocus({
   direction: StromkontoFlow;
 }) {
   return (
-    <Card className="h-full flex-1 rounded-2xl pt-0 shadow-none ring-0">
+    <Card className="h-full flex-1 rounded-2xl shadow-none ring-0">
+      <div aria-hidden inert className="invisible">
+        <EnergyFlowTitle />
+      </div>
       <CardContent className="flex flex-1 items-center justify-center pt-2 pb-4">
         <div
           className={cn(
@@ -623,8 +632,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         simulated={!hideGrid && gridSimulated}
         direction={stromkontoDirection}
       />
-      <Card className="flex h-full flex-1 flex-col rounded-2xl pt-0 shadow-none ring-0">
-      <CardContent className="flex min-h-0 flex-1 flex-col pt-11 pb-3">
+      <Card className="flex h-full flex-1 flex-col rounded-2xl shadow-none ring-0">
+      <div aria-hidden inert className="invisible">
+        <EnergyFlowTitle />
+      </div>
+      <CardContent className="flex min-h-0 flex-1 flex-col pt-0 pb-3">
         <div
           ref={containerRef}
           className="energy-flow-diagram relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"
@@ -657,7 +669,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               pvCircleRef.current = el;
             }}
             icon={<Sun className="size-5" />}
-            value={hidePv ? "–" : formatKw(snapshot.productionKw, 2)}
+            value={hidePv ? "–" : formatFlowKw(snapshot.productionKw)}
             label="PV"
             accent="green"
             muted={hidePv || !isProducing}
@@ -677,7 +689,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             value={
               hideConsumption || snapshot.consumptionKw == null
                 ? "–"
-                : formatKw(snapshot.consumptionKw, 2)
+                : formatFlowKw(snapshot.consumptionKw)
             }
             label="Verbrauch"
             accent="rose"
@@ -692,7 +704,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               stromkontoCircleRef.current = el;
             }}
             icon={<StromkontoBattery direction={stromkontoDirection} className="size-5" />}
-            value={stromkontoValue}
+            value={hideGrid || stromkontoKw == null ? "–" : formatFlowKw(stromkontoKw)}
             label="Stromkonto"
             accent={stromkontoAccent}
             muted={hideGrid || (!isGridImport && !isGridExport)}
