@@ -112,6 +112,7 @@ export function SwipeCarousel({
   showDots = true,
   fillHeight = false,
   framed = false,
+  header,
 }: {
   labels: string[];
   children: ReactNode[];
@@ -129,6 +130,8 @@ export function SwipeCarousel({
    * inneren Karte würde unten vom Überlauf abgeschnitten.
    */
   framed?: boolean;
+  /** Bleibt stehen, während die Seiten darunter wechseln. */
+  header?: ReactNode;
 }) {
   const pageCount = children.length;
   const [internalPage, setInternalPage] = useState(0);
@@ -163,12 +166,13 @@ export function SwipeCarousel({
     <div
       className={cn(
         "flex flex-col gap-2",
-        framed && "overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-foreground/10",
+        framed && "overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-foreground/10 [--card-spacing:--spacing(4)]",
         stretch && "md:h-full",
         fillHeight && "h-full min-h-0",
         className,
       )}
     >
+      {header}
       <div
         className={cn(
           "touch-pan-y overflow-hidden",

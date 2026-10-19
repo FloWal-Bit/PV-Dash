@@ -100,7 +100,7 @@ function YAxisUnit({
   );
 }
 
-/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde, sonst überlagern sich die Zeiten auf dem Handy. */
+/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde. Im Hochformat auf dem Smartphone nur jede vierte, sonst überlagern sich die Zeiten. */
 function halfHourTicks(): string[] {
   const ticks: string[] = [];
   for (let hour = 0; hour < 24; hour++) {
@@ -114,15 +114,25 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
   const value = String(payload?.value ?? "");
   const [hour = "00", minute = "00"] = value.split(":");
   const halfHour = minute === "30";
-  const showLabel = !halfHour && Number(hour) % 2 === 0;
+  const hourNumber = Number(hour);
+  const showLabel = !halfHour && hourNumber % 2 === 0;
+  const hideOnPhonePortrait = showLabel && hourNumber % 4 !== 0;
   return (
     <g transform={`translate(${Number(x)},${Number(y)})`}>
       {showLabel ? (
-        <text y={8} textAnchor="middle" fill="var(--muted-foreground)" fontSize={11}>
+        <text
+          className={hideOnPhonePortrait ? "today-axis-extra" : undefined}
+          y={8}
+          textAnchor="middle"
+          fill="var(--muted-foreground)"
+          fontSize={11}
+        >
           {hour}:00
         </text>
-      ) : (
+      ) : null}
+      {showLabel && !hideOnPhonePortrait ? null : (
         <line
+          className={hideOnPhonePortrait ? "today-axis-fallback-tick" : undefined}
           y2={halfHour ? 4 : 6}
           stroke="var(--muted-foreground)"
           strokeOpacity={halfHour ? 0.55 : 0.85}

@@ -431,8 +431,7 @@ function StromkontoFocus({
   direction: StromkontoFlow;
 }) {
   return (
-    <Card className="h-full flex-1 rounded-2xl shadow-none ring-0">
-      <EnergyFlowTitle showInfo />
+    <Card className="h-full flex-1 rounded-2xl pt-0 shadow-none ring-0">
       <CardContent className="flex flex-1 items-center justify-center pt-2 pb-4">
         <div
           className={cn(
@@ -614,6 +613,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       stretch
       fillHeight
       framed
+      header={<EnergyFlowTitle showInfo />}
       className="energy-flow-carousel min-h-0 min-w-0 flex-1"
     >
       <StromkontoFocus
@@ -623,8 +623,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         simulated={!hideGrid && gridSimulated}
         direction={stromkontoDirection}
       />
-      <Card className="flex h-full flex-1 flex-col rounded-2xl shadow-none ring-0">
-      <EnergyFlowTitle />
+      <Card className="flex h-full flex-1 flex-col rounded-2xl pt-0 shadow-none ring-0">
       <CardContent className="flex min-h-0 flex-1 flex-col pt-0 pb-3">
         <div
           ref={containerRef}

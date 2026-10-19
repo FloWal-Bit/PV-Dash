@@ -323,6 +323,19 @@
     }
   }
 
+  /* Hochformat: nur jede vierte Stunde als Uhrzeit, dazwischen bleibt der Strich. */
+  .today-axis-fallback-tick {
+    display: none;
+  }
+  @media (max-width: 767px) and (orientation: portrait) {
+    .today-axis-extra {
+      display: none;
+    }
+    .today-axis-fallback-tick {
+      display: inline;
+    }
+  }
+
   .energy-flow-node-side {
     top: 80%;
   }
