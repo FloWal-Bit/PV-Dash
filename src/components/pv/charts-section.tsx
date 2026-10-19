@@ -192,12 +192,13 @@ function TodayPowerChart({
           padding={{ left: 0, right: 0 }}
         />
         <YAxis
+          allowDecimals={false}
           tickLine={false}
           axisLine={false}
           width={Y_AXIS_WIDTH}
           padding={{ top: 0, bottom: 0 }}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          tickFormatter={(v) => formatSwissNumber(Number(v), 1)}
+          tickFormatter={(v) => formatSwissNumber(Number(v), 0)}
           label={{ value: "kW", content: YAxisUnit }}
         />
         <Tooltip
@@ -473,16 +474,6 @@ function YieldConsumptionChart({
       })),
     [data, unit],
   );
-  const maxValue = chartData.reduce((max, point) => {
-    const values = [
-      series.ertrag ? point.yieldKwh : 0,
-      series.verbrauch ? point.consumptionKwh : 0,
-      series.eigenverbrauch ? point.eigenverbrauchKwh : 0,
-    ];
-    return Math.max(max, ...values);
-  }, 0);
-  const fractionDigits =
-    unit === "MWh" ? Math.max(0, mwhFractionDigits(maxValue) - (trimDecimal ? 1 : 0)) : 0;
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
@@ -516,12 +507,13 @@ function YieldConsumptionChart({
           tickFormatter={axisTickLabel}
         />
         <YAxis
+          allowDecimals={false}
           tickLine={false}
           axisLine={false}
           width={Y_AXIS_WIDTH}
           padding={{ top: 0, bottom: 0 }}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          tickFormatter={(v) => formatSwissNumber(Number(v), fractionDigits)}
+          tickFormatter={(v) => formatSwissNumber(Number(v), 0)}
           label={{ value: unit, content: YAxisUnit }}
         />
         <Tooltip

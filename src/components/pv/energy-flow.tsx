@@ -622,7 +622,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       stretch
       fillHeight
       framed
-      header={<EnergyFlowTitle showInfo />}
+      header={<EnergyFlowTitle showInfo={flowPage === 0} />}
       className="energy-flow-carousel min-h-0 min-w-0 flex-1"
     >
       <StromkontoFocus
