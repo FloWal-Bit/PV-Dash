@@ -334,6 +334,9 @@
     .today-axis-fallback-tick {
       display: inline;
     }
+    .today-axis-near-label {
+      display: none;
+    }
   }
 
   .energy-flow-node-side {

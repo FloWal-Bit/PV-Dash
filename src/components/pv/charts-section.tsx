@@ -117,6 +117,10 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
   const hourNumber = Number(hour);
   const showLabel = !halfHour && hourNumber % 2 === 0;
   const hideOnPhonePortrait = showLabel && hourNumber % 4 !== 0;
+  const shownLabelHour = !halfHour && hourNumber % 4 === 0;
+  const underShownLabel =
+    (halfHour && (hourNumber % 4 === 0 || hourNumber % 4 === 3)) ||
+    (!halfHour && (hourNumber % 4 === 1 || hourNumber % 4 === 3));
   return (
     <g transform={`translate(${Number(x)},${Number(y)})`}>
       {showLabel ? (
@@ -130,9 +134,15 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
           {hour}:00
         </text>
       ) : null}
-      {showLabel && !hideOnPhonePortrait ? null : (
+      {shownLabelHour ? null : (
         <line
-          className={hideOnPhonePortrait ? "today-axis-fallback-tick" : undefined}
+          className={
+            hideOnPhonePortrait
+              ? "today-axis-fallback-tick"
+              : underShownLabel
+                ? "today-axis-near-label"
+                : undefined
+          }
           y2={halfHour ? 4 : 6}
           stroke="var(--muted-foreground)"
           strokeOpacity={halfHour ? 0.55 : 0.85}
@@ -291,6 +301,15 @@ function toDisplayEnergy(valueKwh: number, unit: EnergyUnit): number {
 /** Unter 10 MWh zwei Nachkommastellen, sonst eine. */
 function mwhFractionDigits(valueMwh: number): number {
   return valueMwh < 10 ? 2 : 1;
+}
+
+const MONTHS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+
+function axisTickLabel(value: unknown): string {
+  const text = String(value ?? "");
+  if (text !== "Dieser Monat") return text;
+  const { month } = zurichYearMonth();
+  return MONTHS_DE[month - 1] ?? text;
 }
 
 function zurichYearMonth(now = new Date()): { year: number; month: number } {
@@ -494,6 +513,7 @@ function YieldConsumptionChart({
           interval={tickInterval}
           padding={{ left: 0, right: 0 }}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+          tickFormatter={axisTickLabel}
         />
         <YAxis
           tickLine={false}
