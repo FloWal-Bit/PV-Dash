@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { isUsableCoordinate, sunshineHoursAt } from "@/lib/sun-hours";
 import {
   getWetterAlarmDailyWeather,
   weatherCategoryFromLabel,
@@ -11,8 +10,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const location = searchParams.get("location")?.trim();
   const dateParam = searchParams.get("date")?.trim();
-  const latitude = Number(searchParams.get("latitude"));
-  const longitude = Number(searchParams.get("longitude"));
 
   let date: Date | undefined;
   if (dateParam) {
@@ -24,14 +21,8 @@ export async function GET(request: Request) {
 
   try {
     const weather = await getWetterAlarmDailyWeather({ locationName: location, date });
-    const dateKey = weather.date;
-    const sunHours =
-      isUsableCoordinate(latitude, longitude)
-        ? ((await sunshineHoursAt(latitude, longitude, dateKey)) ?? weather.sunHours)
-        : weather.sunHours;
     return NextResponse.json({
       ...weather,
-      sunHours,
       weatherCategory: weatherCategoryFromLabel(weather.weatherLabel),
     });
   } catch (error) {

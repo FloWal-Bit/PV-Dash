@@ -638,7 +638,7 @@ function formatRangeTotal(
   const yieldKwh = points.reduce((sum, point) => sum + point.yieldKwh, 0);
   const consumptionKwh = points.reduce((sum, point) => sum + point.consumptionKwh, 0);
   const periodLabel: Record<Exclude<Range, "heute">, string> = {
-    woche: "Diese Woche",
+    woche: "Letzte 7 Tage",
     monat: "Dieser Monat",
     jahr: "Dieses Jahr",
     lebensdauer: "Laufzeit",

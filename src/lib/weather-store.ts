@@ -54,7 +54,7 @@ let activeLocation: Pick<SiteLocation, "name" | "latitude" | "longitude"> = DEFA
 
 function locationKey(location: Pick<SiteLocation, "name" | "latitude" | "longitude">): string {
   const name = location.name.trim() || DEFAULT_SITE_LOCATION.name;
-  return `${name}|${location.latitude}|${location.longitude}`;
+  return `${name}|${location.latitude}|${location.longitude}|insolation`;
 }
 
 function emit() {

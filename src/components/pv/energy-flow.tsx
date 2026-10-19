@@ -6,7 +6,7 @@ import {
   Sun,
 } from "lucide-react";
 import { InfoPopover } from "@/components/pv/info-popover";
-import { SwipeCarousel, SwipePageDots } from "@/components/pv/swipe-carousel";
+import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
@@ -422,7 +422,6 @@ function StromkontoFocus({
   simulated,
   valueClassName,
   direction,
-  footer,
 }: {
   value: string;
   accent: Accent;
@@ -430,7 +429,6 @@ function StromkontoFocus({
   simulated?: boolean;
   valueClassName?: string;
   direction: StromkontoFlow;
-  footer?: ReactNode;
 }) {
   return (
     <Card className="h-full flex-1 rounded-2xl shadow-none ring-0">
@@ -468,7 +466,6 @@ function StromkontoFocus({
           <span className="text-sm font-medium text-muted-foreground">Stromkonto</span>
         </div>
       </CardContent>
-      {footer}
     </Card>
   );
 }
@@ -614,7 +611,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       labels={flowLabels}
       page={flowPage}
       onPageChange={setFlowPage}
-      showDots={false}
       stretch
       fillHeight
       framed
@@ -626,14 +622,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         muted={hideGrid || (!isGridImport && !isGridExport)}
         simulated={!hideGrid && gridSimulated}
         direction={stromkontoDirection}
-        footer={
-          <SwipePageDots
-            labels={flowLabels}
-            page={flowPage}
-            onPageChange={setFlowPage}
-            className="pb-3"
-          />
-        }
       />
       <Card className="flex h-full flex-1 flex-col rounded-2xl shadow-none ring-0">
       <EnergyFlowTitle />
@@ -716,12 +704,6 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
           />
         </div>
       </CardContent>
-      <SwipePageDots
-        labels={flowLabels}
-        page={flowPage}
-        onPageChange={setFlowPage}
-        className="pb-3"
-      />
     </Card>
     </SwipeCarousel>
     </div>

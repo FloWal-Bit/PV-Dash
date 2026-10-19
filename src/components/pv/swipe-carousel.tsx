@@ -160,11 +160,18 @@ export function SwipeCarousel({
   };
 
   return (
-    <div className={cn("flex flex-col gap-2", stretch && "md:h-full", fillHeight && "h-full min-h-0", className)}>
+    <div
+      className={cn(
+        "flex flex-col gap-2",
+        framed && "overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-foreground/10",
+        stretch && "md:h-full",
+        fillHeight && "h-full min-h-0",
+        className,
+      )}
+    >
       <div
         className={cn(
           "touch-pan-y overflow-hidden",
-          framed && "rounded-2xl shadow-card ring-1 ring-foreground/10",
           stretch && "md:min-h-0 md:flex-1",
           fillHeight && "min-h-0 flex-1",
         )}
@@ -196,7 +203,7 @@ export function SwipeCarousel({
         </div>
       </div>
       {showDots ? (
-        <div className="swipe-carousel-dots flex items-center justify-center gap-2" role="tablist">
+        <div className={cn("flex items-center justify-center gap-2", framed && "pb-3")} role="tablist">
           {labels.map((label, index) => (
             <button
               key={label}
