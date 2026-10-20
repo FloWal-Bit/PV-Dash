@@ -5,6 +5,7 @@ import {
   Area,
   Bar,
   BarChart,
+  BarStack,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -465,22 +466,25 @@ function YieldConsumptionChart({
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
     () =>
-      data.map((point) => ({
-        ...point,
-        stromkontoKwh: point.yieldKwh - point.consumptionKwh,
-        yieldKwh: toDisplayEnergy(point.yieldKwh, unit),
-        consumptionKwh: toDisplayEnergy(point.consumptionKwh, unit),
-        eigenverbrauchKwh: toDisplayEnergy(point.directSolarKwh + point.batteryKwh, unit),
-        eigenOnYieldKwh: toDisplayEnergy(
-          Math.min(point.directSolarKwh + point.batteryKwh, point.yieldKwh),
-          unit,
-        ),
-        yieldRestKwh: toDisplayEnergy(
-          Math.max(0, point.yieldKwh - (point.directSolarKwh + point.batteryKwh)),
-          unit,
-        ),
-      })),
-    [data, unit],
+      data.map((point) => {
+        const eigenKwh = point.directSolarKwh + point.batteryKwh;
+        const both = series.ertrag && series.eigenverbrauch;
+        return {
+          ...point,
+          stromkontoKwh: point.yieldKwh - point.consumptionKwh,
+          yieldKwh: toDisplayEnergy(point.yieldKwh, unit),
+          consumptionKwh: toDisplayEnergy(point.consumptionKwh, unit),
+          eigenverbrauchKwh: toDisplayEnergy(eigenKwh, unit),
+          // Grün oben, Petrol unten, zusammen genau so hoch wie der Ertrag.
+          yieldSegmentKwh: series.ertrag
+            ? toDisplayEnergy(both ? Math.max(0, point.yieldKwh - eigenKwh) : point.yieldKwh, unit)
+            : 0,
+          eigenSegmentKwh: series.eigenverbrauch
+            ? toDisplayEnergy(both ? Math.min(eigenKwh, point.yieldKwh) : eigenKwh, unit)
+            : 0,
+        };
+      }),
+    [data, series.eigenverbrauch, series.ertrag, unit],
   );
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -591,33 +595,20 @@ function YieldConsumptionChart({
             );
           }}
         />
-        {series.ertrag && series.eigenverbrauch ? (
+        <BarStack stackId="ertrag" radius={[6, 6, 6, 6]}>
           <Bar
-            dataKey="eigenOnYieldKwh"
-            stackId="ertrag"
+            dataKey="eigenSegmentKwh"
             fill="url(#bar-eigenverbrauch)"
-            radius={[0, 0, 6, 6]}
             maxBarSize={16}
+            isAnimationActive={false}
           />
-        ) : null}
-        {series.ertrag && series.eigenverbrauch ? (
           <Bar
-            dataKey="yieldRestKwh"
-            stackId="ertrag"
+            dataKey="yieldSegmentKwh"
             fill="url(#bar-yield)"
-            radius={[6, 6, 0, 0]}
             maxBarSize={16}
+            isAnimationActive={false}
           />
-        ) : series.ertrag ? (
-          <Bar dataKey="yieldKwh" fill="url(#bar-yield)" radius={[6, 6, 6, 6]} maxBarSize={16} />
-        ) : series.eigenverbrauch ? (
-          <Bar
-            dataKey="eigenverbrauchKwh"
-            fill="url(#bar-eigenverbrauch)"
-            radius={[6, 6, 6, 6]}
-            maxBarSize={16}
-          />
-        ) : null}
+        </BarStack>
         {series.verbrauch ? (
           <Bar
             dataKey="consumptionKwh"
