@@ -1,3 +1,3 @@
 export const APP_NAME = "PV Dash";
-export const APP_VERSION = "1.5.4.2";
+export const APP_VERSION = "1.5.4.3";
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;

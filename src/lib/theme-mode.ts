@@ -11,11 +11,11 @@ export type { WetterAlarmSunTimes };
 const STORAGE_KEY = "pv-dash:theme-mode";
 const DARK_VARIANT_KEY = "pv-dash:dark-variant";
 
-/** Abgesetzt: Karten heller als der Hintergrund. Flach: Karten liegen näher am Hintergrund. */
+/** Hervorgehoben: Karten heller als der Hintergrund. Flach: Karten liegen näher am Hintergrund. */
 export type DarkVariant = "raised" | "flat";
 
 export const DARK_VARIANT_LABELS: Record<DarkVariant, string> = {
-  raised: "Abgesetzt",
+  raised: "Hervorgehoben",
   flat: "Flach",
 };
 

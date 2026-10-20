@@ -437,7 +437,7 @@ function barTooltipTitle(
   return text;
 }
 
-/** Drei Säulen pro Tag: Ertrag, Verbrauch, Eigenverbrauch (PV + Speicheranteil). */
+/** Ertrag und Verbrauch nebeneinander. Der Eigenverbrauch liegt unten in der Ertragssäule. */
 function YieldConsumptionChart({
   data,
   unit = "kWh",
@@ -471,6 +471,14 @@ function YieldConsumptionChart({
         yieldKwh: toDisplayEnergy(point.yieldKwh, unit),
         consumptionKwh: toDisplayEnergy(point.consumptionKwh, unit),
         eigenverbrauchKwh: toDisplayEnergy(point.directSolarKwh + point.batteryKwh, unit),
+        eigenOnYieldKwh: toDisplayEnergy(
+          Math.min(point.directSolarKwh + point.batteryKwh, point.yieldKwh),
+          unit,
+        ),
+        yieldRestKwh: toDisplayEnergy(
+          Math.max(0, point.yieldKwh - (point.directSolarKwh + point.batteryKwh)),
+          unit,
+        ),
       })),
     [data, unit],
   );
@@ -583,21 +591,37 @@ function YieldConsumptionChart({
             );
           }}
         />
-        {series.ertrag ? (
+        {series.ertrag && series.eigenverbrauch ? (
+          <Bar
+            dataKey="eigenOnYieldKwh"
+            stackId="ertrag"
+            fill="url(#bar-eigenverbrauch)"
+            radius={[0, 0, 6, 6]}
+            maxBarSize={16}
+          />
+        ) : null}
+        {series.ertrag && series.eigenverbrauch ? (
+          <Bar
+            dataKey="yieldRestKwh"
+            stackId="ertrag"
+            fill="url(#bar-yield)"
+            radius={[6, 6, 0, 0]}
+            maxBarSize={16}
+          />
+        ) : series.ertrag ? (
           <Bar dataKey="yieldKwh" fill="url(#bar-yield)" radius={[6, 6, 6, 6]} maxBarSize={16} />
+        ) : series.eigenverbrauch ? (
+          <Bar
+            dataKey="eigenverbrauchKwh"
+            fill="url(#bar-eigenverbrauch)"
+            radius={[6, 6, 6, 6]}
+            maxBarSize={16}
+          />
         ) : null}
         {series.verbrauch ? (
           <Bar
             dataKey="consumptionKwh"
             fill="url(#bar-consumption)"
-            radius={[6, 6, 6, 6]}
-            maxBarSize={16}
-          />
-        ) : null}
-        {series.eigenverbrauch ? (
-          <Bar
-            dataKey="eigenverbrauchKwh"
-            fill="url(#bar-eigenverbrauch)"
             radius={[6, 6, 6, 6]}
             maxBarSize={16}
           />
@@ -680,6 +704,17 @@ function formatRangeTotal(
     return `${label}, ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)} / ${formatSignedMwh(stromkontoKwh, stromkontoDigits)}`;
   }
   return `${label}, ${formatYieldKwh(yieldKwh, 0)} / ${formatYieldKwh(consumptionKwh, 0)} / ${formatSignedKwh(stromkontoKwh, 0)}`;
+}
+
+function RangeTotal({ text }: { text: string }) {
+  const splitAt = text.indexOf(", ");
+  if (splitAt === -1) return text;
+  return (
+    <>
+      {text.slice(0, splitAt + 2)}
+      <span className="text-card-foreground">{text.slice(splitAt + 2)}</span>
+    </>
+  );
 }
 
 function zurichDayLabel(date = new Date()): string {
@@ -831,7 +866,11 @@ export function ChartsSection({
             Ertrag, Verbrauch, Stromkonto
           </CardTitle>
           <span className="text-xs text-muted-foreground">
-            {hidePv ? "Simulierte Verläufe sind ausgeblendet" : total}
+            {hidePv ? (
+              "Simulierte Verläufe sind ausgeblendet"
+            ) : (
+              <RangeTotal text={total} />
+            )}
           </span>
         </div>
       </CardHeader>

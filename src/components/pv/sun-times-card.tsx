@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   Clock,
-  Clock3,
   CloudDrizzle,
   Cloudy,
   Sun,
   Sunrise,
   Sunset,
   SunDim,
+  Timer,
   Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,7 +105,7 @@ function SunStat({
       <span className="flex items-baseline justify-center gap-1">
         <span
           className={cn(
-            "text-sm font-semibold tabular-nums text-muted-foreground",
+            "text-sm font-semibold tabular-nums text-card-foreground",
             valueClassName,
           )}
         >
@@ -148,7 +148,7 @@ function SunTimesDayCard({
   return (
     <>
       <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground capitalize">
+        <CardTitle className="text-sm font-medium text-card-foreground capitalize">
           {formatDayHeading(date)}
         </CardTitle>
       </CardHeader>
@@ -167,7 +167,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<Clock3 className="size-4" />}
+          icon={<Timer className="size-4" />}
           label="Sonnenstunden"
           value={
             waLoading ? "…" : sunHoursDisplay != null ? formatSwissNumber(sunHoursDisplay, 1) : "–"
