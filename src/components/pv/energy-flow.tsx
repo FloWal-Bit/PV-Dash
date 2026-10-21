@@ -471,7 +471,7 @@ function StromkontoFocus({
               ) : null}
             </span>
           </div>
-          <span className="text-sm font-medium text-muted-foreground">Stromkonto</span>
+          <span className="text-xs font-medium leading-tight text-muted-foreground">Stromkonto</span>
         </div>
       </CardContent>
     </Card>
