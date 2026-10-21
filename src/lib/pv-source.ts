@@ -68,6 +68,14 @@ function consumptionFromEnergyBalance(productionKw: number, gridKw: number): num
   return round(Math.max(0, productionKw + gridKw));
 }
 
+/**
+ * Tagesverbrauch aus dem whatwatt-Zähler: Ertrag minus Stromkonto heute.
+ * Stromkonto ist Einspeisung minus Bezug, also Verbrauch = Ertrag + Bezug − Einspeisung.
+ */
+function consumptionKwhFromStromkonto(yieldKwh: number, stromkontoChangeTodayKwh: number): number {
+  return round(Math.max(0, yieldKwh - stromkontoChangeTodayKwh));
+}
+
 function consumptionMetrics(productionKw: number, consumptionKw: number) {
   const selfConsumptionRate =
     productionKw > 0.05
@@ -219,6 +227,15 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
         ...snapshot,
         stromkontoBalanceKwh: stromkonto.balanceKwh,
         stromkontoChangeTodayKwh: stromkonto.changeTodayKwh,
+      };
+    }
+    if (snapshot.stromkontoChangeTodayKwh != null) {
+      snapshot = {
+        ...snapshot,
+        todayConsumptionKwh: consumptionKwhFromStromkonto(
+          snapshot.todayYieldKwh,
+          snapshot.stromkontoChangeTodayKwh,
+        ),
       };
     }
   }
