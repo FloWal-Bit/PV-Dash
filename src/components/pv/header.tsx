@@ -94,7 +94,7 @@ export function DashboardHeader({
   }
 
   return (
-    <header className="safe-top sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md landscape:py-1.5">
+    <header className="safe-top sticky top-0 z-30 border-b border-border/60 bg-background landscape:py-1.5">
       <div className="dashboard-container flex items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-col pl-4">
           <button

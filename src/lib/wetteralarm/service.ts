@@ -16,8 +16,8 @@ import { DEFAULT_SITE_LOCATION } from "@/lib/site-location";
 
 const SEARCH_URL = "https://my.wetteralarm.ch/web/search.json";
 const POI_URL = "https://my.wetteralarm.ch/v9/pois";
-/** Tagesprognose ändert sich selten — langer Cache spart Wetter-Alarm-Traffic. */
-const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+/** Passt zum 6-Stunden-Abruf im Dashboard, damit eine neue Marke frische Daten holt. */
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 type PoiCacheEntry = { expiresAt: number; poiId: number };
 type ForecastCacheEntry = { expiresAt: number; data: WetterAlarmDailyWeather };

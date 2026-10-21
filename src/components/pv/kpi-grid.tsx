@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { BatteryFull, Home, Sun } from "lucide-react";
+import { BatteryFull, Home, Zap } from "lucide-react";
 import { StatCard } from "@/components/pv/stat-card";
 import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
@@ -72,7 +72,7 @@ export function KpiGrid({
         }
         value={hidePv ? "–" : formatSwissNumber(snapshot.todayYieldKwh, 1)}
         unit={hidePv ? undefined : "kWh"}
-        icon={<Sun className="size-5" />}
+        icon={<Zap className="size-5" />}
         accent="green"
         simulated={!hidePv && pvSimulated}
       />

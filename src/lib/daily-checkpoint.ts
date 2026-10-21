@@ -1,5 +1,5 @@
-/** Täglicher Abruf-Zeitpunkt für langsam ändernde Daten (Wetter-Alarm). */
-export const DAILY_REFRESH_HOUR = 8;
+/** Wetter-Alarm: alle 6 Stunden, an den Marken 00:00, 06:00, 12:00 und 18:00. */
+export const WEATHER_REFRESH_INTERVAL_HOURS = 6;
 export const APP_TIME_ZONE = "Europe/Zurich";
 
 function datePartsInZone(date: Date, timeZone: string) {
@@ -58,28 +58,31 @@ function zonedDateTimeToUtcMs(
   return utc;
 }
 
-/** UTC-Zeitstempel der letzten 08:00-Uhr-Marke (Ortszeit), die ≤ `now` ist. */
+/** UTC-Zeitstempel der letzten 6-Stunden-Marke (Ortszeit), die ≤ `now` ist. */
 export function lastDailyCheckpointMs(now: Date = new Date()): number {
   const z = datePartsInZone(now, APP_TIME_ZONE);
+  const slotHour =
+    Math.floor(z.hour / WEATHER_REFRESH_INTERVAL_HOURS) * WEATHER_REFRESH_INTERVAL_HOURS;
+  return zonedDateTimeToUtcMs(z.year, z.month, z.day, slotHour, 0, APP_TIME_ZONE);
+}
+
+export function msUntilNextDailyCheckpoint(now: Date = new Date()): number {
+  const z = datePartsInZone(now, APP_TIME_ZONE);
+  let slotHour =
+    (Math.floor(z.hour / WEATHER_REFRESH_INTERVAL_HOURS) + 1) * WEATHER_REFRESH_INTERVAL_HOURS;
   let year = z.year;
   let month = z.month;
   let day = z.day;
 
-  const beforeCheckpoint = z.hour < DAILY_REFRESH_HOUR;
-
-  if (beforeCheckpoint) {
-    const prevUtc = Date.UTC(year, month - 1, day) - 86_400_000;
-    const prev = datePartsInZone(new Date(prevUtc), APP_TIME_ZONE);
-    year = prev.year;
-    month = prev.month;
-    day = prev.day;
+  if (slotHour >= 24) {
+    slotHour = 0;
+    const nextUtc = Date.UTC(year, month - 1, day) + 86_400_000;
+    const next = datePartsInZone(new Date(nextUtc), APP_TIME_ZONE);
+    year = next.year;
+    month = next.month;
+    day = next.day;
   }
 
-  return zonedDateTimeToUtcMs(year, month, day, DAILY_REFRESH_HOUR, 0, APP_TIME_ZONE);
-}
-
-export function msUntilNextDailyCheckpoint(now: Date = new Date()): number {
-  const last = lastDailyCheckpointMs(now);
-  const next = last + 24 * 60 * 60 * 1000;
-  return Math.max(60_000, next - now.getTime());
+  const nextMs = zonedDateTimeToUtcMs(year, month, day, slotHour, 0, APP_TIME_ZONE);
+  return Math.max(60_000, nextMs - now.getTime());
 }

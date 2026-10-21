@@ -57,6 +57,12 @@ function parseTimeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
+function fiveMinuteLabel(totalMinutes: number): string {
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 function sampleIntervalHours(points: { time: string }[]): number {
   if (points.length < 2) return 1;
   const delta = parseTimeToMinutes(points[1].time) - parseTimeToMinutes(points[0].time);
@@ -755,28 +761,34 @@ export function ChartsSection({
 
   const todayChartData = useMemo((): TodayChartPoint[] => {
     const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-    return today.map((point) => {
-      const isFuture = parseTimeToMinutes(point.time) > nowMinutes;
-      if (isFuture) {
-        return {
-          time: point.time,
-          label: point.label,
+    const byLabel = new Map(today.map((point) => [point.label, point]));
+    const points: TodayChartPoint[] = [];
+    for (let minutes = 0; minutes <= 24 * 60; minutes += 5) {
+      const label = fiveMinuteLabel(minutes);
+      const source = byLabel.get(label);
+      const isFuture = minutes > nowMinutes;
+      if (!source || isFuture) {
+        points.push({
+          time: label,
+          label,
           productionKw: null,
           consumptionKw: null,
           consumedFromPvKw: null,
-        };
+        });
+        continue;
       }
-      return {
-        time: point.time,
-        label: point.label,
-        productionKw: point.productionKw,
-        consumptionKw: point.consumptionKw,
+      points.push({
+        time: source.time,
+        label: source.label,
+        productionKw: source.productionKw,
+        consumptionKw: source.consumptionKw,
         consumedFromPvKw:
-          point.consumptionKw == null
+          source.consumptionKw == null
             ? null
-            : Math.min(point.productionKw, point.consumptionKw),
-      };
-    });
+            : Math.min(source.productionKw, source.consumptionKw),
+      });
+    }
+    return points;
   }, [today]);
 
   const todayDayLabel = zurichDayLabel();
