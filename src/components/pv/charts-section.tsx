@@ -84,6 +84,27 @@ const X_AXIS_HEIGHT = 28;
 const Y_UNIT_LABEL_WIDTH = 25;
 const CHART_PULL_LEFT = Y_AXIS_WIDTH - Y_UNIT_LABEL_WIDTH;
 
+/** Zeichenfläche der Kurven, ohne Achsen. Darüber bis zum Kartenrand schliesst ein Tipp die Punktwerte. */
+function pointerInDiagram(card: HTMLElement, clientX: number, clientY: number): boolean {
+  const surface = card.querySelector(".recharts-surface");
+  if (!(surface instanceof SVGSVGElement)) return false;
+  const box = surface.getBoundingClientRect();
+  return (
+    clientX >= box.left + Y_AXIS_WIDTH &&
+    clientX <= box.right - CHART_MARGIN.right &&
+    clientY >= box.top + CHART_MARGIN.top &&
+    clientY <= box.bottom - X_AXIS_HEIGHT
+  );
+}
+
+function pointerClosesPointValues(card: HTMLElement, clientX: number, clientY: number): boolean {
+  const surface = card.querySelector(".recharts-surface");
+  if (!(surface instanceof SVGSVGElement)) return false;
+  const box = surface.getBoundingClientRect();
+  if (clientY > box.bottom) return false;
+  return !pointerInDiagram(card, clientX, clientY);
+}
+
 /** Einheit über der Y-Skala, links bündig mit der Zeile „Diese Woche“. */
 function YAxisUnit({
   viewBox,
@@ -107,7 +128,7 @@ function YAxisUnit({
   );
 }
 
-/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde. Im Hochformat auf dem Smartphone nur jede vierte, sonst überlagern sich die Zeiten. */
+/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde. Im Hochformat auf dem Smartphone nur jede vierte, ohne die kleinen Stundenstriche. */
 function halfHourTicks(): string[] {
   const ticks: string[] = [];
   for (let hour = 0; hour < 24; hour++) {
@@ -125,9 +146,6 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
   const showLabel = !halfHour && hourNumber % 2 === 0;
   const hideOnPhonePortrait = showLabel && hourNumber % 4 !== 0;
   const shownLabelHour = !halfHour && hourNumber % 4 === 0;
-  const underShownLabel =
-    (halfHour && (hourNumber % 4 === 0 || hourNumber % 4 === 3)) ||
-    (!halfHour && (hourNumber % 4 === 1 || hourNumber % 4 === 3));
   return (
     <g transform={`translate(${Number(x)},${Number(y)})`}>
       {showLabel ? (
@@ -143,13 +161,7 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
       ) : null}
       {shownLabelHour ? null : (
         <line
-          className={
-            hideOnPhonePortrait
-              ? "today-axis-fallback-tick"
-              : underShownLabel
-                ? "today-axis-near-label"
-                : undefined
-          }
+          className={hideOnPhonePortrait ? "today-axis-fallback-tick" : "today-axis-tick"}
           y2={halfHour ? 4 : 6}
           stroke="var(--muted-foreground)"
           strokeOpacity={halfHour ? 0.55 : 0.85}
@@ -168,9 +180,11 @@ type ChartSeriesVisibility = {
 function TodayPowerChart({
   data,
   series,
+  tooltipActive,
 }: {
   data: TodayChartPoint[];
   series: ChartSeriesVisibility;
+  tooltipActive?: boolean;
 }) {
   const hourTicks = halfHourTicks().filter((tick) => data.some((point) => point.label === tick));
 
@@ -209,6 +223,7 @@ function TodayPowerChart({
           label={{ value: "kW", content: YAxisUnit }}
         />
         <Tooltip
+          active={tooltipActive}
           cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
@@ -454,6 +469,7 @@ function YieldConsumptionChart({
   expandMonthNameLabel = false,
   showStromkonto = true,
   series,
+  tooltipActive,
 }: {
   data: DailyEnergyPoint[];
   unit?: EnergyUnit;
@@ -468,6 +484,7 @@ function YieldConsumptionChart({
   /** Laufzeit zeigt keine Stromkonto-Zeile. */
   showStromkonto?: boolean;
   series: ChartSeriesVisibility;
+  tooltipActive?: boolean;
 }) {
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
@@ -535,6 +552,7 @@ function YieldConsumptionChart({
           label={{ value: unit, content: YAxisUnit }}
         />
         <Tooltip
+          active={tooltipActive}
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
@@ -750,6 +768,7 @@ export function ChartsSection({
     verbrauch: true,
     eigenverbrauch: true,
   });
+  const [tooltipDismissed, setTooltipDismissed] = useState(false);
   const range = RANGE_ORDER[page] ?? "heute";
   const pvSimulated = isPvSimulated(source);
   const hideSimulated = useSyncExternalStore(
@@ -862,8 +881,25 @@ export function ChartsSection({
   }, []);
 
   return (
-    <Card ref={cardRef} className="yield-chart-card shadow-card rounded-2xl">
-      <CardHeader>
+    <Card
+      ref={cardRef}
+      className="yield-chart-card shadow-card rounded-2xl"
+      onPointerDown={(event) => {
+        const card = event.currentTarget;
+        if (pointerClosesPointValues(card, event.clientX, event.clientY)) {
+          setTooltipDismissed(true);
+          return;
+        }
+        if (pointerInDiagram(card, event.clientX, event.clientY)) setTooltipDismissed(false);
+      }}
+      onMouseMove={(event) => {
+        if (!tooltipDismissed) return;
+        if (pointerInDiagram(event.currentTarget, event.clientX, event.clientY)) {
+          setTooltipDismissed(false);
+        }
+      }}
+    >
+      <CardHeader className="-mt-(--card-spacing) pt-(--card-spacing)">
         <div className="flex flex-col gap-1">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             Ertrag, Verbrauch, Stromkonto
@@ -882,6 +918,7 @@ export function ChartsSection({
           labels={RANGE_LABELS}
           page={page}
           onPageChange={(next) => {
+            setTooltipDismissed(false);
             setPage(next);
             if (next !== page) pvStore.refreshHistory();
           }}
@@ -908,7 +945,7 @@ export function ChartsSection({
                   Für heute liegen noch keine Ertrags- und Verbrauchsdaten vor.
                 </div>
               ) : range === "heute" ? (
-                <TodayPowerChart data={todayChartData} series={series} />
+                <TodayPowerChart data={todayChartData} series={series} tooltipActive={tooltipDismissed ? false : undefined} />
               ) : (
                 <YieldConsumptionChart
                   data={barData}
@@ -919,6 +956,7 @@ export function ChartsSection({
                   expandMonthNameLabel={range === "jahr"}
                   showStromkonto={range !== "lebensdauer"}
                   series={series}
+                  tooltipActive={tooltipDismissed ? false : undefined}
                 />
               )}
             </div>

@@ -12,10 +12,15 @@ import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/d
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw } from "@/lib/format";
 
-/** Zweistellige kW-Werte im Diagramm nur mit einer Nachkommastelle, sonst mit zwei. */
-function formatFlowKw(value: number): string {
-  const wholeDigits = Math.trunc(Math.abs(value)).toString().length;
-  return formatKw(value, wholeDigits === 2 ? 1 : 2);
+/**
+ * Hat eine der Leistungszahlen zwei oder mehr Stellen vor dem Komma,
+ * zeigen Tab 1 und Tab 2 nur eine Nachkommastelle. Sonst zwei.
+ */
+function flowKwFractionDigits(values: Array<number | null>): number {
+  const wide = values.some(
+    (value) => value != null && Math.trunc(Math.abs(value)).toString().length >= 2,
+  );
+  return wide ? 1 : 2;
 }
 import { cn } from "@/lib/utils";
 import type { PvSnapshot } from "@/lib/pv-data";
@@ -497,6 +502,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   const isGridImport = gridMeasured && hasGrid && gridKw > 0.05;
   const isGridExport = gridMeasured && hasGrid && gridKw < -0.05;
   const stromkontoKw = gridMeasured && hasGrid ? Math.abs(gridKw) : null;
+  const flowDigits = flowKwFractionDigits([
+    hidePv ? null : snapshot.productionKw,
+    hideConsumption || snapshot.consumptionKw == null ? null : snapshot.consumptionKw,
+    hideGrid || stromkontoKw == null ? null : stromkontoKw,
+  ]);
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoAccent: Accent = isGridExport
@@ -602,7 +612,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   }
 
   const stromkontoValue =
-    hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, 2);
+    hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, flowDigits);
   const stromkontoDirection: StromkontoFlow = hideGrid
     ? "idle"
     : isGridExport
@@ -669,7 +679,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               pvCircleRef.current = el;
             }}
             icon={<Sun className="size-5" />}
-            value={hidePv ? "–" : formatFlowKw(snapshot.productionKw)}
+            value={hidePv ? "–" : formatKw(snapshot.productionKw, flowDigits)}
             label="PV"
             accent="green"
             muted={hidePv || !isProducing}
@@ -689,7 +699,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             value={
               hideConsumption || snapshot.consumptionKw == null
                 ? "–"
-                : formatFlowKw(snapshot.consumptionKw)
+                : formatKw(snapshot.consumptionKw, flowDigits)
             }
             label="Verbrauch"
             accent="rose"
@@ -704,7 +714,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               stromkontoCircleRef.current = el;
             }}
             icon={<StromkontoBattery direction={stromkontoDirection} className="size-5" />}
-            value={hideGrid || stromkontoKw == null ? "–" : formatFlowKw(stromkontoKw)}
+            value={hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, flowDigits)}
             label="Stromkonto"
             accent={stromkontoAccent}
             muted={hideGrid || (!isGridImport && !isGridExport)}
