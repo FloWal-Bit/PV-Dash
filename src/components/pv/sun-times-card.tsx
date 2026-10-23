@@ -112,7 +112,7 @@ function SunStat({
           {value}
         </span>
         {unit ? (
-          <span className="text-sm font-medium text-muted-foreground">{unit}</span>
+          <span className="text-sm font-medium text-card-foreground">{unit}</span>
         ) : null}
       </span>
     </div>

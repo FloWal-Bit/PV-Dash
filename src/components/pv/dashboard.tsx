@@ -6,6 +6,7 @@ import { DashboardHeader } from "@/components/pv/header";
 import { KpiGrid } from "@/components/pv/kpi-grid";
 import { EnergyFlow } from "@/components/pv/energy-flow";
 import { SunTimesCard } from "@/components/pv/sun-times-card";
+import { InfoBanner } from "@/components/pv/info-banner";
 import { ChartsSection } from "@/components/pv/charts-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
           <DashboardSkeleton />
         ) : (
           <>
+            <InfoBanner />
             <SunTimesCard
               className="min-w-0"
               referenceDate={new Date(snapshot.timestamp)}

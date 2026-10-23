@@ -5,13 +5,19 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
-import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
+import {
+  readInfoBanner,
+  normalizeInfoBanner,
+  type DevSettingsUpdate,
+  type SharedDevSettings,
+} from "@/lib/dev-settings-shared";
 
 export type { DevSettingsUpdate, SharedDevSettings };
 
 type PersistedDevSettings = {
   updatedAt: string;
   hideSimulated: boolean | null;
+  infoBanner: string;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -24,10 +30,12 @@ function readFile(): PersistedDevSettings | null {
     if (typeof parsed !== "object" || parsed === null) return null;
     const v = parsed as Record<string, unknown>;
     const hideSimulated = typeof v.hideSimulated === "boolean" ? v.hideSimulated : null;
+    const infoBanner = readInfoBanner(v.infoBanner);
     const hadLocation = "siteLocation" in v || "yieldForecast" in v;
     const file: PersistedDevSettings = {
       updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : new Date(0).toISOString(),
       hideSimulated,
+      infoBanner,
     };
     if (hadLocation) writeFile(file);
     return file;
@@ -39,6 +47,7 @@ function readFile(): PersistedDevSettings | null {
 function resolve(file: PersistedDevSettings | null): SharedDevSettings {
   return {
     hideSimulated: file?.hideSimulated ?? true,
+    infoBanner: file?.infoBanner ?? "",
     configured: file != null,
     updatedAt: file?.updatedAt ?? null,
   };
@@ -61,6 +70,10 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
       typeof update.hideSimulated === "boolean"
         ? update.hideSimulated
         : (current?.hideSimulated ?? null),
+    infoBanner:
+      typeof update.infoBanner === "string"
+        ? normalizeInfoBanner(update.infoBanner)
+        : (current?.infoBanner ?? ""),
   };
   writeFile(next);
   return resolve(next);

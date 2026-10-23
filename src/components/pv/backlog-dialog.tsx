@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useSyncExternalStore, type FormEvent } from "react";
-import { Check, EyeOff, ListTodo, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { Check, EyeOff, Info, ListTodo, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { backlogStore } from "@/lib/backlog-store";
 import { MAX_BACKLOG_TITLE_LENGTH } from "@/lib/backlog-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { infoBannerStore } from "@/lib/info-banner";
+import { MAX_INFO_BANNER_LENGTH, normalizeInfoBanner } from "@/lib/dev-settings-shared";
 import { DeveloperPlantSettings, SettingsSection } from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
 import { cn } from "@/lib/utils";
@@ -158,11 +160,90 @@ export function BacklogDialog({
           </SettingsSection>
 
           <DeveloperPlantSettings />
+          <InfoBannerEditor />
           <HideSimulatedToggle />
           {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InfoBannerEditor() {
+  const saved = useSyncExternalStore(
+    infoBannerStore.subscribe,
+    infoBannerStore.getSnapshot,
+    infoBannerStore.getServerSnapshot,
+  );
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const savingRef = useRef(false);
+  const value = draft ?? saved;
+  const dirty = value !== saved;
+
+  async function save() {
+    if (savingRef.current) return;
+    let next = value;
+    try {
+      next = normalizeInfoBanner(value);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Hinweis konnte nicht gespeichert werden.");
+      return;
+    }
+    if (next === saved) {
+      setDraft(null);
+      return;
+    }
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      await infoBannerStore.set(next);
+      setDraft(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Hinweis konnte nicht gespeichert werden.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  return (
+    <SettingsSection
+      icon={<Info className="size-4" />}
+      iconClassName="bg-chart-3/12 text-chart-3"
+      title="Info-Banner"
+    >
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Steht oberhalb der Wetterkarte. Die Karte wird so hoch, wie der Text braucht.
+        Leer lassen blendet den Hinweis aus.
+      </p>
+      <textarea
+        className="flex min-h-24 w-full resize-y rounded-xl border border-border/80 bg-background px-3 py-2 text-sm leading-relaxed shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60"
+        value={value}
+        maxLength={MAX_INFO_BANNER_LENGTH}
+        disabled={saving}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          if (error) setError(null);
+        }}
+        onBlur={() => {
+          if (dirty) void save();
+        }}
+        placeholder="Hinweis für das Dashboard…"
+        aria-label="Text des Info-Banners"
+      />
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {value.length}/{MAX_INFO_BANNER_LENGTH}
+        </span>
+        <Button type="button" variant="secondary" size="sm" disabled={saving || !dirty} onClick={() => void save()}>
+          {saving ? "…" : "Speichern"}
+        </Button>
+      </div>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </SettingsSection>
   );
 }
 

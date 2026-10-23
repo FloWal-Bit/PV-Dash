@@ -48,7 +48,7 @@ export function KpiGrid({
         simulated={!hideGrid && gridSimulated}
       />
       <StatCard
-        label="Stand Stromkonto"
+        label="Stromkonto Total"
         value={
           hideGrid || snapshot.stromkontoBalanceKwh == null
             ? "–"
