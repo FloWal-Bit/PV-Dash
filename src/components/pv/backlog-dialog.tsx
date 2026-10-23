@@ -74,6 +74,7 @@ export function BacklogDialog({
         </div>
 
         <div className="flex max-h-[min(70dvh,36rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
+          <InfoBannerEditor />
           <SettingsSection
             icon={<ListTodo className="size-4" />}
             iconClassName="bg-chart-1/12 text-chart-1"
@@ -160,7 +161,6 @@ export function BacklogDialog({
           </SettingsSection>
 
           <DeveloperPlantSettings />
-          <InfoBannerEditor />
           <HideSimulatedToggle />
           {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
         </div>

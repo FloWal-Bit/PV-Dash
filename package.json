@@ -1,6 +1,6 @@
 {
   "name": "pv-dash",
-  "version": "1.5.4.6",
+  "version": "1.5.5",
   "private": true,
   "scripts": {
     "dev": "next dev --port 47823",
