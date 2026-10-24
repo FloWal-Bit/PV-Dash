@@ -1,4 +1,16 @@
+import { isInstalledApp, isIosBrowser } from "@/lib/install-prompt";
+
 const STORAGE_KEY = "pv-dash:hide-status-bar";
+
+/**
+ * iOS/iPadOS Safari zeigt beim Eintritt in die Fullscreen-API den Systemtoast
+ * «zum Beenden des Vollbildmodus: von oben ziehen». Installierte Home-Bildschirm-
+ * Apps (navigator.standalone bzw. display-mode standalone/fullscreen) haben die
+ * Browserleiste bereits ausgeblendet. Dort die API nicht aufrufen.
+ */
+export function mustNotRequestDocumentFullscreen(): boolean {
+  return isIosBrowser() || isInstalledApp();
+}
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -37,7 +49,7 @@ export const hideStatusBarStore = {
   },
 };
 
-/** Blendet die System-Statusleiste aus, sofern der Browser den Vollbildmodus erlaubt. */
+/** Blendet die System-Statusleiste aus, sofern das ohne den iOS-Vollbild-Toast geht. */
 export async function setHideStatusBar(hide: boolean): Promise<boolean> {
   if (typeof document === "undefined") return false;
   if (!hide) {
@@ -45,6 +57,10 @@ export async function setHideStatusBar(hide: boolean): Promise<boolean> {
     if (document.fullscreenElement) {
       await document.exitFullscreen();
     }
+    return true;
+  }
+  if (mustNotRequestDocumentFullscreen()) {
+    writeHideStatusBar(true);
     return true;
   }
   if (typeof document.documentElement.requestFullscreen !== "function") {
