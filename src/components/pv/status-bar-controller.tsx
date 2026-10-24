@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { readHideStatusBar } from "@/lib/status-bar";
+import { readHideStatusBar, requestDocumentFullscreen } from "@/lib/status-bar";
 
 /**
- * Startet im Vollbild. Installierte Apps öffnen darüber bereits ohne
- * Browserleiste. Ein normaler Tab darf den Vollbildmodus erst nach einem
- * Tipp betreten, deshalb beim ersten Zeigerkontakt. Wer ihn selbst verlässt,
- * bleibt für diese Sitzung im Fenster.
+ * Startet im Vollbild, ausser auf Android: Chrome zeigt dort einen
+ * Systemhinweis, sobald die Seite die Fullscreen-API aufruft. Installierte
+ * Apps blenden die Browserleiste über das Manifest aus. Ein normaler Tab darf
+ * den Vollbildmodus erst nach einem Tipp betreten, deshalb beim ersten
+ * Zeigerkontakt. Wer ihn selbst verlässt, bleibt für diese Sitzung im Fenster.
  */
 export function StatusBarController() {
   useEffect(() => {
@@ -16,8 +17,7 @@ export function StatusBarController() {
 
     const enter = () => {
       if (userLeft || !readHideStatusBar() || document.fullscreenElement) return;
-      if (typeof document.documentElement.requestFullscreen !== "function") return;
-      document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+      void requestDocumentFullscreen().catch(() => {});
     };
 
     const onChange = () => {

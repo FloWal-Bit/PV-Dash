@@ -1,5 +1,27 @@
 const STORAGE_KEY = "pv-dash:hide-status-bar";
 
+type ChromeClientHints = {
+  platform?: string;
+  brands?: { brand: string }[];
+};
+
+/**
+ * Android, including Chrome. Matches an Android user agent, or Chrome when its
+ * client hints report platform Android (reduced UA strings omit the token).
+ * Desktop Chrome does not match and may still use the Fullscreen API.
+ */
+export function isAndroidClient(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const userAgent = navigator.userAgent ?? "";
+  const hints = (navigator as Navigator & { userAgentData?: ChromeClientHints }).userAgentData;
+  const platform = hints?.platform ?? "";
+  const brands = hints?.brands?.map((brand) => brand.brand).join(" ") ?? "";
+  const androidUserAgent = /Android/i.test(userAgent);
+  const chrome = /Chrome|Chromium/i.test(userAgent) || /Chrome|Chromium/i.test(brands);
+  const chromeOnAndroid = chrome && /Android/i.test(platform);
+  return androidUserAgent || chromeOnAndroid;
+}
+
 type Listener = () => void;
 const listeners = new Set<Listener>();
 let snapshot = true;
@@ -37,6 +59,21 @@ export const hideStatusBarStore = {
   },
 };
 
+/**
+ * Requests document fullscreen. Chrome on Android shows the system hint
+ * "zum Beenden des Vollbildmodus: von oben ziehen" for this API, and CSS
+ * cannot hide it, so Android returns false before requestFullscreen or
+ * webkitRequestFullscreen. The installed PWA display mode is unchanged.
+ */
+export async function requestDocumentFullscreen(): Promise<boolean> {
+  if (typeof document === "undefined") return false;
+  if (isAndroidClient()) return false;
+  const root = document.documentElement;
+  if (typeof root.requestFullscreen !== "function") return false;
+  await root.requestFullscreen({ navigationUI: "hide" });
+  return true;
+}
+
 /** Blendet die System-Statusleiste aus, sofern der Browser den Vollbildmodus erlaubt. */
 export async function setHideStatusBar(hide: boolean): Promise<boolean> {
   if (typeof document === "undefined") return false;
@@ -47,11 +84,13 @@ export async function setHideStatusBar(hide: boolean): Promise<boolean> {
     }
     return true;
   }
-  if (typeof document.documentElement.requestFullscreen !== "function") {
-    return false;
+  if (isAndroidClient()) {
+    writeHideStatusBar(true);
+    return true;
   }
   try {
-    await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+    const entered = await requestDocumentFullscreen();
+    if (!entered) return false;
     writeHideStatusBar(true);
     return true;
   } catch {
