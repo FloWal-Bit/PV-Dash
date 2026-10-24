@@ -538,6 +538,75 @@ function ForecastField({
   );
 }
 
+/** Push-Benachrichtigungen, nur in den Dev-Einstellungen. */
+export function PushNotificationSettings() {
+  const { enabled, permission } = useSyncExternalStore(
+    notificationSettingsStore.subscribe,
+    notificationSettingsStore.getSnapshot,
+    notificationSettingsStore.getServerSnapshot,
+  );
+  const [pending, setPending] = useState(false);
+
+  async function handleToggle(checked: boolean) {
+    if (!checked) {
+      notificationSettingsStore.disable();
+      return;
+    }
+    setPending(true);
+    await notificationSettingsStore.enable();
+    setPending(false);
+  }
+
+  const isUnsupported = permission === "unsupported";
+  const isDenied = permission === "denied";
+
+  return (
+    <SettingsSection
+      icon={<Bell className="size-4" />}
+      iconClassName="bg-muted text-foreground/70"
+      title="Benachrichtigungen"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Label htmlFor="push-notifications">Push-Benachrichtigungen</Label>
+          <span className="text-xs leading-relaxed text-muted-foreground">
+            Meldung, sobald die Anlage heute mehr als{" "}
+            {formatYieldKwh(YIELD_NOTIFICATION_THRESHOLD_KWH, 0)} erzeugt hat.
+          </span>
+        </div>
+        <Switch
+          id="push-notifications"
+          checked={enabled}
+          disabled={pending || isUnsupported}
+          onCheckedChange={handleToggle}
+          className="data-checked:bg-chart-3"
+        />
+      </div>
+
+      {isUnsupported ? (
+        <p className="text-xs text-muted-foreground">
+          Push-Benachrichtigungen werden in diesem Browser nicht unterstützt.
+        </p>
+      ) : isDenied ? (
+        <p className="text-xs text-destructive">
+          Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den
+          Browser-/Geräteeinstellungen, um sie hier zu aktivieren.
+        </p>
+      ) : null}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!enabled}
+        onClick={() => sendTestNotification()}
+      >
+        Testbenachrichtigung senden
+      </Button>
+    </SettingsSection>
+  );
+}
+
 /** Standort und Stromkonto, nur im versteckten Entwicklerbereich. */
 export function DeveloperPlantSettings() {
   const { location, isCustom } = useSyncExternalStore(
@@ -560,30 +629,11 @@ export function DeveloperPlantSettings() {
 }
 
 /**
- * Einstellungen-Dialog: Anzeige und Benachrichtigungen.
- * Standort und Stromkonto liegen im Entwicklerbereich (fünfmal auf «PV Dash» tippen).
+ * Einstellungen-Dialog: Anzeige und Home-Bildschirm.
+ * Standort, Stromkonto und Push-Benachrichtigungen liegen im Entwicklerbereich
+ * (fünfmal auf «PV Dash» tippen).
  */
 export function SettingsDialog() {
-  const { enabled, permission } = useSyncExternalStore(
-    notificationSettingsStore.subscribe,
-    notificationSettingsStore.getSnapshot,
-    notificationSettingsStore.getServerSnapshot,
-  );
-  const [pending, setPending] = useState(false);
-
-  async function handleToggle(checked: boolean) {
-    if (!checked) {
-      notificationSettingsStore.disable();
-      return;
-    }
-    setPending(true);
-    await notificationSettingsStore.enable();
-    setPending(false);
-  }
-
-  const isUnsupported = permission === "unsupported";
-  const isDenied = permission === "denied";
-
   return (
     <Dialog>
       <DialogTrigger
@@ -639,50 +689,6 @@ export function SettingsDialog() {
             title="Home-Bildschirm"
           >
             <HomeScreenSetting />
-          </SettingsSection>
-
-          <SettingsSection
-            icon={<Bell className="size-4" />}
-            iconClassName="bg-muted text-foreground/70"
-            title="Benachrichtigungen"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <Label htmlFor="push-notifications">Push-Benachrichtigungen</Label>
-                <span className="text-xs leading-relaxed text-muted-foreground">
-                  Meldung, sobald die Anlage heute mehr als{" "}
-                  {formatYieldKwh(YIELD_NOTIFICATION_THRESHOLD_KWH, 0)} erzeugt hat.
-                </span>
-              </div>
-              <Switch
-                id="push-notifications"
-                checked={enabled}
-                disabled={pending || isUnsupported}
-                onCheckedChange={handleToggle}
-                className="data-checked:bg-chart-3"
-              />
-            </div>
-
-            {isUnsupported ? (
-              <p className="text-xs text-muted-foreground">
-                Push-Benachrichtigungen werden in diesem Browser nicht unterstützt.
-              </p>
-            ) : isDenied ? (
-              <p className="text-xs text-destructive">
-                Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den
-                Browser-/Geräteeinstellungen, um sie hier zu aktivieren.
-              </p>
-            ) : null}
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!enabled}
-              onClick={() => sendTestNotification()}
-            >
-              Testbenachrichtigung senden
-            </Button>
           </SettingsSection>
 
           <SettingsSection
