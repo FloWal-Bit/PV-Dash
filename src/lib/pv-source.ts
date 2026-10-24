@@ -45,6 +45,7 @@ import {
 } from "@/lib/open-meteo-yield/service";
 import { applyWhatWattHourConsumption } from "@/lib/whatwatt/hour-samples";
 import { getLatestWhatWattMeterTotals, getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
+import { applyWhatWattLivePower, livePowerRates } from "@/lib/whatwatt-live-power";
 
 export type PvHistory = {
   today: HistoryPoint[];
@@ -63,11 +64,6 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Verbrauch aus Erzeugung + Netzleistung (positiv = Bezug, negativ = Einspeisung). */
-function consumptionFromEnergyBalance(productionKw: number, gridKw: number): number {
-  return round(Math.max(0, productionKw + gridKw));
-}
-
 /**
  * Tagesverbrauch aus dem whatwatt-Zähler: Ertrag minus Stromkonto heute.
  * Stromkonto ist Einspeisung minus Bezug, also Verbrauch = Ertrag + Bezug − Einspeisung.
@@ -76,21 +72,13 @@ function consumptionKwhFromStromkonto(yieldKwh: number, stromkontoChangeTodayKwh
   return round(Math.max(0, yieldKwh - stromkontoChangeTodayKwh));
 }
 
-function consumptionMetrics(productionKw: number, consumptionKw: number) {
-  const selfConsumptionRate =
-    productionKw > 0.05
-      ? Math.min(100, Math.round((Math.min(productionKw, consumptionKw) / productionKw) * 100))
-      : 0;
-  const autarkyRate =
-    consumptionKw > 0.05
-      ? Math.min(100, Math.round((Math.min(productionKw, consumptionKw) / consumptionKw) * 100))
-      : 0;
-  return { selfConsumptionRate, autarkyRate };
-}
-
 export type LiveDashboardPayload = {
   source: DataSource;
-  /** Ist ein whatwatt Go konfiguriert und erreichbar, überschreibt es die Netzwerte der Hauptquelle. */
+  /**
+   * Ist ein whatwatt Go konfiguriert und erreichbar, bleiben Netzleistung und
+   * Stromkonto seine Messung. Die angezeigte PV-Leistung wird nur angehoben,
+   * wenn die Hauptquelle unter der Einspeisung liegt.
+   */
   gridSource: GridSource;
   snapshot: PvSnapshot;
   /** Prognostizierter Tagesertrag (kWh), Open-Meteo GTI × kWp × PR für heute. */
@@ -123,12 +111,11 @@ function simulateHistory(now = new Date()): PvHistory {
 }
 
 /**
- * Überschreibt Netzbezug/-einspeisung im Snapshot mit den Live-Messwerten
- * eines lokalen whatwatt Go, falls konfiguriert und erreichbar. whatwatt Go
- * misst direkt am Netzanschluss (Smart-Meter-Adapter) und liefert damit
- * meist genauere Netzwerte als die PV-Anlage selbst – ist es nicht
- * konfiguriert oder gerade nicht erreichbar, bleiben die Netzwerte der
- * Hauptquelle (FusionSolar/Simulation) unverändert.
+ * Legt die whatwatt-Messung über den Snapshot, falls konfiguriert und
+ * erreichbar. Die Netzleistung des Zählers bleibt unverändert. Liegt die
+ * PV-Quelle unter der Einspeisung, führt whatwatt auch die angezeigte
+ * Erzeugung, damit PV, Verbrauch und Stromkonto zusammenpassen. Ohne
+ * whatwatt bleiben die Werte der Hauptquelle unverändert.
  */
 async function overlayWhatWattGrid(
   snapshot: PvSnapshot,
@@ -139,16 +126,17 @@ async function overlayWhatWattGrid(
 
   try {
     const grid = await getWhatWattGridSnapshot();
-    const consumptionKw = consumptionFromEnergyBalance(snapshot.productionKw, grid.gridKw);
-    const { selfConsumptionRate, autarkyRate } = consumptionMetrics(
-      snapshot.productionKw,
-      consumptionKw,
+    const live = applyWhatWattLivePower(snapshot.productionKw, grid.gridKw);
+    const { selfConsumptionRate, autarkyRate } = livePowerRates(
+      live.productionKw,
+      live.consumptionKw,
     );
     return {
       snapshot: {
         ...snapshot,
+        productionKw: live.productionKw,
         gridKw: grid.gridKw,
-        consumptionKw,
+        consumptionKw: live.consumptionKw,
         selfConsumptionRate,
         autarkyRate,
         gridImportTodayKwh: grid.gridImportTodayKwh,
@@ -178,7 +166,11 @@ async function rememberDevRateLimit(err: unknown): Promise<void> {
   await noteFusionSolarDevCooldown();
 }
 
-/** Momentanwerte für Energiefluss, Kennzahlen und Prognose. Ohne Verlaufsreihen. */
+/**
+ * Momentanwerte für Energiefluss, Kennzahlen und Prognose. Ohne Verlaufsreihen.
+ * Die Live-kW kommen aus einem Snapshot: `overlayWhatWattGrid` richtet PV,
+ * Verbrauch und Stromkonto auf die whatwatt-Messung aus.
+ */
 export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
   const base = await (async (): Promise<{ source: DataSource; snapshot: PvSnapshot; warning: string | null }> => {
     if (!isFusionSolarConfigured()) {
