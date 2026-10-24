@@ -20,6 +20,14 @@ export function formatKw(value: number, fractionDigits = 1): string {
   return `${formatSwissNumber(value, fractionDigits)} kW`;
 }
 
+/**
+ * Nachkommastellen einer einzelnen kW-Zahl: ab zwei Stellen vor dem Komma
+ * nur eine Nachkommastelle, sonst zwei.
+ */
+export function kwFractionDigits(value: number): number {
+  return Math.trunc(Math.abs(value)).toString().length >= 2 ? 1 : 2;
+}
+
 /** z. B. +1'234.5 oder -12.3 (ohne Einheit). */
 export function formatSignedSwissNumber(value: number, fractionDigits = 1): string {
   if (value > 0) return `+${formatSwissNumber(value, fractionDigits)}`;
