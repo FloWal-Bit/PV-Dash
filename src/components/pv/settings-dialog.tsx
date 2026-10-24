@@ -64,10 +64,12 @@ function StatusBarSwitch() {
 
 function HomeScreenSetting() {
   const [installed, setInstalled] = useState(false);
+  const [ready, setReady] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
     setInstalled(isInstalledApp());
+    setReady(true);
     if (isIosBrowser()) setHint(homeScreenHint());
   }, []);
 
@@ -81,24 +83,24 @@ function HomeScreenSetting() {
     setHint(homeScreenHint());
   }
 
-  if (installed) {
-    return (
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        PV Dash läuft auf diesem Gerät bereits als App.
-      </p>
-    );
-  }
+  if (!ready || installed) return null;
 
   return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Legt PV Dash auf den Home-Bildschirm. Danach startet es ohne Browserleiste.
-      </p>
-      <Button type="button" variant="outline" size="sm" onClick={() => void handleInstall()}>
-        Als App installieren
-      </Button>
-      {hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
-    </div>
+    <SettingsSection
+      icon={<Smartphone className="size-4" />}
+      iconClassName="bg-muted text-foreground/70"
+      title="App installieren"
+    >
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Installiert PV Dash auf dem Smartphone. Danach startet PV Dash ohne Browserleiste.
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={() => void handleInstall()}>
+          Als App installieren
+        </Button>
+        {hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
+      </div>
+    </SettingsSection>
   );
 }
 
@@ -629,7 +631,7 @@ export function DeveloperPlantSettings() {
 }
 
 /**
- * Einstellungen-Dialog: Anzeige und Home-Bildschirm.
+ * Einstellungen-Dialog: Anzeige und App installieren.
  * Standort, Stromkonto und Push-Benachrichtigungen liegen im Entwicklerbereich
  * (fünfmal auf «PV Dash» tippen).
  */
@@ -683,13 +685,7 @@ export function SettingsDialog() {
             </div>
           </SettingsSection>
 
-          <SettingsSection
-            icon={<Smartphone className="size-4" />}
-            iconClassName="bg-muted text-foreground/70"
-            title="Home-Bildschirm"
-          >
-            <HomeScreenSetting />
-          </SettingsSection>
+          <HomeScreenSetting />
 
           <SettingsSection
             icon={<Info className="size-4" />}
