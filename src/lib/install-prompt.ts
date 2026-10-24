@@ -39,6 +39,12 @@ export function isIosBrowser(): boolean {
   return iPhone || iPadOs;
 }
 
+/** Chrome auf Android zeigt beim Fullscreen-API-Eintritt den Systemtoast mit dem Hostnamen. */
+export function isAndroidBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  return /Android/i.test(window.navigator.userAgent);
+}
+
 export function homeScreenHint(): string {
   if (isIosBrowser()) {
     return "Tippe auf Teilen und dann auf „Zum Home-Bildschirm“.";
