@@ -95,7 +95,7 @@ function HomeScreenSetting() {
         Legt PV Dash auf den Home-Bildschirm. Danach startet es ohne Browserleiste.
       </p>
       <Button type="button" variant="outline" size="sm" onClick={() => void handleInstall()}>
-        Als App speichern
+        Als App installieren
       </Button>
       {hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
     </div>
