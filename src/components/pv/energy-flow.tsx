@@ -10,16 +10,15 @@ import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
-import { formatKw } from "@/lib/format";
+import { formatKw, kwFractionDigits } from "@/lib/format";
 
 /**
- * Hat eine der Leistungszahlen zwei oder mehr Stellen vor dem Komma,
- * zeigen Tab 1 und Tab 2 nur eine Nachkommastelle. Sonst zwei.
+ * Tab 2 (Energiefluss): hat eine der Leistungszahlen zwei oder mehr Stellen
+ * vor dem Komma, zeigen alle Knoten nur eine Nachkommastelle. Sonst zwei.
+ * Die große Stromkonto-Zahl auf Tab 1 richtet sich nur nach dem eigenen Wert.
  */
 function flowKwFractionDigits(values: Array<number | null>): number {
-  const wide = values.some(
-    (value) => value != null && Math.trunc(Math.abs(value)).toString().length >= 2,
-  );
+  const wide = values.some((value) => value != null && kwFractionDigits(value) === 1);
   return wide ? 1 : 2;
 }
 import { cn } from "@/lib/utils";
@@ -502,10 +501,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   const isGridImport = gridMeasured && hasGrid && gridKw > 0.05;
   const isGridExport = gridMeasured && hasGrid && gridKw < -0.05;
   const stromkontoKw = gridMeasured && hasGrid ? Math.abs(gridKw) : null;
+  const stromkontoShownKw = hideGrid || stromkontoKw == null ? null : stromkontoKw;
   const flowDigits = flowKwFractionDigits([
     hidePv ? null : snapshot.productionKw,
     hideConsumption || snapshot.consumptionKw == null ? null : snapshot.consumptionKw,
-    hideGrid || stromkontoKw == null ? null : stromkontoKw,
+    stromkontoShownKw,
   ]);
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
@@ -612,7 +612,9 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   }
 
   const stromkontoValue =
-    hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, flowDigits);
+    stromkontoShownKw == null
+      ? "–"
+      : formatKw(stromkontoShownKw, kwFractionDigits(stromkontoShownKw));
   const stromkontoDirection: StromkontoFlow = hideGrid
     ? "idle"
     : isGridExport
