@@ -4,9 +4,9 @@ import { useEffect } from "react";
 import { mustNotRequestDocumentFullscreen, readHideStatusBar } from "@/lib/status-bar";
 
 /**
- * Startet im Vollbild, wo das ohne den iOS-Systemtoast möglich ist.
- * Installierte Apps sind bereits ohne Browserleiste. iOS/iPadOS ruft die
- * Fullscreen-API nicht auf. Ein normaler Tab darf den Vollbildmodus erst nach
+ * Startet im Vollbild, wo das ohne den Systemtoast möglich ist.
+ * Installierte Apps sind bereits ohne Browserleiste. Android und iOS/iPadOS
+ * rufen die Fullscreen-API nicht auf. Ein normaler Tab darf den Vollbildmodus erst nach
  * einem Tipp betreten, deshalb beim ersten Zeigerkontakt. Wer ihn selbst
  * verlässt, bleibt für diese Sitzung im Fenster.
  */
