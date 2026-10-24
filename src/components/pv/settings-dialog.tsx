@@ -693,8 +693,9 @@ export function SettingsDialog() {
             title="Über PV Dash"
           >
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Entstanden mit Cursor, Koffein und der Musik von Paul Kalkbrenner. Herbst
-              2026.
+              Die Applikation wird in den Schweizer Rechenzentren von Infomaniak mit
+              Hauptsitz in Genf gehostet. Der unabhängige Cloud-Anbieter betreibt seine
+              gesamte Infrastruktur zu 100&nbsp;% mit erneuerbarer Energie.
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
               Anbindung:
@@ -727,9 +728,8 @@ export function SettingsDialog() {
               : Solare Ertragsprognose (GTI, PR 0,78).
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Die Applikation wird in den Schweizer Rechenzentren von Infomaniak mit
-              Hauptsitz in Genf gehostet. Der unabhängige Cloud-Anbieter betreibt seine
-              gesamte Infrastruktur zu 100&nbsp;% mit erneuerbarer Energie.
+              Entstanden mit Cursor, Koffein und der Musik von Paul Kalkbrenner. Herbst
+              2026. Florian Walther.
             </p>
           </SettingsSection>
         </div>
