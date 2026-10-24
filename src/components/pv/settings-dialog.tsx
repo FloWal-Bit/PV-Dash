@@ -32,10 +32,13 @@ import { formatYieldKwh } from "@/lib/format";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import {
+  canPromptInstall,
+  getHomeScreenInstallServerState,
+  getHomeScreenInstallState,
   homeScreenHint,
-  isInstalledApp,
   isIosBrowser,
   promptHomeScreenInstall,
+  subscribeHomeScreenInstall,
 } from "@/lib/install-prompt";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
 import { cn } from "@/lib/utils";
@@ -63,27 +66,27 @@ function StatusBarSwitch() {
 }
 
 function HomeScreenSetting() {
-  const [installed, setInstalled] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [hint, setHint] = useState<string | null>(null);
-
-  useEffect(() => {
-    setInstalled(isInstalledApp());
-    setReady(true);
-    if (isIosBrowser()) setHint(homeScreenHint());
-  }, []);
+  const { installed, canInstall, ios } = useSyncExternalStore(
+    subscribeHomeScreenInstall,
+    getHomeScreenInstallState,
+    getHomeScreenInstallServerState,
+  );
+  const [accepted, setAccepted] = useState(false);
+  const [manualHint, setManualHint] = useState<string | null>(null);
 
   async function handleInstall() {
     const outcome = await promptHomeScreenInstall();
     if (outcome === "accepted") {
-      setInstalled(true);
-      setHint(null);
+      setAccepted(true);
       return;
     }
-    setHint(homeScreenHint());
+    if (!isIosBrowser() && !canPromptInstall()) setManualHint(homeScreenHint());
   }
 
-  if (!ready || installed) return null;
+  if (installed || accepted) return null;
+
+  const showButton = canInstall || !ios;
+  const hint = canInstall ? null : ios ? homeScreenHint() : manualHint;
 
   return (
     <SettingsSection
@@ -95,9 +98,11 @@ function HomeScreenSetting() {
         <p className="text-xs leading-relaxed text-muted-foreground">
           Installiert PV Dash auf dem Smartphone oder Tablet. Danach startet PV Dash ohne Browserleiste.
         </p>
-        <Button type="button" variant="outline" size="sm" onClick={() => void handleInstall()}>
-          Als App installieren
-        </Button>
+        {showButton ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => void handleInstall()}>
+            Als App installieren
+          </Button>
+        ) : null}
         {hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
       </div>
     </SettingsSection>

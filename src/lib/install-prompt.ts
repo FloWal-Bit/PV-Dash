@@ -17,6 +17,70 @@ export function subscribeInstallPrompt(onChange: () => void): () => void {
   return () => window.removeEventListener(INSTALL_EVENT, onChange);
 }
 
+export type HomeScreenInstallState = {
+  installed: boolean;
+  /** Browser hat `beforeinstallprompt` geliefert und kann den Dialog selbst öffnen. */
+  canInstall: boolean;
+  ios: boolean;
+};
+
+const SERVER_INSTALL_STATE: HomeScreenInstallState = {
+  installed: false,
+  canInstall: false,
+  ios: false,
+};
+
+let installState = SERVER_INSTALL_STATE;
+const installListeners = new Set<() => void>();
+
+function readHomeScreenInstallState(): HomeScreenInstallState {
+  return {
+    installed: isInstalledApp(),
+    canInstall: canPromptInstall(),
+    ios: isIosBrowser(),
+  };
+}
+
+function publishHomeScreenInstallState(): void {
+  const next = readHomeScreenInstallState();
+  if (
+    next.installed === installState.installed &&
+    next.canInstall === installState.canInstall &&
+    next.ios === installState.ios
+  ) {
+    return;
+  }
+  installState = next;
+  for (const listener of installListeners) listener();
+}
+
+export function subscribeHomeScreenInstall(listener: () => void): () => void {
+  installListeners.add(listener);
+  const unsubscribePrompt = subscribeInstallPrompt(publishHomeScreenInstallState);
+  return () => {
+    installListeners.delete(listener);
+    unsubscribePrompt();
+  };
+}
+
+export function getHomeScreenInstallState(): HomeScreenInstallState {
+  if (typeof window === "undefined") return installState;
+  const next = readHomeScreenInstallState();
+  if (
+    next.installed === installState.installed &&
+    next.canInstall === installState.canInstall &&
+    next.ios === installState.ios
+  ) {
+    return installState;
+  }
+  installState = next;
+  return installState;
+}
+
+export function getHomeScreenInstallServerState(): HomeScreenInstallState {
+  return SERVER_INSTALL_STATE;
+}
+
 export function canPromptInstall(): boolean {
   return typeof window !== "undefined" && window.__pvDashInstall != null;
 }
