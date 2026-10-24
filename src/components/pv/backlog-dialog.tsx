@@ -15,7 +15,11 @@ import { MAX_BACKLOG_TITLE_LENGTH } from "@/lib/backlog-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
 import { MAX_INFO_BANNER_LENGTH, normalizeInfoBanner } from "@/lib/dev-settings-shared";
-import { DeveloperPlantSettings, SettingsSection } from "@/components/pv/settings-dialog";
+import {
+  DeveloperPlantSettings,
+  PushNotificationSettings,
+  SettingsSection,
+} from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
 import { cn } from "@/lib/utils";
 
@@ -160,6 +164,7 @@ export function BacklogDialog({
             )}
           </SettingsSection>
 
+          <PushNotificationSettings />
           <DeveloperPlantSettings />
           <HideSimulatedToggle />
           {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
