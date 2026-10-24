@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import { Check, EyeOff, Info, ListTodo, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { Check, EyeOff, Info, ListTodo, Plus, RefreshCcw, Smartphone, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import {
   SettingsSection,
 } from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
+import { readDeviceId, reportDeviceVisit } from "@/lib/device-visit";
+import type { DeviceLogSummary } from "@/lib/device-log-shared";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
@@ -79,6 +81,7 @@ export function BacklogDialog({
 
         <div className="flex max-h-[min(70dvh,36rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
           <InfoBannerEditor />
+          <DeviceLogSection open={open} />
           <SettingsSection
             icon={<ListTodo className="size-4" />}
             iconClassName="bg-chart-1/12 text-chart-1"
@@ -171,6 +174,120 @@ export function BacklogDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const SEEN_TIME_ZONE = "Europe/Zurich";
+
+function formatSeen(iso: string, now = new Date()): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "unbekannt";
+  const time = date.toLocaleTimeString("de-CH", {
+    timeZone: SEEN_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const day = date.toLocaleDateString("en-CA", { timeZone: SEEN_TIME_ZONE });
+  const today = now.toLocaleDateString("en-CA", { timeZone: SEEN_TIME_ZONE });
+  if (day === today) return `heute, ${time}`;
+  const dateLabel = date.toLocaleDateString("de-CH", {
+    timeZone: SEEN_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  return `${dateLabel}, ${time}`;
+}
+
+function DeviceLogSection({ open }: { open: boolean }) {
+  const [summary, setSummary] = useState<DeviceLogSummary | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      await reportDeviceVisit();
+      if (cancelled) return;
+      const id = readDeviceId();
+      try {
+        const response = await fetch("/api/device-log", { cache: "no-store" });
+        if (!response.ok) throw new Error("Geräte konnten nicht geladen werden.");
+        const data = (await response.json()) as DeviceLogSummary;
+        if (cancelled) return;
+        setDeviceId(id);
+        setSummary(data);
+        setError(null);
+      } catch {
+        if (cancelled) return;
+        setDeviceId(id);
+        setError("Geräte konnten nicht geladen werden.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const count = summary?.count ?? 0;
+
+  return (
+    <SettingsSection
+      icon={<Smartphone className="size-4" />}
+      iconClassName="bg-chart-2/12 text-chart-2"
+      title="Geräte"
+    >
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Zählt, auf wie vielen Geräten PV Dash geöffnet wurde. Derselbe Browser bleibt ein
+        Gerät, auch wenn die Seite mehrmals geladen wird.
+      </p>
+      {summary ? (
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-2xl font-semibold tabular-nums tracking-tight">
+            {count}
+            <span className="ml-2 text-sm font-medium text-muted-foreground">
+              {count === 1 ? "Gerät" : "Geräte"}
+            </span>
+          </p>
+          <p className="text-xs tabular-nums text-muted-foreground">
+            Heute aktiv: {summary.todayCount}
+          </p>
+        </div>
+      ) : error ? null : (
+        <p className="text-sm text-muted-foreground">Geräte werden geladen…</p>
+      )}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {summary && summary.devices.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border/80 px-4 py-6 text-center">
+          <p className="text-sm font-medium">Noch kein Aufruf</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Sobald PV Dash auf einem Gerät geöffnet wird, erscheint es hier.
+          </p>
+        </div>
+      ) : null}
+      {summary && summary.devices.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {summary.devices.map((device) => (
+            <li
+              key={device.id}
+              className="flex flex-col gap-0.5 rounded-2xl border border-border/70 bg-card px-3 py-2.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-sm font-medium">{device.label}</p>
+                {device.id === deviceId ? (
+                  <span className="shrink-0 text-[11px] font-medium text-chart-3">Dieses Gerät</span>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Zuletzt {formatSeen(device.lastSeen)} · {device.hits}{" "}
+                {device.hits === 1 ? "Aufruf" : "Aufrufe"}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </SettingsSection>
   );
 }
 

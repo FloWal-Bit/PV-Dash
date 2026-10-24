@@ -15,6 +15,7 @@ import { siteLocationStore } from "@/lib/site-location";
 import { weatherStore } from "@/lib/weather-store";
 import { checkYieldNotification } from "@/lib/notifications";
 import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
+import { reportDeviceVisit } from "@/lib/device-visit";
 
 export function Dashboard({ plantName }: { plantName: string }) {
   const {
@@ -52,6 +53,10 @@ export function Dashboard({ plantName }: { plantName: string }) {
     !weatherLoading && weatherError ? weatherError : null,
     forecastSolarError,
   ].filter((message): message is string => message != null);
+
+  useEffect(() => {
+    void reportDeviceVisit();
+  }, []);
 
   useEffect(() => {
     void weatherStore.refresh(location);
