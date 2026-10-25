@@ -135,7 +135,7 @@ function HomeScreenSetting() {
     >
       <div className="flex flex-col items-start gap-3">
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Installiert PV Dash auf dem Smartphone oder Tablet. Danach startet PV Dash ohne Browserleiste.
+          Installiert PV Dash auf dem Gerät. Danach startet PV Dash ohne Browserleiste.
         </p>
         {showButton ? (
           <Button type="button" variant="outline" size="sm" onClick={() => void handleInstall()}>
