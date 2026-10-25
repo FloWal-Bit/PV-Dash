@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
 import {
   Home,
   Sun,
@@ -9,6 +9,10 @@ import { InfoPopover } from "@/components/pv/info-popover";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
+import {
+  energyFlowDefaultTabStore,
+  energyFlowDefaultTabToPage,
+} from "@/lib/energy-flow-default-tab";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw, kwFractionDigits } from "@/lib/format";
 
@@ -622,8 +626,18 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       : isGridImport
         ? "out"
         : "idle";
-  const [flowPage, setFlowPage] = useState(0);
+  const defaultTab = useSyncExternalStore(
+    energyFlowDefaultTabStore.subscribe,
+    energyFlowDefaultTabStore.getSnapshot,
+    energyFlowDefaultTabStore.getServerSnapshot,
+  );
+  const defaultPage = energyFlowDefaultTabToPage(defaultTab);
+  const [flowPage, setFlowPage] = useState(defaultPage);
   const flowLabels = ["Stromkonto", "Energiefluss"];
+
+  useEffect(() => {
+    setFlowPage(defaultPage);
+  }, [defaultPage]);
 
   return (
     <div ref={frameRef} className={cn("flex min-w-0 flex-col", className)}>
