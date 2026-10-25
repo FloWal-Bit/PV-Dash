@@ -733,8 +733,7 @@ export function SettingsDialog() {
               : Solare Ertragsprognose (GTI, PR 0,78).
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Entstanden mit Cursor, Koffein und der Musik von Paul Kalkbrenner. Herbst
-              2026. Florian Walther.
+              Florian Walther, Herbst 2026.
             </p>
           </SettingsSection>
         </div>
