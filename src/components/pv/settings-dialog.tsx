@@ -732,7 +732,7 @@ export function SettingsDialog() {
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
               <span className="text-sm font-medium">Startansicht</span>
               <span className="text-xs leading-relaxed text-muted-foreground">
-                Welcher Tab links steht und beim Öffnen zuerst gezeigt wird.
+                Dieser Tab wird in der Kategorie „Energiefluss“ zuerst angezeigt.
               </span>
               <EnergyFlowDefaultTabSetting />
             </div>
