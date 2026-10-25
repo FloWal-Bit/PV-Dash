@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { BatteryFull, Bell, EyeOff, Info, MapPin, Settings2, Smartphone, Zap } from "lucide-react";
+import { BatteryFull, Bell, Check, EyeOff, Info, MapPin, Settings2, Smartphone, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,11 @@ import {
   parseStromkontoBalanceInput,
 } from "@/lib/stromkonto-shared";
 import { formatYieldKwh } from "@/lib/format";
+import {
+  ENERGY_FLOW_DEFAULT_TAB_LABELS,
+  type EnergyFlowDefaultTab,
+  energyFlowDefaultTabStore,
+} from "@/lib/energy-flow-default-tab";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import {
@@ -62,6 +67,40 @@ function StatusBarSwitch() {
       }}
       className="data-checked:bg-chart-3"
     />
+  );
+}
+
+function EnergyFlowDefaultTabSetting() {
+  const tab = useSyncExternalStore(
+    energyFlowDefaultTabStore.subscribe,
+    energyFlowDefaultTabStore.getSnapshot,
+    energyFlowDefaultTabStore.getServerSnapshot,
+  );
+
+  return (
+    <div role="radiogroup" aria-label="Standard-Tab auf Card 2" className="flex flex-col gap-1">
+      {([1, 2] as const).map((option) => {
+        const selected = option === tab;
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-muted",
+              selected && "bg-muted/80",
+            )}
+            onClick={() => energyFlowDefaultTabStore.set(option)}
+          >
+            <span className="min-w-0 flex-1 leading-snug">
+              Tab {option}: {ENERGY_FLOW_DEFAULT_TAB_LABELS[option as EnergyFlowDefaultTab]}
+            </span>
+            {selected ? <Check className="size-4 shrink-0 text-primary" /> : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -687,6 +726,13 @@ export function SettingsDialog() {
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
               <span className="text-sm font-medium">Farbschema</span>
               <ThemeModeSetting />
+            </div>
+            <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
+              <span className="text-sm font-medium">Card 2 Startansicht</span>
+              <span className="text-xs leading-relaxed text-muted-foreground">
+                Welcher Tab beim Öffnen von Stromkonto / Energiefluss zuerst gezeigt wird.
+              </span>
+              <EnergyFlowDefaultTabSetting />
             </div>
           </SettingsSection>
 
