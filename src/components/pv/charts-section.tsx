@@ -223,6 +223,7 @@ function TodayPowerChart({
           label={{ value: "kW", content: YAxisUnit }}
         />
         <Tooltip
+          trigger="click"
           active={tooltipActive}
           cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
           content={(props) => {
@@ -552,6 +553,7 @@ function YieldConsumptionChart({
           label={{ value: unit, content: YAxisUnit }}
         />
         <Tooltip
+          trigger="click"
           active={tooltipActive}
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
           content={(props) => {
@@ -768,7 +770,9 @@ export function ChartsSection({
     verbrauch: true,
     eigenverbrauch: true,
   });
-  const [tooltipDismissed, setTooltipDismissed] = useState(false);
+  /** Detailwerte nur nach Tippen auf eine Säule/Kurve; Swipen der Tabs öffnet sie nicht. */
+  const [tooltipDismissed, setTooltipDismissed] = useState(true);
+  const suppressChartOpenUntil = useRef(0);
   const range = RANGE_ORDER[page] ?? "heute";
   const pvSimulated = isPvSimulated(source);
   const hideSimulated = useSyncExternalStore(
@@ -890,11 +894,10 @@ export function ChartsSection({
           setTooltipDismissed(true);
           return;
         }
-        if (pointerInDiagram(card, event.clientX, event.clientY)) setTooltipDismissed(false);
-      }}
-      onMouseMove={(event) => {
-        if (!tooltipDismissed) return;
-        if (pointerInDiagram(event.currentTarget, event.clientX, event.clientY)) {
+        if (
+          pointerInDiagram(card, event.clientX, event.clientY) &&
+          Date.now() >= suppressChartOpenUntil.current
+        ) {
           setTooltipDismissed(false);
         }
       }}
@@ -918,7 +921,8 @@ export function ChartsSection({
           labels={RANGE_LABELS}
           page={page}
           onPageChange={(next) => {
-            setTooltipDismissed(false);
+            setTooltipDismissed(true);
+            if (next !== page) suppressChartOpenUntil.current = Date.now() + 400;
             setPage(next);
             if (next !== page) pvStore.refreshHistory();
           }}
