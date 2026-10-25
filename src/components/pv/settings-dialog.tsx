@@ -78,7 +78,7 @@ function EnergyFlowDefaultTabSetting() {
   );
 
   return (
-    <div role="radiogroup" aria-label="Standard-Tab auf Card 2" className="flex flex-col gap-1">
+    <div role="radiogroup" aria-label="Startansicht" className="flex flex-col gap-1">
       {([1, 2] as const).map((option) => {
         const selected = option === tab;
         return (
