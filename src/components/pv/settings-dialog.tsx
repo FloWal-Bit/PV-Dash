@@ -732,7 +732,7 @@ export function SettingsDialog() {
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
               <span className="text-sm font-medium">Startansicht</span>
               <span className="text-xs leading-relaxed text-muted-foreground">
-                Welcher Tab beim Öffnen von Stromkonto / Energiefluss zuerst gezeigt wird.
+                Welcher Tab links steht und beim Öffnen zuerst gezeigt wird.
               </span>
               <EnergyFlowDefaultTabSetting />
             </div>

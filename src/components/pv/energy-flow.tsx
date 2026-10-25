@@ -9,10 +9,7 @@ import { InfoPopover } from "@/components/pv/info-popover";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
-import {
-  energyFlowDefaultTabStore,
-  energyFlowDefaultTabToPage,
-} from "@/lib/energy-flow-default-tab";
+import { energyFlowDefaultTabStore } from "@/lib/energy-flow-default-tab";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw, kwFractionDigits } from "@/lib/format";
 
@@ -631,34 +628,31 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
     energyFlowDefaultTabStore.getSnapshot,
     energyFlowDefaultTabStore.getServerSnapshot,
   );
-  const defaultPage = energyFlowDefaultTabToPage(defaultTab);
-  const [flowPage, setFlowPage] = useState(defaultPage);
-  const flowLabels = ["Stromkonto", "Energiefluss"];
+  /** Startansicht steht links (Seite 0); die andere Ansicht folgt als zweiter Swipe. */
+  const stromkontoFirst = defaultTab === 1;
+  const flowLabels = stromkontoFirst
+    ? (["Stromkonto", "Energiefluss"] as const)
+    : (["Energiefluss", "Stromkonto"] as const);
+  const [flowPage, setFlowPage] = useState(0);
+  const showingStromkonto =
+    flowLabels[flowPage] === "Stromkonto";
 
   useEffect(() => {
-    setFlowPage(defaultPage);
-  }, [defaultPage]);
+    setFlowPage(0);
+  }, [defaultTab]);
 
-  return (
-    <div ref={frameRef} className={cn("flex min-w-0 flex-col", className)}>
-    <SwipeCarousel
-      labels={flowLabels}
-      page={flowPage}
-      onPageChange={setFlowPage}
-      stretch
-      fillHeight
-      framed
-      header={<EnergyFlowTitle showInfo={flowPage === 0} />}
-      className="energy-flow-carousel min-h-0 min-w-0 flex-1"
-    >
-      <StromkontoFocus
-        value={stromkontoValue}
-        accent={stromkontoAccent}
-        muted={hideGrid || (!isGridImport && !isGridExport)}
-        simulated={!hideGrid && gridSimulated}
-        direction={stromkontoDirection}
-      />
-      <Card className="flex h-full flex-1 flex-col rounded-2xl shadow-none ring-0">
+  const stromkontoSlide = (
+    <StromkontoFocus
+      value={stromkontoValue}
+      accent={stromkontoAccent}
+      muted={hideGrid || (!isGridImport && !isGridExport)}
+      simulated={!hideGrid && gridSimulated}
+      direction={stromkontoDirection}
+    />
+  );
+
+  const energieflussSlide = (
+    <Card className="flex h-full flex-1 flex-col rounded-2xl shadow-none ring-0">
       <div aria-hidden inert className="invisible">
         <EnergyFlowTitle />
       </div>
@@ -742,6 +736,22 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
         </div>
       </CardContent>
     </Card>
+  );
+
+  return (
+    <div ref={frameRef} className={cn("flex min-w-0 flex-col", className)}>
+    <SwipeCarousel
+      labels={[...flowLabels]}
+      page={flowPage}
+      onPageChange={setFlowPage}
+      stretch
+      fillHeight
+      framed
+      header={<EnergyFlowTitle showInfo={showingStromkonto} />}
+      className="energy-flow-carousel min-h-0 min-w-0 flex-1"
+    >
+      {stromkontoFirst ? stromkontoSlide : energieflussSlide}
+      {stromkontoFirst ? energieflussSlide : stromkontoSlide}
     </SwipeCarousel>
     </div>
   );
