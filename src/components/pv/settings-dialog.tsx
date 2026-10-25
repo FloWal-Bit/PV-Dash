@@ -696,9 +696,9 @@ export function SettingsDialog() {
       </DialogTrigger>
       <DialogContent className="max-h-[90dvh] gap-0 overflow-hidden p-0 sm:max-w-md">
         <div className="border-b border-border/70 bg-muted/40 px-5 py-4">
-          <DialogHeader className="gap-1.5">
+          <DialogHeader className="gap-0">
             <DialogTitle className="text-lg">Einstellungen</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               Anzeige und Benachrichtigungen für {APP_NAME}.
             </DialogDescription>
           </DialogHeader>
