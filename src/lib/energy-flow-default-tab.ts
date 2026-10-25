@@ -33,10 +33,6 @@ function emit() {
   for (const listener of listeners) listener();
 }
 
-export function energyFlowDefaultTabToPage(tab: EnergyFlowDefaultTab): number {
-  return tab - 1;
-}
-
 export const energyFlowDefaultTabStore = {
   subscribe(listener: Listener): () => void {
     if (typeof window !== "undefined") {
