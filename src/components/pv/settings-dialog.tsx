@@ -705,6 +705,8 @@ export function SettingsDialog() {
         </div>
 
         <div className="flex max-h-[min(70dvh,36rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
+          <HomeScreenSetting />
+
           <SettingsSection
             icon={<EyeOff className="size-4" />}
             iconClassName="bg-muted text-foreground/70"
@@ -735,8 +737,6 @@ export function SettingsDialog() {
               <EnergyFlowDefaultTabSetting />
             </div>
           </SettingsSection>
-
-          <HomeScreenSetting />
 
           <SettingsSection
             icon={<Info className="size-4" />}
