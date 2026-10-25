@@ -902,7 +902,7 @@ export function ChartsSection({
       <CardHeader className="-mt-(--card-spacing) pt-(--card-spacing)">
         <div className="flex flex-col gap-1">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Ertrag, Verbrauch, Stromkonto
+            Ertrag / Verbrauch / Stromkonto
           </CardTitle>
           <span className="text-xs text-muted-foreground">
             {hidePv ? (
