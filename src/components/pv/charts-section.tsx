@@ -686,7 +686,7 @@ function formatRangeTotal(
       consumptionKwh == null ? "–" : formatYieldKwh(consumptionKwh, 1);
     const stromkonto =
       stromkontoChangeTodayKwh == null ? "–" : formatSignedKwh(stromkontoChangeTodayKwh, 1);
-    return `Heute, ${formatYieldKwh(yieldKwh, 1)} / ${consumption} / ${stromkonto}`;
+    return `Heute: ${formatYieldKwh(yieldKwh, 1)} / ${consumption} / ${stromkonto}`;
   }
   const points =
     range === "woche"
@@ -708,7 +708,7 @@ function formatRangeTotal(
   if (range === "lebensdauer") {
     const yieldDigits = mwhFractionDigits(yieldKwh / 1000);
     const consumptionDigits = mwhFractionDigits(consumptionKwh / 1000);
-    return `${label}, ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)} / -`;
+    return `${label}: ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)} / -`;
   }
   const stromkontoKwh = yieldKwh - consumptionKwh;
   if (range === "jahr") {
@@ -716,13 +716,13 @@ function formatRangeTotal(
     const yieldDigits = Math.max(0, mwhFractionDigits(yieldKwh / 1000) - trim);
     const consumptionDigits = Math.max(0, mwhFractionDigits(consumptionKwh / 1000) - trim);
     const stromkontoDigits = Math.max(0, mwhFractionDigits(Math.abs(stromkontoKwh) / 1000) - trim);
-    return `${label}, ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)} / ${formatSignedMwh(stromkontoKwh, stromkontoDigits)}`;
+    return `${label}: ${formatYieldMwh(yieldKwh, yieldDigits)} / ${formatYieldMwh(consumptionKwh, consumptionDigits)} / ${formatSignedMwh(stromkontoKwh, stromkontoDigits)}`;
   }
-  return `${label}, ${formatYieldKwh(yieldKwh, 0)} / ${formatYieldKwh(consumptionKwh, 0)} / ${formatSignedKwh(stromkontoKwh, 0)}`;
+  return `${label}: ${formatYieldKwh(yieldKwh, 0)} / ${formatYieldKwh(consumptionKwh, 0)} / ${formatSignedKwh(stromkontoKwh, 0)}`;
 }
 
 function RangeTotal({ text }: { text: string }) {
-  const splitAt = text.indexOf(", ");
+  const splitAt = text.indexOf(": ");
   if (splitAt === -1) return text;
   return (
     <>
