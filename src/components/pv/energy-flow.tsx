@@ -369,17 +369,23 @@ function StromkontoColorInfo() {
         ))}
       </ul>
       <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
-        Stromkonto. Aktualisierungsrate alle 15 Sekunden.
+        Stromkonto. Aktualisiert alle 15 Sekunden.
       </p>
     </InfoPopover>
   );
 }
 
-function EnergyFlowTitle({ showInfo = false }: { showInfo?: boolean }) {
+function EnergyFlowTitle({
+  title = "Energiefluss",
+  showInfo = false,
+}: {
+  title?: string;
+  showInfo?: boolean;
+}) {
   return (
     <CardHeader className="pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">
-        Energiefluss
+        {title}
       </CardTitle>
       {showInfo ? (
         <CardAction>
@@ -476,7 +482,6 @@ function StromkontoFocus({
               ) : null}
             </span>
           </div>
-          <span className="text-xs font-medium leading-tight text-muted-foreground">Stromkonto</span>
         </div>
       </CardContent>
     </Card>
@@ -747,7 +752,12 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
       stretch
       fillHeight
       framed
-      header={<EnergyFlowTitle showInfo={showingStromkonto} />}
+      header={
+        <EnergyFlowTitle
+          title={showingStromkonto ? "Stromkonto" : "Energiefluss"}
+          showInfo={showingStromkonto}
+        />
+      }
       className="energy-flow-carousel min-h-0 min-w-0 flex-1"
     >
       {stromkontoFirst ? stromkontoSlide : energieflussSlide}
