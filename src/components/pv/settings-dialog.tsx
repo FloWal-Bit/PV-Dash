@@ -94,7 +94,7 @@ function EnergyFlowDefaultTabSetting() {
             onClick={() => energyFlowDefaultTabStore.set(option)}
           >
             <span className="min-w-0 flex-1 leading-snug">
-              Tab {option}: {ENERGY_FLOW_DEFAULT_TAB_LABELS[option as EnergyFlowDefaultTab]}
+              {ENERGY_FLOW_DEFAULT_TAB_LABELS[option as EnergyFlowDefaultTab]}
             </span>
             {selected ? <Check className="size-4 shrink-0 text-primary" /> : null}
           </button>
