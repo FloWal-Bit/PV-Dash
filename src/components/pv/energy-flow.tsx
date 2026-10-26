@@ -369,7 +369,7 @@ function StromkontoColorInfo() {
         ))}
       </ul>
       <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
-        Stromkonto. Aktualisierungsrate alle 15 Sekunden.
+        Stromkonto. Aktualisiert alle 15 Sekunden.
       </p>
     </InfoPopover>
   );
