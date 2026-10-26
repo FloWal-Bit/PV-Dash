@@ -80,8 +80,8 @@ export function BacklogDialog({
         </div>
 
         <div className="flex max-h-[min(70dvh,36rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
-          <InfoBannerEditor />
           <DeviceLogSection open={open} />
+          <InfoBannerEditor />
           <SettingsSection
             icon={<ListTodo className="size-4" />}
             iconClassName="bg-chart-1/12 text-chart-1"
