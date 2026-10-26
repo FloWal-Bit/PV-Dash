@@ -94,7 +94,7 @@ function EnergyFlowDefaultTabSetting() {
             onClick={() => energyFlowDefaultTabStore.set(option)}
           >
             <span className="min-w-0 flex-1 leading-snug">
-              Tab {option}: {ENERGY_FLOW_DEFAULT_TAB_LABELS[option as EnergyFlowDefaultTab]}
+              {ENERGY_FLOW_DEFAULT_TAB_LABELS[option as EnergyFlowDefaultTab]}
             </span>
             {selected ? <Check className="size-4 shrink-0 text-primary" /> : null}
           </button>
@@ -732,7 +732,7 @@ export function SettingsDialog() {
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
               <span className="text-sm font-medium">Startansicht</span>
               <span className="text-xs leading-relaxed text-muted-foreground">
-                Dieser Tab wird in der Kategorie „Energiefluss“ zuerst angezeigt.
+                Dieser Tab wird auf der zweiten Card zuerst angezeigt.
               </span>
               <EnergyFlowDefaultTabSetting />
             </div>
