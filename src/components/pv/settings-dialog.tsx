@@ -732,7 +732,7 @@ export function SettingsDialog() {
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
               <span className="text-sm font-medium">Startansicht</span>
               <span className="text-xs leading-relaxed text-muted-foreground">
-                Dieser Tab wird in der Kategorie „Energiefluss“ zuerst angezeigt.
+                Dieser Tab wird auf der zweiten Card zuerst angezeigt.
               </span>
               <EnergyFlowDefaultTabSetting />
             </div>
