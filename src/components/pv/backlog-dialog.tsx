@@ -246,6 +246,11 @@ function DeviceRow({
       {isCurrent ? (
         <span className="shrink-0 text-[11px] font-medium text-chart-3">Dieses</span>
       ) : null}
+      {device.version ? (
+        <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground">
+          v{device.version}
+        </span>
+      ) : null}
       <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{when}</span>
     </li>
   );

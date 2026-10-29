@@ -1,8 +1,8 @@
 /**
  * Aufrufe von PV Dash, gruppiert nach Gerät.
  * Liegt in .data/device-log.json. Die Kennung entsteht im Browser und
- * bleibt dort; der Server speichert nur diese Kennung, ein grobes Label
- * und die Zeitpunkte.
+ * bleibt dort; der Server speichert nur diese Kennung, ein grobes Label,
+ * die App-Version und die Zeitpunkte.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
@@ -11,6 +11,7 @@ import {
   MAX_TRACKED_DEVICES,
   isDeviceId,
   normalizeDeviceLabel,
+  normalizeDeviceVersion,
   type DeviceLogSummary,
   type DeviceVisit,
 } from "@/lib/device-log-shared";
@@ -51,6 +52,7 @@ function readDevices(): DeviceVisit[] {
     return raw.filter(isDeviceVisit).map((device) => ({
       ...device,
       label: normalizeDeviceLabel(device.label),
+      version: normalizeDeviceVersion(device.version),
     }));
   } catch {
     return [];
@@ -81,7 +83,12 @@ export function getDeviceLog(): DeviceLogSummary {
   return summarizeDeviceLog(readDevices());
 }
 
-export function recordDeviceVisit(id: string, label: string, now = new Date()): DeviceLogSummary {
+export function recordDeviceVisit(
+  id: string,
+  label: string,
+  version = "",
+  now = new Date(),
+): DeviceLogSummary {
   const seenAt = now.toISOString();
   const devices = readDevices();
   const index = devices.findIndex((device) => device.id === id);
@@ -90,6 +97,7 @@ export function recordDeviceVisit(id: string, label: string, now = new Date()): 
     devices[index] = {
       ...current,
       label,
+      version: version || current.version,
       lastSeen: seenAt,
       hits: current.hits + 1,
     };
@@ -97,6 +105,7 @@ export function recordDeviceVisit(id: string, label: string, now = new Date()): 
     devices.push({
       id,
       label,
+      version,
       firstSeen: seenAt,
       lastSeen: seenAt,
       hits: 1,

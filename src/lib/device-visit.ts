@@ -2,6 +2,7 @@
 
 import { isInstalledApp } from "@/lib/install-prompt";
 import { DEVICE_ID_PATTERN } from "@/lib/device-log-shared";
+import { APP_VERSION } from "@/lib/version";
 
 const STORAGE_KEY = "pv-dash:device-id";
 
@@ -36,8 +37,17 @@ function browserName(userAgent: string): string {
   return "Browser";
 }
 
+/** Playwright/Selenium und Headless-Chrome der Cursor-Cloud-Agents. */
+function isCursorAgent(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (navigator.webdriver) return true;
+  return /HeadlessChrome/i.test(navigator.userAgent);
+}
+
 /** Grobes Label für die Dev Settings. Der volle User-Agent wird nicht gespeichert. */
 export function currentDeviceLabel(): string {
+  if (isCursorAgent()) return "Cursor · Agent";
+
   const userAgent = window.navigator.userAgent;
   const iPad =
     /iPad/.test(userAgent) ||
@@ -63,7 +73,7 @@ function sendVisit(): Promise<void> {
     return fetch("/api/device-log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, label }),
+      body: JSON.stringify({ id, label, version: APP_VERSION }),
       keepalive: true,
     }).then(
       () => undefined,
