@@ -776,7 +776,7 @@ export function SettingsDialog() {
               >
                 Open-Meteo
               </a>
-              : Solare Ertragsprognose (GTI, PR 0,78).
+              : Solare Ertragsprognose (GTI, PR 0,77).
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
               Florian Walther, Herbst 2026.
