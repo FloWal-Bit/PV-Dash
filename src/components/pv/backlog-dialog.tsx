@@ -205,29 +205,37 @@ function formatSeenTime(iso: string): string {
   });
 }
 
-function formatSeenOlder(iso: string): string {
+function formatSeenDate(iso: string, withYear: boolean): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "–";
   const day = date.toLocaleDateString("de-CH", {
     timeZone: SEEN_TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
+    ...(withYear ? { year: "numeric" as const } : {}),
   });
   return `${day}, ${formatSeenTime(iso)}`;
 }
 
 function groupDevicesByRecency(devices: DeviceVisit[], now = new Date()) {
   const { today, yesterday } = zurichTodayAndYesterday(now);
+  const thisYear = today.slice(0, 4);
   const todayDevices: DeviceVisit[] = [];
   const yesterdayDevices: DeviceVisit[] = [];
+  const thisYearDevices: DeviceVisit[] = [];
   const olderDevices: DeviceVisit[] = [];
   for (const device of devices) {
     const day = zurichDayKey(device.lastSeen);
+    if (day == null) {
+      olderDevices.push(device);
+      continue;
+    }
     if (day === today) todayDevices.push(device);
     else if (day === yesterday) yesterdayDevices.push(device);
+    else if (day.startsWith(`${thisYear}-`)) thisYearDevices.push(device);
     else olderDevices.push(device);
   }
-  return { todayDevices, yesterdayDevices, olderDevices };
+  return { todayDevices, yesterdayDevices, thisYearDevices, olderDevices };
 }
 
 function DeviceRow({
@@ -282,7 +290,7 @@ function DeviceGroup({
   );
 }
 
-/** Eingeklappte Gerätegruppe (Gestern / Älter). */
+/** Eingeklappte Gerätegruppe (Gestern / In diesem Jahr / Älter). */
 function CollapsibleDeviceGroup({
   label,
   devices,
@@ -370,6 +378,9 @@ function DeviceLogSection({ open }: { open: boolean }) {
             {groups.todayDevices.length} heute
             {" · "}
             {groups.yesterdayDevices.length} gestern
+            {groups.thisYearDevices.length > 0
+              ? ` · ${groups.thisYearDevices.length} dieses Jahr`
+              : null}
             {groups.olderDevices.length > 0
               ? ` · ${groups.olderDevices.length} älter`
               : null}
@@ -388,10 +399,16 @@ function DeviceLogSection({ open }: { open: boolean }) {
             formatWhen={formatSeenTime}
           />
           <CollapsibleDeviceGroup
+            label="In diesem Jahr"
+            devices={groups.thisYearDevices}
+            currentDeviceId={deviceId}
+            formatWhen={(iso) => formatSeenDate(iso, false)}
+          />
+          <CollapsibleDeviceGroup
             label="Älter"
             devices={groups.olderDevices}
             currentDeviceId={deviceId}
-            formatWhen={formatSeenOlder}
+            formatWhen={(iso) => formatSeenDate(iso, true)}
           />
         </div>
       ) : null}
