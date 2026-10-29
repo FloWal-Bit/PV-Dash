@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import { Check, EyeOff, Info, ListTodo, Plus, RefreshCcw, Smartphone, Trash2 } from "lucide-react";
+import { Check, ChevronRight, EyeOff, Info, ListTodo, Plus, RefreshCcw, Smartphone, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,7 @@ import {
 } from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
 import { readDeviceId, reportDeviceVisit } from "@/lib/device-visit";
-import type { DeviceLogSummary } from "@/lib/device-log-shared";
+import type { DeviceLogSummary, DeviceVisit } from "@/lib/device-log-shared";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
@@ -179,24 +179,107 @@ export function BacklogDialog({
 
 const SEEN_TIME_ZONE = "Europe/Zurich";
 
-function formatSeen(iso: string, now = new Date()): string {
+function zurichDayKey(iso: string): string | null {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "unbekannt";
-  const time = date.toLocaleTimeString("de-CH", {
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-CA", { timeZone: SEEN_TIME_ZONE });
+}
+
+/** Kalendertag und Vortag in Europe/Zurich als `YYYY-MM-DD`. */
+function zurichTodayAndYesterday(now = new Date()): { today: string; yesterday: string } {
+  const today = now.toLocaleDateString("en-CA", { timeZone: SEEN_TIME_ZONE });
+  const [year, month, day] = today.split("-").map(Number);
+  const previous = new Date(Date.UTC(year, month - 1, day));
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  const yesterday = previous.toISOString().slice(0, 10);
+  return { today, yesterday };
+}
+
+function formatSeenTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "–";
+  return date.toLocaleTimeString("de-CH", {
     timeZone: SEEN_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
   });
-  const day = date.toLocaleDateString("en-CA", { timeZone: SEEN_TIME_ZONE });
-  const today = now.toLocaleDateString("en-CA", { timeZone: SEEN_TIME_ZONE });
-  if (day === today) return `heute, ${time}`;
-  const dateLabel = date.toLocaleDateString("de-CH", {
+}
+
+function formatSeenOlder(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "–";
+  const day = date.toLocaleDateString("de-CH", {
     timeZone: SEEN_TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
   });
-  return `${dateLabel}, ${time}`;
+  return `${day}, ${formatSeenTime(iso)}`;
+}
+
+function groupDevicesByRecency(devices: DeviceVisit[], now = new Date()) {
+  const { today, yesterday } = zurichTodayAndYesterday(now);
+  const todayDevices: DeviceVisit[] = [];
+  const yesterdayDevices: DeviceVisit[] = [];
+  const olderDevices: DeviceVisit[] = [];
+  for (const device of devices) {
+    const day = zurichDayKey(device.lastSeen);
+    if (day === today) todayDevices.push(device);
+    else if (day === yesterday) yesterdayDevices.push(device);
+    else olderDevices.push(device);
+  }
+  return { todayDevices, yesterdayDevices, olderDevices };
+}
+
+function DeviceRow({
+  device,
+  currentDeviceId,
+  when,
+}: {
+  device: DeviceVisit;
+  currentDeviceId: string | null;
+  when: string;
+}) {
+  const isCurrent = device.id === currentDeviceId;
+  return (
+    <li className="flex items-center gap-2 py-1 text-sm">
+      <p className="min-w-0 flex-1 truncate font-medium">{device.label}</p>
+      {isCurrent ? (
+        <span className="shrink-0 text-[11px] font-medium text-chart-3">Dieses</span>
+      ) : null}
+      <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{when}</span>
+    </li>
+  );
+}
+
+function DeviceGroup({
+  title,
+  devices,
+  currentDeviceId,
+  formatWhen,
+}: {
+  title: string;
+  devices: DeviceVisit[];
+  currentDeviceId: string | null;
+  formatWhen: (iso: string) => string;
+}) {
+  if (devices.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
+      <ul className="flex flex-col">
+        {devices.map((device) => (
+          <DeviceRow
+            key={device.id}
+            device={device}
+            currentDeviceId={currentDeviceId}
+            when={formatWhen(device.lastSeen)}
+          />
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function DeviceLogSection({ open }: { open: boolean }) {
@@ -230,6 +313,7 @@ function DeviceLogSection({ open }: { open: boolean }) {
     };
   }, [open]);
 
+  const groups = summary ? groupDevicesByRecency(summary.devices) : null;
   const count = summary?.count ?? 0;
 
   return (
@@ -238,54 +322,58 @@ function DeviceLogSection({ open }: { open: boolean }) {
       iconClassName="bg-chart-2/12 text-chart-2"
       title="Geräte"
     >
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Zählt, auf wie vielen Geräten PV Dash geöffnet wurde. Derselbe Browser bleibt ein
-        Gerät, auch wenn die Seite mehrmals geladen wird.
-      </p>
-      {summary ? (
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-2xl font-semibold tabular-nums tracking-tight">
-            {count}
-            <span className="ml-2 text-sm font-medium text-muted-foreground">
-              {count === 1 ? "Gerät" : "Geräte"}
-            </span>
-          </p>
-          <p className="text-xs tabular-nums text-muted-foreground">
-            Heute aktiv: {summary.todayCount}
-          </p>
-        </div>
-      ) : error ? null : (
-        <p className="text-sm text-muted-foreground">Geräte werden geladen…</p>
-      )}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      {summary && summary.devices.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border/80 px-4 py-6 text-center">
-          <p className="text-sm font-medium">Noch kein Aufruf</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Sobald PV Dash auf einem Gerät geöffnet wird, erscheint es hier.
-          </p>
-        </div>
+      {!summary && !error ? (
+        <p className="text-xs text-muted-foreground">Geräte werden geladen…</p>
       ) : null}
-      {summary && summary.devices.length > 0 ? (
-        <ul className="flex flex-col gap-2">
-          {summary.devices.map((device) => (
-            <li
-              key={device.id}
-              className="flex flex-col gap-0.5 rounded-2xl border border-border/70 bg-card px-3 py-2.5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="min-w-0 truncate text-sm font-medium">{device.label}</p>
-                {device.id === deviceId ? (
-                  <span className="shrink-0 text-[11px] font-medium text-chart-3">Dieses Gerät</span>
-                ) : null}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Zuletzt {formatSeen(device.lastSeen)} · {device.hits}{" "}
-                {device.hits === 1 ? "Aufruf" : "Aufrufe"}
-              </p>
-            </li>
-          ))}
-        </ul>
+      {summary && count === 0 ? (
+        <p className="text-xs text-muted-foreground">Noch kein Aufruf.</p>
+      ) : null}
+      {summary && groups && count > 0 ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-xs tabular-nums text-muted-foreground">
+            {count} {count === 1 ? "Gerät" : "Geräte"}
+            {" · "}
+            {groups.todayDevices.length} heute
+            {" · "}
+            {groups.yesterdayDevices.length} gestern
+            {groups.olderDevices.length > 0
+              ? ` · ${groups.olderDevices.length} älter`
+              : null}
+          </p>
+
+          <DeviceGroup
+            title="Heute"
+            devices={groups.todayDevices}
+            currentDeviceId={deviceId}
+            formatWhen={formatSeenTime}
+          />
+          <DeviceGroup
+            title="Gestern"
+            devices={groups.yesterdayDevices}
+            currentDeviceId={deviceId}
+            formatWhen={formatSeenTime}
+          />
+
+          {groups.olderDevices.length > 0 ? (
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center gap-1 py-0.5 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+                <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
+                Älter ({groups.olderDevices.length})
+              </summary>
+              <ul className="mt-1 flex flex-col border-t border-border/60 pt-1">
+                {groups.olderDevices.map((device) => (
+                  <DeviceRow
+                    key={device.id}
+                    device={device}
+                    currentDeviceId={deviceId}
+                    when={formatSeenOlder(device.lastSeen)}
+                  />
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
       ) : null}
     </SettingsSection>
   );
