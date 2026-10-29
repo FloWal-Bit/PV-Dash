@@ -124,7 +124,7 @@ export function DashboardHeader({
           ) : null}
           {gridSource === "whatwatt" || gridWarning ? (
             <StatusBadge
-              label="whatwatt Go"
+              label="Stromkonto"
               tone={gridSource === "whatwatt" && !gridWarning ? "green" : "amber"}
               detail={gridSource === "whatwatt" && !gridWarning ? null : gridWarning}
             />
