@@ -282,6 +282,39 @@ function DeviceGroup({
   );
 }
 
+/** Eingeklappte Gerätegruppe (Gestern / Älter). */
+function CollapsibleDeviceGroup({
+  label,
+  devices,
+  currentDeviceId,
+  formatWhen,
+}: {
+  label: string;
+  devices: DeviceVisit[];
+  currentDeviceId: string | null;
+  formatWhen: (iso: string) => string;
+}) {
+  if (devices.length === 0) return null;
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none items-center gap-1 py-0.5 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
+        {label} ({devices.length})
+      </summary>
+      <ul className="mt-1 flex flex-col border-t border-border/60 pt-1">
+        {devices.map((device) => (
+          <DeviceRow
+            key={device.id}
+            device={device}
+            currentDeviceId={currentDeviceId}
+            when={formatWhen(device.lastSeen)}
+          />
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function DeviceLogSection({ open }: { open: boolean }) {
   const [summary, setSummary] = useState<DeviceLogSummary | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -348,31 +381,18 @@ function DeviceLogSection({ open }: { open: boolean }) {
             currentDeviceId={deviceId}
             formatWhen={formatSeenTime}
           />
-          <DeviceGroup
-            title="Gestern"
+          <CollapsibleDeviceGroup
+            label="Gestern"
             devices={groups.yesterdayDevices}
             currentDeviceId={deviceId}
             formatWhen={formatSeenTime}
           />
-
-          {groups.olderDevices.length > 0 ? (
-            <details className="group">
-              <summary className="flex cursor-pointer list-none items-center gap-1 py-0.5 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
-                <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
-                Älter ({groups.olderDevices.length})
-              </summary>
-              <ul className="mt-1 flex flex-col border-t border-border/60 pt-1">
-                {groups.olderDevices.map((device) => (
-                  <DeviceRow
-                    key={device.id}
-                    device={device}
-                    currentDeviceId={deviceId}
-                    when={formatSeenOlder(device.lastSeen)}
-                  />
-                ))}
-              </ul>
-            </details>
-          ) : null}
+          <CollapsibleDeviceGroup
+            label="Älter"
+            devices={groups.olderDevices}
+            currentDeviceId={deviceId}
+            formatWhen={formatSeenOlder}
+          />
         </div>
       ) : null}
     </SettingsSection>
