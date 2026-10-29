@@ -8,6 +8,20 @@ const nextConfig: NextConfig = {
   // without this, the client bundle silently gets 403'd and the app never
   // hydrates (stuck showing the server-rendered skeleton forever).
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  // Icon-URL trägt ?v=APP_VERSION; kurze Revalidierung hilft ohne Query-String.
+  async headers() {
+    return [
+      {
+        source: "/icon.svg",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=3600, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
