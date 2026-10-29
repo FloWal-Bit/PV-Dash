@@ -47,6 +47,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${roboto.variable} ${geistMono.variable} h-full w-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        {/* Query-String am Manifest, damit Browser/PWA bei Versionsbump neu laden. */}
+        <link rel="manifest" href={APP_MANIFEST_SRC} />
+      </head>
       <body className="flex min-h-full w-full min-w-0 flex-col overscroll-none">
         <script
           dangerouslySetInnerHTML={{
