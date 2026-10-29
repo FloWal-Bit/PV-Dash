@@ -1,6 +1,7 @@
 /** Geräte, die PV Dash geöffnet haben. Kein Standort, keine IP, kein User-Agent. */
 
 export const MAX_DEVICE_LABEL_LENGTH = 80;
+export const MAX_DEVICE_VERSION_LENGTH = 32;
 export const MAX_TRACKED_DEVICES = 100;
 
 /** UUID, wie sie `crypto.randomUUID()` erzeugt. */
@@ -9,8 +10,10 @@ export const DEVICE_ID_PATTERN =
 
 export type DeviceVisit = {
   id: string;
-  /** Grobes Gerät, z. B. «iPhone · Safari» oder «Windows · App». */
+  /** Grobes Gerät, z. B. «iPhone · Safari», «Windows · App» oder «Cursor · Agent». */
   label: string;
+  /** Zuletzt gesehene App-Version ohne «v», z. B. «1.5.6». Leer bei Alt-Einträgen. */
+  version: string;
   firstSeen: string;
   lastSeen: string;
   hits: number;
@@ -35,4 +38,15 @@ export function normalizeDeviceLabel(value: unknown): string {
     .trim()
     .slice(0, MAX_DEVICE_LABEL_LENGTH);
   return text.length > 0 ? text : "Unbekanntes Gerät";
+}
+
+export function normalizeDeviceVersion(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const text = value
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .replace(/^v/i, "")
+    .slice(0, MAX_DEVICE_VERSION_LENGTH);
+  if (!/^\d+\.\d+\.\d+[0-9A-Za-z._-]*$/.test(text)) return "";
+  return text;
 }

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDeviceLog, recordDeviceVisit } from "@/lib/device-log";
-import { isDeviceId, normalizeDeviceLabel } from "@/lib/device-log-shared";
+import {
+  isDeviceId,
+  normalizeDeviceLabel,
+  normalizeDeviceVersion,
+} from "@/lib/device-log-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +23,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ungültiger JSON-Body." }, { status: 400 });
   }
 
-  const { id } = body as { id?: unknown };
-  if (!isDeviceId(id)) {
+  const payload = body as { id?: unknown; label?: unknown; version?: unknown };
+  if (!isDeviceId(payload.id)) {
     return NextResponse.json({ error: "Ungültige Gerätekennung." }, { status: 400 });
   }
 
-  const label = normalizeDeviceLabel((body as { label?: unknown }).label);
-  return NextResponse.json(recordDeviceVisit(id, label));
+  const label = normalizeDeviceLabel(payload.label);
+  const version = normalizeDeviceVersion(payload.version);
+  return NextResponse.json(recordDeviceVisit(payload.id, label, version));
 }
