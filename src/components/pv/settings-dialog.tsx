@@ -28,7 +28,7 @@ import {
   DEFAULT_STROMKONTO_BALANCE_KWH,
   parseStromkontoBalanceInput,
 } from "@/lib/stromkonto-shared";
-import { formatYieldKwh } from "@/lib/format";
+import { formatSwissNumber, formatYieldKwh } from "@/lib/format";
 import {
   ENERGY_FLOW_DEFAULT_TAB_LABELS,
   type EnergyFlowDefaultTab,
@@ -674,6 +674,30 @@ export function DeveloperPlantSettings() {
   );
 }
 
+/** Open-Meteo-Zeile mit PR aus den Dev-Einstellungen (Ertragsprognose). */
+function AboutOpenMeteoSource() {
+  const plant = useSyncExternalStore(
+    yieldForecastStore.subscribe,
+    yieldForecastStore.getSnapshot,
+    yieldForecastStore.getServerSnapshot,
+  );
+  const pr = formatSwissNumber(plant.performanceRatio, 2);
+
+  return (
+    <>
+      <a
+        href="https://open-meteo.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2 hover:text-foreground"
+      >
+        Open-Meteo
+      </a>
+      : Solare Ertragsprognose (GTI, PR {pr}).
+    </>
+  );
+}
+
 /**
  * Einstellungen-Dialog: Anzeige und App installieren.
  * Standort, Stromkonto und Push-Benachrichtigungen liegen im Entwicklerbereich
@@ -768,15 +792,7 @@ export function SettingsDialog() {
               </a>
               : Wetterdaten
               <br />
-              <a
-                href="https://open-meteo.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-foreground"
-              >
-                Open-Meteo
-              </a>
-              : Solare Ertragsprognose (GTI, PR 0,78).
+              <AboutOpenMeteoSource />
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
               Florian Walther, Herbst 2026.
