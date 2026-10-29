@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
   // without this, the client bundle silently gets 403'd and the app never
   // hydrates (stuck showing the server-rendered skeleton forever).
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+
+  // Weniger Peak-RAM beim Production-Build auf Infomaniak/Jelastic.
+  // Kein custom `webpack()`-Hook: sonst fällt der Default-Build-Worker weg.
+  productionBrowserSourceMaps: false,
+  enablePrerenderSourceMaps: false,
+  experimental: {
+    cpus: 1,
+    webpackMemoryOptimizations: true,
+    serverSourceMaps: false,
+  },
 };
 
 export default nextConfig;
