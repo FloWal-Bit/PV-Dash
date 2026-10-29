@@ -751,7 +751,7 @@ export function SettingsDialog() {
             <p className="text-xs leading-relaxed text-muted-foreground">
               Anbindung:
               <br />
-              whatwatt via MQTT und HiveMQ als Broker
+              Stromkonto via MQTT und HiveMQ als Broker
               <br />
               FusionSolar via API
             </p>
