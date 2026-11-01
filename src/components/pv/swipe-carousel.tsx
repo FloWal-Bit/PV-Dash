@@ -9,6 +9,7 @@ function useSwipePageNavigation(
   page: number,
   pageCount: number,
   onPageChange?: (page: number) => void,
+  enabled = true,
 ) {
   const touchStartX = useRef<number | null>(null);
 
@@ -21,22 +22,30 @@ function useSwipePageNavigation(
   );
 
   const bindSwipeSurface = {
-    className: "touch-pan-y",
+    className: enabled ? "touch-pan-y" : "touch-none",
     onTouchStart: (e: TouchEvent) => {
+      if (!enabled) {
+        touchStartX.current = null;
+        return;
+      }
       touchStartX.current = e.changedTouches[0]?.clientX ?? 0;
     },
     onTouchEnd: (e: TouchEvent) => {
-      if (touchStartX.current == null) return;
+      if (!enabled || touchStartX.current == null) return;
       const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
       touchStartX.current = null;
       if (delta <= -SWIPE_THRESHOLD_PX) goTo(page + 1);
       else if (delta >= SWIPE_THRESHOLD_PX) goTo(page - 1);
     },
     onPointerDown: (e: PointerEvent) => {
+      if (!enabled) {
+        touchStartX.current = null;
+        return;
+      }
       if (e.pointerType === "mouse") touchStartX.current = e.clientX;
     },
     onPointerUp: (e: PointerEvent) => {
-      if (e.pointerType !== "mouse" || touchStartX.current == null) return;
+      if (!enabled || e.pointerType !== "mouse" || touchStartX.current == null) return;
       const delta = e.clientX - touchStartX.current;
       touchStartX.current = null;
       if (delta <= -SWIPE_THRESHOLD_PX) goTo(page + 1);
@@ -85,14 +94,22 @@ export function SwipePageSurface({
   onPageChange,
   children,
   className,
+  swipeEnabled = true,
 }: {
   labels: string[];
   page: number;
   onPageChange: (page: number) => void;
   children: ReactNode;
   className?: string;
+  /** Aus, solange z. B. das Chart-Overlay offen ist und horizontal gescrollt wird. */
+  swipeEnabled?: boolean;
 }) {
-  const { bindSwipeSurface } = useSwipePageNavigation(page, labels.length, onPageChange);
+  const { bindSwipeSurface } = useSwipePageNavigation(
+    page,
+    labels.length,
+    onPageChange,
+    swipeEnabled,
+  );
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>

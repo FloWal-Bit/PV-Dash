@@ -105,6 +105,24 @@ function pointerClosesPointValues(card: HTMLElement, clientX: number, clientY: n
   return !pointerInDiagram(card, clientX, clientY);
 }
 
+/**
+ * Recharts setzt den Hover-Index nur bei mousemove/touchmove. Nach dem Tippen
+ * einmalig einen Move anstoßen, damit der erste Punkt sofort im Overlay steht.
+ */
+function seedChartHoverAt(card: HTMLElement, clientX: number, clientY: number) {
+  const wrapper = card.querySelector(".recharts-wrapper");
+  if (!(wrapper instanceof HTMLElement)) return;
+  wrapper.dispatchEvent(
+    new MouseEvent("mousemove", {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY,
+      view: window,
+    }),
+  );
+}
+
 /** Einheit über der Y-Skala, links bündig mit der Zeile „Diese Woche“. */
 function YAxisUnit({
   viewBox,
@@ -184,7 +202,8 @@ function TodayPowerChart({
 }: {
   data: TodayChartPoint[];
   series: ChartSeriesVisibility;
-  tooltipActive?: boolean;
+  /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
+  tooltipActive: boolean;
 }) {
   const hourTicks = halfHourTicks().filter((tick) => data.some((point) => point.label === tick));
 
@@ -223,7 +242,7 @@ function TodayPowerChart({
           label={{ value: "kW", content: YAxisUnit }}
         />
         <Tooltip
-          trigger="click"
+          trigger="hover"
           active={tooltipActive}
           cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
           content={(props) => {
@@ -485,7 +504,8 @@ function YieldConsumptionChart({
   /** Laufzeit zeigt keine Stromkonto-Zeile. */
   showStromkonto?: boolean;
   series: ChartSeriesVisibility;
-  tooltipActive?: boolean;
+  /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
+  tooltipActive: boolean;
 }) {
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
@@ -553,7 +573,7 @@ function YieldConsumptionChart({
           label={{ value: unit, content: YAxisUnit }}
         />
         <Tooltip
-          trigger="click"
+          trigger="hover"
           active={tooltipActive}
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
           content={(props) => {
@@ -770,9 +790,13 @@ export function ChartsSection({
     verbrauch: true,
     eigenverbrauch: true,
   });
-  /** Detailwerte nur nach Tippen auf eine Säule/Kurve; Swipen der Tabs öffnet sie nicht. */
+  /**
+   * Detailwerte erst nach Tippen aufs Diagramm. Offen bleiben sie beim
+   * Horizontal-Scrubben (hover-trigger); Tipp ausserhalb oder Tab-Wechsel schliesst.
+   */
   const [tooltipDismissed, setTooltipDismissed] = useState(true);
   const suppressChartOpenUntil = useRef(0);
+  const tooltipOpen = !tooltipDismissed;
   const range = RANGE_ORDER[page] ?? "heute";
   const pvSimulated = isPvSimulated(source);
   const hideSimulated = useSyncExternalStore(
@@ -899,6 +923,7 @@ export function ChartsSection({
           Date.now() >= suppressChartOpenUntil.current
         ) {
           setTooltipDismissed(false);
+          seedChartHoverAt(card, event.clientX, event.clientY);
         }
       }}
     >
@@ -920,6 +945,7 @@ export function ChartsSection({
         <SwipePageSurface
           labels={RANGE_LABELS}
           page={page}
+          swipeEnabled={!tooltipOpen}
           onPageChange={(next) => {
             setTooltipDismissed(true);
             if (next !== page) suppressChartOpenUntil.current = Date.now() + 400;
@@ -932,6 +958,7 @@ export function ChartsSection({
             <div
               className={cn(
                 "yield-chart-plot h-56 min-w-0 landscape:h-64 sm:h-72 transition-opacity",
+                tooltipOpen && "touch-none",
                 !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
               )}
               style={
@@ -949,7 +976,7 @@ export function ChartsSection({
                   Für heute liegen noch keine Ertrags- und Verbrauchsdaten vor.
                 </div>
               ) : range === "heute" ? (
-                <TodayPowerChart data={todayChartData} series={series} tooltipActive={tooltipDismissed ? false : undefined} />
+                <TodayPowerChart data={todayChartData} series={series} tooltipActive={tooltipOpen} />
               ) : (
                 <YieldConsumptionChart
                   data={barData}
@@ -960,7 +987,7 @@ export function ChartsSection({
                   expandMonthNameLabel={range === "jahr"}
                   showStromkonto={range !== "lebensdauer"}
                   series={series}
-                  tooltipActive={tooltipDismissed ? false : undefined}
+                  tooltipActive={tooltipOpen}
                 />
               )}
             </div>
