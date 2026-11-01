@@ -3,6 +3,7 @@ import { Geist_Mono, Roboto } from "next/font/google";
 import { StatusBarController } from "@/components/pv/status-bar-controller";
 import { ThemeModeController } from "@/components/pv/theme-mode-controller";
 import { ThemeProvider } from "@/components/theme-provider";
+import { APP_ICON_SRC, APP_MANIFEST_SRC } from "@/lib/version";
 import "./globals.css";
 
 const roboto = Roboto({
@@ -20,15 +21,14 @@ export const metadata: Metadata = {
   title: "PV Dash",
   description:
     "Behalte deine Solaranlage im Blick: Erzeugung, Verbrauch, Speicher und Ertrag auf einen Blick – schlicht, intuitiv, für Handy und Tablet.",
-  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "PV Dash",
   },
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: [{ url: APP_ICON_SRC, type: "image/svg+xml" }],
+    apple: [{ url: APP_ICON_SRC, type: "image/svg+xml" }],
   },
 };
 
@@ -47,6 +47,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${roboto.variable} ${geistMono.variable} h-full w-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        {/* Query-String am Manifest, damit Browser/PWA bei Versionsbump neu laden. */}
+        <link rel="manifest" href={APP_MANIFEST_SRC} />
+      </head>
       <body className="flex min-h-full w-full min-w-0 flex-col overscroll-none">
         <script
           dangerouslySetInnerHTML={{

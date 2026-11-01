@@ -18,6 +18,21 @@ const nextConfig: NextConfig = {
     webpackMemoryOptimizations: true,
     serverSourceMaps: false,
   },
+
+  // Icon-URL trägt ?v=APP_VERSION; kurze Revalidierung hilft ohne Query-String.
+  async headers() {
+    return [
+      {
+        source: "/icon.svg",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=3600, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
