@@ -734,24 +734,60 @@ function RangeTotal({ text }: { text: string }) {
   );
 }
 
+/**
+ * Tageslabel der Monatsansicht: unpaddingt wie in `mapDaySeriesToMonth`
+ * (`String(parts.day)` → "1"…"31"). `day: "2-digit"` würde "01" liefern und
+ * das Live-Overlay an den Tagen 1–9 verfehlen.
+ */
 function zurichDayLabel(date = new Date()): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Zurich",
-    day: "2-digit",
-  }).format(date);
+  return String(
+    Number(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Zurich",
+        day: "numeric",
+      }).format(date),
+    ),
+  );
 }
 
 function applyLiveToday(
   points: DailyEnergyPoint[],
   liveToday: ChartsSectionProps["liveToday"],
   isToday: (point: DailyEnergyPoint) => boolean,
+  /** Wenn gesetzt und heute fehlt in der Reihe: heutigen Live-Punkt anhängen. */
+  seedLabelWhenMissing?: string,
 ): DailyEnergyPoint[] {
   if (!liveToday) return points;
-  return points.map((point) =>
-    isToday(point)
-      ? withLiveDayTotals(point, liveToday.yieldKwh, liveToday.consumptionKwh ?? point.consumptionKwh)
-      : point,
-  );
+  let found = false;
+  const next = points.map((point) => {
+    if (!isToday(point)) return point;
+    found = true;
+    return withLiveDayTotals(
+      point,
+      liveToday.yieldKwh,
+      liveToday.consumptionKwh ?? point.consumptionKwh,
+    );
+  });
+  // Am 1. eines Monats liefert FusionSolar oft noch keine Tagesreihe — dann
+  // den heutigen Live-Stand als ersten Balken ergänzen (erst sobald gemessen).
+  const hasLive =
+    liveToday.yieldKwh > 0 || (liveToday.consumptionKwh != null && liveToday.consumptionKwh > 0);
+  if (!found && seedLabelWhenMissing && hasLive) {
+    next.push(
+      withLiveDayTotals(
+        {
+          label: seedLabelWhenMissing,
+          yieldKwh: 0,
+          consumptionKwh: 0,
+          directSolarKwh: 0,
+          batteryKwh: 0,
+        },
+        liveToday.yieldKwh,
+        liveToday.consumptionKwh ?? 0,
+      ),
+    );
+  }
+  return next;
 }
 
 export function ChartsSection({
@@ -820,9 +856,42 @@ export function ChartsSection({
     [week, liveToday],
   );
   const monthWithLive = useMemo(
-    () => applyLiveToday(month, liveToday, (point) => point.label === todayDayLabel),
+    () =>
+      applyLiveToday(
+        month,
+        liveToday,
+        (point) => point.label === todayDayLabel,
+        todayDayLabel,
+      ),
     [month, liveToday, todayDayLabel],
   );
+
+  /** Jahresbalken „Dieser Monat“ aus der (ggf. live ergänzten) Monatsreihe. */
+  const yearWithLive = useMemo(() => {
+    if (!liveToday || monthWithLive.length === 0) return year;
+    const sum = (key: keyof Pick<DailyEnergyPoint, "yieldKwh" | "consumptionKwh" | "directSolarKwh" | "batteryKwh">) =>
+      Math.round(monthWithLive.reduce((total, point) => total + point[key], 0) * 10) / 10;
+    const yieldKwh = sum("yieldKwh");
+    const consumptionKwh = sum("consumptionKwh");
+    const directSolarKwh = sum("directSolarKwh");
+    const batteryKwh = sum("batteryKwh");
+    let found = false;
+    const next = year.map((point) => {
+      if (point.label !== "Dieser Monat") return point;
+      found = true;
+      return { ...point, yieldKwh, consumptionKwh, directSolarKwh, batteryKwh };
+    });
+    if (!found) {
+      next.push({
+        label: "Dieser Monat",
+        yieldKwh,
+        consumptionKwh,
+        directSolarKwh,
+        batteryKwh,
+      });
+    }
+    return next;
+  }, [year, monthWithLive, liveToday]);
 
   const total = useMemo(
     () =>
@@ -832,12 +901,12 @@ export function ChartsSection({
         todayChartData,
         weekWithLive,
         monthWithLive,
-        year,
+        yearWithLive,
         lifetime,
         liveToday,
         stromkontoChangeTodayKwh,
       ),
-    [range, today, todayChartData, weekWithLive, monthWithLive, year, lifetime, liveToday, stromkontoChangeTodayKwh],
+    [range, today, todayChartData, weekWithLive, monthWithLive, yearWithLive, lifetime, liveToday, stromkontoChangeTodayKwh],
   );
 
   const barData =
@@ -846,7 +915,7 @@ export function ChartsSection({
       : range === "monat"
         ? monthWithLive
         : range === "jahr"
-          ? year
+          ? yearWithLive
           : lifetimeWithout2021(lifetime);
   const todayEnergyMissing = range === "heute" && todayEnergyDataMissing(todayChartData, liveToday);
   const cardRef = useRef<HTMLDivElement | null>(null);
