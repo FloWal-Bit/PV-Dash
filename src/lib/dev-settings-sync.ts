@@ -3,6 +3,7 @@
 import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
+import { yieldForecastStore } from "@/lib/yield-forecast-settings";
 
 let inflightSaves = 0;
 let lastUpdatedAt: string | null = null;
@@ -12,6 +13,7 @@ export function applySharedDevSettings(data: SharedDevSettings): void {
   lastUpdatedAt = data.updatedAt;
   hideSimulatedStore.applyRemote(data.hideSimulated);
   infoBannerStore.applyRemote(data.infoBanner);
+  yieldForecastStore.applyRemotePerformanceRatio(data.performanceRatio);
 }
 
 export async function putDevSettings(update: DevSettingsUpdate): Promise<SharedDevSettings> {

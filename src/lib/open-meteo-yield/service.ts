@@ -222,7 +222,12 @@ export async function getOpenMeteoForecastedTodayYieldKwh(
   peakKwp: number,
   date = new Date(),
 ): Promise<OpenMeteoYieldResult> {
-  const plant = { ...defaultYieldForecastPlant(), peakKwp };
+  const { getSharedDevSettings } = await import("@/lib/dev-settings");
+  const plant = {
+    ...defaultYieldForecastPlant(),
+    peakKwp,
+    performanceRatio: getSharedDevSettings().performanceRatio,
+  };
   const { today, error } = await getOpenMeteoTodayAndTomorrowYieldKwh(plant, date);
   if (today.kwh == null && error) {
     return { kwh: null, error, meta: null };

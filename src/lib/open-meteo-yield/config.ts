@@ -10,7 +10,7 @@ export const OPEN_METEO_TILT_DEG = 11;
 export const OPEN_METEO_AZIMUTH_DEG = 0;
 export const OPEN_METEO_TIMEZONE = "Europe/Zurich";
 
-/** Kalibrierung Sep/Okt 2026 (GTI × kWp × PR). */
+/** Kalibrierung Sep/Okt 2026 (GTI × kWp × PR). Override über Dev Settings oder Env. */
 export const DEFAULT_OPEN_METEO_PERFORMANCE_RATIO = 0.77;
 
 export function resolveOpenMeteoPeakKwp(): number {

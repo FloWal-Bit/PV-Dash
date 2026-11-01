@@ -1,16 +1,20 @@
 /**
  * Gemeinsame Entwicklereinstellungen ohne Ort und ohne Anlagenkoordinaten.
  * Liegt in .data/dev-settings.json. Standort bleibt auf dem Gerät.
+ * Der Leistungsfaktor (PR) gilt serverseitig für die Ertragsprognose aller Clients.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import {
   readInfoBanner,
+  readPerformanceRatio,
   normalizeInfoBanner,
+  normalizePerformanceRatio,
   type DevSettingsUpdate,
   type SharedDevSettings,
 } from "@/lib/dev-settings-shared";
+import { resolveOpenMeteoPerformanceRatio } from "@/lib/open-meteo-yield/config";
 
 export type { DevSettingsUpdate, SharedDevSettings };
 
@@ -18,6 +22,8 @@ type PersistedDevSettings = {
   updatedAt: string;
   hideSimulated: boolean | null;
   infoBanner: string;
+  /** null = noch nicht gesetzt → Env/Default. */
+  performanceRatio: number | null;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -31,11 +37,13 @@ function readFile(): PersistedDevSettings | null {
     const v = parsed as Record<string, unknown>;
     const hideSimulated = typeof v.hideSimulated === "boolean" ? v.hideSimulated : null;
     const infoBanner = readInfoBanner(v.infoBanner);
+    const performanceRatio = readPerformanceRatio(v.performanceRatio);
     const hadLocation = "siteLocation" in v || "yieldForecast" in v;
     const file: PersistedDevSettings = {
       updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : new Date(0).toISOString(),
       hideSimulated,
       infoBanner,
+      performanceRatio,
     };
     if (hadLocation) writeFile(file);
     return file;
@@ -44,10 +52,16 @@ function readFile(): PersistedDevSettings | null {
   }
 }
 
+function resolvePerformanceRatio(stored: number | null | undefined): number {
+  if (stored != null) return stored;
+  return resolveOpenMeteoPerformanceRatio();
+}
+
 function resolve(file: PersistedDevSettings | null): SharedDevSettings {
   return {
     hideSimulated: file?.hideSimulated ?? true,
     infoBanner: file?.infoBanner ?? "",
+    performanceRatio: resolvePerformanceRatio(file?.performanceRatio),
     configured: file != null,
     updatedAt: file?.updatedAt ?? null,
   };
@@ -74,6 +88,10 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
       typeof update.infoBanner === "string"
         ? normalizeInfoBanner(update.infoBanner)
         : (current?.infoBanner ?? ""),
+    performanceRatio:
+      typeof update.performanceRatio === "number"
+        ? normalizePerformanceRatio(update.performanceRatio)
+        : (current?.performanceRatio ?? null),
   };
   writeFile(next);
   return resolve(next);
