@@ -1,8 +1,8 @@
 /**
  * Aufrufe von PV Dash, gruppiert nach Gerät.
  * Liegt in .data/device-log.json. Die Kennung entsteht im Browser und
- * bleibt dort; der Server speichert nur diese Kennung, ein grobes Label,
- * die App-Version und die Zeitpunkte.
+ * bleibt dort; der Server speichert nur diese Kennung, ein grobes Label
+ * (Plattform, optional Modell, Browser/App), die App-Version und die Zeitpunkte.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
