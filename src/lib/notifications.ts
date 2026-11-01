@@ -1,4 +1,5 @@
 import { formatYieldKwh } from "@/lib/format";
+import { APP_ICON_SRC } from "@/lib/version";
 
 /**
  * Push-Benachrichtigungen bei Ertrags-Meilensteinen.
@@ -119,7 +120,7 @@ function showYieldNotification(todayYieldKwh: number): void {
   try {
     new Notification("PV Dash", {
       body: `Deine Anlage hat heute bereits ${formatYieldKwh(todayYieldKwh, 1)} erzeugt.`,
-      icon: "/icon.svg",
+      icon: APP_ICON_SRC,
       tag: "pv-yield-threshold",
     });
   } catch {

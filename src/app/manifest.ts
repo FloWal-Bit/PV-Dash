@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { APP_ICON_SRC } from "@/lib/version";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -13,13 +14,13 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#e2a33d",
     icons: [
       {
-        src: "/icon.svg",
+        src: APP_ICON_SRC,
         sizes: "any",
         type: "image/svg+xml",
         purpose: "any",
       },
       {
-        src: "/icon.svg",
+        src: APP_ICON_SRC,
         sizes: "any",
         type: "image/svg+xml",
         purpose: "maskable",
