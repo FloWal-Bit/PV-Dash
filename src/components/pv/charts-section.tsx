@@ -824,7 +824,7 @@ export function ChartsSection({
   const [series, setSeries] = useState<ChartSeriesVisibility>({
     ertrag: true,
     verbrauch: true,
-    eigenverbrauch: true,
+    eigenverbrauch: false,
   });
   /**
    * Detailwerte erst nach Tippen aufs Diagramm. Offen bleiben sie beim
