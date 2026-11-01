@@ -22,7 +22,11 @@ import {
 } from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
 import { readDeviceId, reportDeviceVisit } from "@/lib/device-visit";
-import type { DeviceLogSummary, DeviceVisit } from "@/lib/device-log-shared";
+import {
+  shortDeviceId,
+  type DeviceLogSummary,
+  type DeviceVisit,
+} from "@/lib/device-log-shared";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
@@ -241,17 +245,22 @@ function DeviceRow({
 }) {
   const isCurrent = device.id === currentDeviceId;
   return (
-    <li className="flex items-center gap-2 py-1 text-sm">
-      <p className="min-w-0 flex-1 truncate font-medium">{device.label}</p>
-      {isCurrent ? (
-        <span className="shrink-0 text-[11px] font-medium text-chart-3">Dieses</span>
-      ) : null}
-      {device.version ? (
-        <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground">
-          v{device.version}
+    <li className="flex flex-col gap-0.5 border-b border-border/40 py-2 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 text-sm font-medium leading-snug break-words">
+          {device.label}
+        </p>
+        <span className="shrink-0 pt-0.5 tabular-nums text-xs text-muted-foreground">{when}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+        {isCurrent ? (
+          <span className="font-medium text-chart-3">Dieses Gerät</span>
+        ) : null}
+        {device.version ? <span className="tabular-nums">v{device.version}</span> : null}
+        <span className="font-mono tabular-nums opacity-70" title={device.id}>
+          #{shortDeviceId(device.id)}
         </span>
-      ) : null}
-      <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{when}</span>
+      </div>
     </li>
   );
 }

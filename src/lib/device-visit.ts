@@ -8,6 +8,10 @@ const STORAGE_KEY = "pv-dash:device-id";
 
 let reportPromise: Promise<void> | null = null;
 
+type NavigatorUAData = {
+  getHighEntropyValues: (hints: string[]) => Promise<{ model?: string }>;
+};
+
 export function readDeviceId(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -44,8 +48,47 @@ function isCursorAgent(): boolean {
   return /HeadlessChrome/i.test(navigator.userAgent);
 }
 
-/** Grobes Label für die Dev Settings. Der volle User-Agent wird nicht gespeichert. */
-export function currentDeviceLabel(): string {
+function sanitizeModel(raw: string): string | null {
+  const text = raw
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return null;
+  // Platzhalter, wenn Chrome/Android kein Modell liefert
+  if (/^(K|wv|Android|iPhone|iPad|iPod|Macintosh|Linux|Windows)$/i.test(text)) return null;
+  return text.slice(0, 40);
+}
+
+/**
+ * Klassischer Android-UA: `Android 13; SM-S918B Build/...` bzw. `GT-I9500`.
+ * iPhone/iPad liefern im UA kein Modell.
+ */
+export function modelFromUserAgent(userAgent: string): string | null {
+  const android = /Android [^;]*;\s*([^;)]+?)(?:\s+Build\/|[;)])/i.exec(userAgent);
+  if (android?.[1]) return sanitizeModel(android[1]);
+  return null;
+}
+
+async function modelFromClientHints(): Promise<string | null> {
+  const uaData = (navigator as Navigator & { userAgentData?: NavigatorUAData }).userAgentData;
+  if (!uaData?.getHighEntropyValues) return null;
+  try {
+    const { model } = await uaData.getHighEntropyValues(["model"]);
+    return typeof model === "string" ? sanitizeModel(model) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Client Hints (Chromium) oder Fallback aus dem Android-User-Agent. */
+export async function resolveDeviceModel(userAgent: string): Promise<string | null> {
+  const fromHints = await modelFromClientHints();
+  if (fromHints) return fromHints;
+  return modelFromUserAgent(userAgent);
+}
+
+/** Label für die Dev Settings. Der volle User-Agent wird nicht gespeichert. */
+export async function currentDeviceLabel(): Promise<string> {
   if (isCursorAgent()) return "Cursor · Agent";
 
   const userAgent = window.navigator.userAgent;
@@ -63,22 +106,27 @@ export function currentDeviceLabel(): string {
   else if (/Linux/i.test(userAgent)) device = "Linux";
 
   const surface = isInstalledApp() ? "App" : browserName(userAgent);
+  const model = await resolveDeviceModel(userAgent);
+  if (model) return `${device} · ${model} · ${surface}`;
   return `${device} · ${surface}`;
 }
 
 function sendVisit(): Promise<void> {
   try {
     const id = getOrCreateDeviceId();
-    const label = currentDeviceLabel();
-    return fetch("/api/device-log", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, label, version: APP_VERSION }),
-      keepalive: true,
-    }).then(
-      () => undefined,
-      () => undefined,
-    );
+    return currentDeviceLabel()
+      .then((label) =>
+        fetch("/api/device-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, label, version: APP_VERSION }),
+          keepalive: true,
+        }),
+      )
+      .then(
+        () => undefined,
+        () => undefined,
+      );
   } catch {
     return Promise.resolve();
   }

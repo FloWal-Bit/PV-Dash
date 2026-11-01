@@ -1,6 +1,10 @@
-/** Geräte, die PV Dash geöffnet haben. Kein Standort, keine IP, kein User-Agent. */
+/**
+ * Geräte, die PV Dash geöffnet haben.
+ * Kein Standort, keine IP, kein voller User-Agent — nur ein grobes Label
+ * (Plattform, optional Modell wie «SM-S918B», Browser/App) und die App-Version.
+ */
 
-export const MAX_DEVICE_LABEL_LENGTH = 80;
+export const MAX_DEVICE_LABEL_LENGTH = 96;
 export const MAX_DEVICE_VERSION_LENGTH = 32;
 export const MAX_TRACKED_DEVICES = 100;
 
@@ -10,7 +14,10 @@ export const DEVICE_ID_PATTERN =
 
 export type DeviceVisit = {
   id: string;
-  /** Grobes Gerät, z. B. «iPhone · Safari», «Windows · App» oder «Cursor · Agent». */
+  /**
+   * Lesbares Gerät, z. B. «Android · SM-S918B · Chrome», «iPhone · Safari»,
+   * «Windows · App» oder «Cursor · Agent».
+   */
   label: string;
   /** Zuletzt gesehene App-Version ohne «v», z. B. «1.5.6». Leer bei Alt-Einträgen. */
   version: string;
@@ -18,6 +25,11 @@ export type DeviceVisit = {
   lastSeen: string;
   hits: number;
 };
+
+/** Kurze Kennung zum Auseinanderhalten gleicher Labels. */
+export function shortDeviceId(id: string): string {
+  return id.slice(-4);
+}
 
 export type DeviceLogSummary = {
   count: number;
