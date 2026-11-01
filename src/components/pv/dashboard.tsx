@@ -14,7 +14,7 @@ import { pvStore } from "@/lib/pv-store";
 import { siteLocationStore } from "@/lib/site-location";
 import { weatherStore } from "@/lib/weather-store";
 import { checkYieldNotification } from "@/lib/notifications";
-import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
+import { APP_VERSION_LABEL } from "@/lib/version";
 import { reportDeviceVisit } from "@/lib/device-visit";
 
 export function Dashboard({ plantName }: { plantName: string }) {
@@ -173,7 +173,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
       <footer className="dashboard-container safe-bottom w-full text-xs text-muted-foreground">
         <div className="flex items-center justify-end py-6">
           <span className="shrink-0 tabular-nums">
-            {APP_NAME} {APP_VERSION_LABEL}
+            {APP_VERSION_LABEL}
           </span>
         </div>
       </footer>
