@@ -367,6 +367,66 @@ function zurichYearMonth(now = new Date()): { year: number; month: number } {
   };
 }
 
+function emptyBarPoint(label: string): DailyEnergyPoint {
+  return {
+    label,
+    yieldKwh: 0,
+    consumptionKwh: 0,
+    directSolarKwh: 0,
+    batteryKwh: 0,
+  };
+}
+
+/** Kalendertage des Monats (1–12), unabhängig von der Zeitzone der Laufzeit. */
+function daysInCalendarMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Monatsachse immer mit allen Tagen 1…N füllen — auch ohne Messwerte
+ * (künftige Tage und Lücken in der Quelle als 0).
+ */
+function padMonthDays(points: DailyEnergyPoint[], now = new Date()): DailyEnergyPoint[] {
+  const { year, month } = zurichYearMonth(now);
+  const todayLabel = zurichDayLabel(now);
+  const byLabel = new Map<string, DailyEnergyPoint>();
+  for (const point of points) {
+    const label = point.label === "Heute" ? todayLabel : point.label;
+    byLabel.set(label, { ...point, label });
+  }
+  const padded: DailyEnergyPoint[] = [];
+  const days = daysInCalendarMonth(year, month);
+  for (let day = 1; day <= days; day++) {
+    const label = String(day);
+    padded.push(byLabel.get(label) ?? emptyBarPoint(label));
+  }
+  return padded;
+}
+
+/**
+ * Jahresachse immer mit allen 12 Monaten füllen — auch ohne Messwerte
+ * (künftige Monate und Lücken in der Quelle als 0).
+ */
+function padYearMonths(points: DailyEnergyPoint[], now = new Date()): DailyEnergyPoint[] {
+  const { month: currentMonth } = zurichYearMonth(now);
+  const byMonth = new Map<number, DailyEnergyPoint>();
+  for (const point of points) {
+    if (point.label === "Dieser Monat") {
+      byMonth.set(currentMonth, point);
+      continue;
+    }
+    const index = MONTHS_DE.indexOf(point.label);
+    if (index >= 0) byMonth.set(index + 1, point);
+  }
+  const padded: DailyEnergyPoint[] = [];
+  for (let month = 1; month <= 12; month++) {
+    const label = month === currentMonth ? "Dieser Monat" : MONTHS_DE[month - 1];
+    const existing = byMonth.get(month);
+    padded.push(existing ? { ...existing, label } : emptyBarPoint(label));
+  }
+  return padded;
+}
+
 /** Tooltip: „Samstag, 3. Oktober“. */
 function calendarDayTitle(year: number, month: number, day: number): string {
   const date = new Date(Date.UTC(year, month - 1, day, 12));
@@ -882,7 +942,7 @@ export function ChartsSection({
   const monthWithLive = useMemo(
     () =>
       applyLiveToday(
-        month,
+        padMonthDays(month),
         liveToday,
         (point) => point.label === todayDayLabel,
         todayDayLabel,
@@ -892,7 +952,8 @@ export function ChartsSection({
 
   /** Jahresbalken „Dieser Monat“ aus der (ggf. live ergänzten) Monatsreihe. */
   const yearWithLive = useMemo(() => {
-    if (!liveToday || monthWithLive.length === 0) return year;
+    const yearPadded = padYearMonths(year);
+    if (!liveToday) return yearPadded;
     const sum = (key: keyof Pick<DailyEnergyPoint, "yieldKwh" | "consumptionKwh" | "directSolarKwh" | "batteryKwh">) =>
       Math.round(monthWithLive.reduce((total, point) => total + point[key], 0) * 10) / 10;
     const yieldKwh = sum("yieldKwh");
@@ -900,7 +961,7 @@ export function ChartsSection({
     const directSolarKwh = sum("directSolarKwh");
     const batteryKwh = sum("batteryKwh");
     let found = false;
-    const next = year.map((point) => {
+    const next = yearPadded.map((point) => {
       if (point.label !== "Dieser Monat") return point;
       found = true;
       return { ...point, yieldKwh, consumptionKwh, directSolarKwh, batteryKwh };
