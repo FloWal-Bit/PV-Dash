@@ -22,7 +22,8 @@ Start command (nach Prebuilt-Extract gilt das `package.json` im Artifact):
 npm start
 ```
 
-Das startet `start.sh` → `HOSTNAME=0.0.0.0 node server.js` (PORT von Jelastic).
+Das startet `start.sh` → zwingend `HOSTNAME=0.0.0.0 node server.js` (PORT von Jelastic).
+Ohne festes `0.0.0.0` bindet Next an den Container-Hostnamen → **502** am Proxy.
 
 ## Lokal packen (ohne CI)
 

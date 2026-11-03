@@ -32,13 +32,14 @@ fi
 
 VERSION="$(node -p "require('./package.json').version")"
 
-# Jelastic setzt PORT; Hostname muss 0.0.0.0 sein (Proxy vor dem Node).
+# Jelastic setzt PORT. HOSTNAME ist auf Linux oft schon der Container-Name —
+# Next standalone bindet daran und der Proxy liefert 502. Immer 0.0.0.0 erzwingen.
 cat > dist/jelastic/start.sh <<'EOF'
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")"
 export NODE_ENV=production
-export HOSTNAME="${HOSTNAME:-0.0.0.0}"
+export HOSTNAME=0.0.0.0
 export PORT="${PORT:-3000}"
 exec node server.js
 EOF
