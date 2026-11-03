@@ -32,8 +32,17 @@ fi
 
 VERSION="$(node -p "require('./package.json').version")"
 
-# Jelastic setzt PORT. HOSTNAME ist auf Linux oft schon der Container-Name —
-# Next standalone bindet daran und der Proxy liefert 502. Immer 0.0.0.0 erzwingen.
+# Next standalone: `hostname = process.env.HOSTNAME || '0.0.0.0'`.
+# Unter Jelastic/Linux ist HOSTNAME bereits der Container-Name → Bind falsch → 502.
+# Auch wenn der Prozess mit bloßem `node server.js` startet (ohne start.sh).
+if grep -q "process.env.HOSTNAME" dist/jelastic/server.js; then
+  sed -i "s/process\\.env\\.HOSTNAME || ['\"]0\\.0\\.0\\.0['\"]/'0.0.0.0'/g" dist/jelastic/server.js
+  echo "[pack] patched server.js listen host → hardcoded 0.0.0.0"
+else
+  echo "[pack] WARN: HOSTNAME-Zeile in server.js nicht gefunden" >&2
+fi
+
+# Zusätzlich start.sh (falls npm start genutzt wird).
 cat > dist/jelastic/start.sh <<'EOF'
 #!/bin/bash
 set -euo pipefail
