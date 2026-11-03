@@ -13,6 +13,12 @@ export HOSTNAME=0.0.0.0
 # Jelastic setzt PORT; Fallback nur für lokale Smoke-Tests.
 export PORT="${PORT:-3000}"
 
+# Prefers artifact start.sh (stellt node_modules nach npm-prune wieder her).
+if [ -f start.sh ] && [ -f server.js ]; then
+  echo "[start] delegating to ./start.sh"
+  exec bash start.sh
+fi
+
 if [ -f server.js ] && [ -d .next/static ]; then
   echo "[start] prebuilt root server.js PORT=$PORT"
   exec node server.js

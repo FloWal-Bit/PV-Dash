@@ -42,18 +42,69 @@ else
   echo "[pack] WARN: HOSTNAME-Zeile in server.js nicht gefunden" >&2
 fi
 
-# Zusätzlich start.sh (falls npm start genutzt wird).
+# start.sh: Jelastic führt vor npm start oft `npm install` aus. Unser
+# package.json listet absichtlich keine dependencies (sonst On-Node-Download /
+# Cloudlets). npm install entfernt dann „extraneous“ Module inkl. next.
+# Deshalb: falls next fehlt, aus ~/pv-dash-prebuilt.tgz wiederherstellen.
 cat > dist/jelastic/start.sh <<'EOF'
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")"
 export NODE_ENV=production
+# Nicht "${HOSTNAME:-…}": Jelastic setzt HOSTNAME auf den Container-Namen → 502.
 export HOSTNAME=0.0.0.0
 export PORT="${PORT:-3000}"
+
+restore_prebuilt_if_needed() {
+  if [ -f node_modules/next/package.json ] && [ -f server.js ] && [ -d .next/static ]; then
+    return 0
+  fi
+  local tb=""
+  for cand in "$HOME/pv-dash-prebuilt.tgz" "$PWD/pv-dash-prebuilt.tgz"; do
+    if [ -f "$cand" ] && [ -s "$cand" ]; then
+      tb="$cand"
+      break
+    fi
+  done
+  if [ -z "$tb" ]; then
+    echo "[start] ERROR: next/server.js fehlt und kein pv-dash-prebuilt.tgz unter ~/ oder ROOT." >&2
+    echo "[start] Fix: UPDATE_PACKAGES_ON_RESTART=false setzen und Tarball nach ~/ kopieren." >&2
+    return 1
+  fi
+  echo "[start] node_modules unvollständig (npm install prune?) — restore aus $tb" >&2
+  local tmp
+  tmp="$(mktemp -d)"
+  tar -xzf "$tb" -C "$tmp"
+  if [ ! -f "$tmp/server.js" ] || [ ! -f "$tmp/node_modules/next/package.json" ]; then
+    echo "[start] ERROR: Artifact in $tb ist unvollständig." >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  # Nur fehlende Runtime-Teile — kein Full-Tree-Rsync (vermeidet supervisor-Restart-Loops).
+  mkdir -p node_modules .next
+  rsync -a "$tmp/node_modules/" "$PWD/node_modules/"
+  rsync -a "$tmp/.next/" "$PWD/.next/"
+  cp -f "$tmp/server.js" "$PWD/server.js"
+  if [ -f "$tmp/start.sh" ]; then cp -f "$tmp/start.sh" "$PWD/start.sh"; fi
+  if [ -f "$tmp/package.json" ]; then cp -f "$tmp/package.json" "$PWD/package.json"; fi
+  if [ -f "$tmp/.prebuilt-version" ]; then cp -f "$tmp/.prebuilt-version" "$PWD/.prebuilt-version"; fi
+  if [ -d "$tmp/public" ]; then mkdir -p public; rsync -a "$tmp/public/" "$PWD/public/"; fi
+  rm -rf "$tmp"
+  if [ ! -f node_modules/next/package.json ]; then
+    echo "[start] ERROR: restore fehlgeschlagen (next fehlt weiter)." >&2
+    return 1
+  fi
+}
+
+restore_prebuilt_if_needed
+echo "[start] prebuilt node server.js PORT=$PORT HOSTNAME=$HOSTNAME"
 exec node server.js
 EOF
 chmod +x dist/jelastic/start.sh
 
+# Keine dependencies: verhindert teures On-Node-Download.
+# start.sh stellt node_modules aus ~/pv-dash-prebuilt.tgz wieder her,
+# nachdem Jelastics `npm install` die traced Modules als extraneous pruned.
 cat > dist/jelastic/package.json <<EOF
 {
   "name": "pv-dash",
@@ -63,6 +114,14 @@ cat > dist/jelastic/package.json <<EOF
     "start": "bash start.sh"
   }
 }
+EOF
+
+cat > dist/jelastic/.npmrc <<'EOF'
+omit=dev
+audit=false
+fund=false
+prefer-offline=true
+fetch-retries=0
 EOF
 
 # Marker für den Post-Deploy-Hook
