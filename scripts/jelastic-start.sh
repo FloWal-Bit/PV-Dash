@@ -7,7 +7,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export NODE_ENV=production
-export HOSTNAME="${HOSTNAME:-0.0.0.0}"
+# Nicht "${HOSTNAME:-…}": Jelastic/Linux setzt HOSTNAME bereits auf den
+# Container-Namen — Next würde nur dort binden → 502 am Proxy.
+export HOSTNAME=0.0.0.0
 # Jelastic setzt PORT; Fallback nur für lokale Smoke-Tests.
 export PORT="${PORT:-3000}"
 
