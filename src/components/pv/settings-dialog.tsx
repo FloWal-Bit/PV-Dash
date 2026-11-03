@@ -45,7 +45,7 @@ import {
   promptHomeScreenInstall,
   subscribeHomeScreenInstall,
 } from "@/lib/install-prompt";
-import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
+import { APP_NAME } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
@@ -823,16 +823,6 @@ export function SettingsDialog() {
               Florian Walther, Herbst 2026.
             </p>
           </SettingsSection>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-muted/30 px-5 py-3">
-          <div className="flex min-w-0 flex-col">
-            <span className="text-sm font-medium">{APP_NAME}</span>
-            <span className="text-xs text-muted-foreground">PV-Monitor</span>
-          </div>
-          <span className="rounded-full bg-background px-2.5 py-1 text-[11px] font-medium tabular-nums text-muted-foreground ring-1 ring-border">
-            {APP_VERSION_LABEL}
-          </span>
         </div>
       </DialogContent>
     </Dialog>
