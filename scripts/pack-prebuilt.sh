@@ -68,7 +68,7 @@ restore_prebuilt_if_needed() {
   done
   if [ -z "$tb" ]; then
     echo "[start] ERROR: next/server.js fehlt und kein pv-dash-prebuilt.tgz unter ~/ oder ROOT." >&2
-    echo "[start] Einmalig: curl -fsSL -L -o ~/pv-dash-prebuilt.tgz <Release-Asset-URL>" >&2
+    echo "[start] Fix: UPDATE_PACKAGES_ON_RESTART=false setzen und Tarball nach ~/ kopieren." >&2
     return 1
   fi
   echo "[start] node_modules unvollständig (npm install prune?) — restore aus $tb" >&2
@@ -80,13 +80,15 @@ restore_prebuilt_if_needed() {
     rm -rf "$tmp"
     return 1
   fi
-  rsync -a \
-    --exclude '.data/' \
-    --exclude '.env' \
-    --exclude '.env.*' \
-    --exclude 'scripts/' \
-    --exclude 'pv-dash-prebuilt.tgz' \
-    "$tmp"/ "$PWD"/
+  # Nur fehlende Runtime-Teile — kein Full-Tree-Rsync (vermeidet supervisor-Restart-Loops).
+  mkdir -p node_modules .next
+  rsync -a "$tmp/node_modules/" "$PWD/node_modules/"
+  rsync -a "$tmp/.next/" "$PWD/.next/"
+  cp -f "$tmp/server.js" "$PWD/server.js"
+  if [ -f "$tmp/start.sh" ]; then cp -f "$tmp/start.sh" "$PWD/start.sh"; fi
+  if [ -f "$tmp/package.json" ]; then cp -f "$tmp/package.json" "$PWD/package.json"; fi
+  if [ -f "$tmp/.prebuilt-version" ]; then cp -f "$tmp/.prebuilt-version" "$PWD/.prebuilt-version"; fi
+  if [ -d "$tmp/public" ]; then mkdir -p public; rsync -a "$tmp/public/" "$PWD/public/"; fi
   rm -rf "$tmp"
   if [ ! -f node_modules/next/package.json ]; then
     echo "[start] ERROR: restore fehlgeschlagen (next fehlt weiter)." >&2
