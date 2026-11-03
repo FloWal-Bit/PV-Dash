@@ -18,6 +18,28 @@ preserve_data() {
   mkdir -p .data
 }
 
+# Alte On-Node-Builds füllen die Quota (node_modules ~500MB, .next ~400MB, npm-Cache GB).
+# Prebuilt braucht das nicht — vor/nach dem Extract wegräumen.
+purge_build_debris() {
+  echo "[postdeploy] purging legacy build debris (node_modules/.next/npm-cache)"
+  rm -rf \
+    node_modules \
+    .next \
+    dist \
+    .turbo \
+    .swc \
+    coverage \
+    2>/dev/null || true
+  rm -rf \
+    "$HOME/.npm/_cacache" \
+    "$HOME/.npm/_logs" \
+    "$HOME/.cache/yarn" \
+    "$HOME/.cache/node-gyp" \
+    2>/dev/null || true
+  rm -f /tmp/pv-dash-prebuilt-*.tgz 2>/dev/null || true
+  df -h "$HOME" 2>/dev/null | tail -1 || true
+}
+
 install_from_tarball() {
   local tarball="$1"
   echo "[postdeploy] extracting $(basename "$tarball")"
@@ -29,14 +51,24 @@ install_from_tarball() {
     rm -rf "$tmp"
     exit 1
   fi
+  # Zuerst Platz schaffen, sonst scheitert rsync an voller Quota.
+  purge_build_debris
   # Runtime-Daten und Secrets behalten; Rest durch Prebuilt ersetzen.
   rsync -a --delete \
     --exclude '.data/' \
     --exclude '.env' \
     --exclude '.env.*' \
     --exclude 'pv-dash-prebuilt.tgz' \
+    --exclude 'scripts/' \
     "$tmp"/ "$PWD"/
+  # start.sh aus dem Artifact reicht; Hook-Skript bleibt über Git-Sync für den nächsten Publish.
+  # Falls scripts/ vom Git-Tree noch da sein soll: nicht löschen wenn tarball keine scripts hat —
+  # --exclude scripts/ verhindert, dass rsync --delete die Hook-Skripte entfernt, solange
+  # sie nur im Git-Tree lagen. Nach Overlay ohne scripts/ im Target bleiben bestehende.
+  # Besser: scripts aus Source behalten.
   rm -rf "$tmp"
+  # Tarball nicht auf der Quota behalten
+  rm -f pv-dash-prebuilt.tgz /tmp/pv-dash-prebuilt-*.tgz 2>/dev/null || true
 }
 
 download_github_release() {
@@ -90,13 +122,17 @@ legacy_build() {
 preserve_data
 
 # Schon ein Prebuilt-Root (z. B. Archive-Upload)?
-if [ -f server.js ] && [ -d .next/static ]; then
-  echo "[postdeploy] existing prebuilt server.js — skip download/build"
-  if [ -f .prebuilt-version ]; then
-    echo "[postdeploy] version=$(cat .prebuilt-version)"
-  fi
+if [ -f server.js ] && [ -d .next/static ] && [ -f .prebuilt-version ]; then
+  echo "[postdeploy] existing prebuilt server.js — light cleanup only"
+  # Kein volles node_modules/.next löschen: das IST das Prebuilt.
+  rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" dist 2>/dev/null || true
+  rm -f /tmp/pv-dash-prebuilt-*.tgz pv-dash-prebuilt.tgz 2>/dev/null || true
+  echo "[postdeploy] version=$(cat .prebuilt-version)"
   exit 0
 fi
+
+# Vor Download Platz schaffen (sonst „keine Speicherkapazität“).
+purge_build_debris
 
 VERSION=""
 if [ -f package.json ]; then
