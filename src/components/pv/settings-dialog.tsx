@@ -326,8 +326,10 @@ function SiteLocationEditor({
 
 function StromkontoEditor() {
   const [balanceInput, setBalanceInput] = useState(String(DEFAULT_STROMKONTO_BALANCE_KWH));
+  const [todayInput, setTodayInput] = useState("0");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingBalance, setSavingBalance] = useState(false);
+  const [savingToday, setSavingToday] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -337,13 +339,17 @@ function StromkontoEditor() {
       try {
         const response = await fetch("/api/stromkonto");
         if (!response.ok) throw new Error("Laden fehlgeschlagen");
-        const data: { balanceKwh: number } = await response.json();
+        const data: { balanceKwh: number; todayChangeKwh: number | null } =
+          await response.json();
         if (!cancelled) {
           setBalanceInput(String(data.balanceKwh));
+          setTodayInput(
+            data.todayChangeKwh == null ? "0" : String(data.todayChangeKwh),
+          );
         }
       } catch {
         if (!cancelled) {
-          setError("Basiskontostand konnte nicht geladen werden.");
+          setError("Stromkonto-Werte konnten nicht geladen werden.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -363,7 +369,7 @@ function StromkontoEditor() {
       return;
     }
 
-    setSaving(true);
+    setSavingBalance(true);
     setError(null);
     setSuccess(null);
 
@@ -387,9 +393,47 @@ function StromkontoEditor() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
     } finally {
-      setSaving(false);
+      setSavingBalance(false);
     }
   }
+
+  async function handleSaveToday() {
+    const todayChangeKwh = parseStromkontoBalanceInput(todayInput);
+    if (todayChangeKwh == null) {
+      setError("Bitte einen gültigen Tageswert in kWh eingeben (z. B. 12.5 oder -3).");
+      setSuccess(null);
+      return;
+    }
+
+    setSavingToday(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/stromkonto", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ todayChangeKwh }),
+      });
+      const data: { todayChangeKwh?: number; anchored?: boolean; error?: string } =
+        await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Speichern fehlgeschlagen");
+      }
+      setTodayInput(String(data.todayChangeKwh));
+      setSuccess(
+        data.anchored
+          ? "Stromkonto heute gespeichert und an aktuelle Zählerstände angeheftet."
+          : "Stromkonto heute gespeichert. Anheftung erfolgt beim nächsten whatwatt-Messwert.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+    } finally {
+      setSavingToday(false);
+    }
+  }
+
+  const busy = loading || savingBalance || savingToday;
 
   return (
     <SettingsSection
@@ -406,7 +450,7 @@ function StromkontoEditor() {
       </p>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="stromkonto-balance">Basiskontostand (kWh)</Label>
+        <Label htmlFor="stromkonto-balance">Basiskontostand / Total (kWh)</Label>
         <div className="flex items-center gap-2">
           <input
             id="stromkonto-balance"
@@ -414,7 +458,7 @@ function StromkontoEditor() {
             inputMode="decimal"
             className={cn(inputClassName, "min-w-0 flex-1")}
             value={balanceInput}
-            disabled={loading || saving}
+            disabled={busy}
             onChange={(e) => setBalanceInput(e.target.value)}
             placeholder="516"
           />
@@ -423,18 +467,45 @@ function StromkontoEditor() {
             variant="secondary"
             size="sm"
             className="shrink-0"
-            disabled={loading || saving}
+            disabled={busy}
             onClick={() => void handleSaveBalance()}
           >
-            {saving ? "Speichern…" : "Basiskontostand speichern"}
+            {savingBalance ? "Speichern…" : "Total speichern"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="stromkonto-today">Stromkonto heute (kWh)</Label>
+        <div className="flex items-center gap-2">
+          <input
+            id="stromkonto-today"
+            type="text"
+            inputMode="decimal"
+            className={cn(inputClassName, "min-w-0 flex-1")}
+            value={todayInput}
+            disabled={busy}
+            onChange={(e) => setTodayInput(e.target.value)}
+            placeholder="0"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            disabled={busy}
+            onClick={() => void handleSaveToday()}
+          >
+            {savingToday ? "Speichern…" : "Heute speichern"}
           </Button>
         </div>
       </div>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Stromkonto heute wird um 00:00 Uhr Schweizer Zeit auf 0 gesetzt und zählt
-        ab dann Einspeisung minus Bezug. Der Kontostand selbst wird in der Nacht
-        vom 3. auf den 4. August auf 0 gesetzt und zählt ab dann neu.
+        Positiv = Einspeisung überwiegt, negativ = Bezug. Ab dem Speichern zählt
+        whatwatt weiter dazu. Ohne manuellen Wert startet „heute“ um 00:00 Uhr
+        Schweizer Zeit bei 0. Der Totalkontostand wird in der Nacht vom 3. auf
+        den 4. August auf 0 gesetzt und zählt ab dann neu.
       </p>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
