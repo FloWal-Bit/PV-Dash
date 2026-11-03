@@ -51,3 +51,21 @@ Das ist der alte Weg (`npm install` + `next build`) und treibt Dynamic Cloudlets
 Nach stabilem Prebuilt-Betrieb Reserved möglichst auf die **Runtime-Last**
 senken (oft deutlich unter dem früheren Build-Peak). Nicht für den Build
 reservieren — der findet ausserhalb statt.
+
+## Disk voll („keine Speicherkapazität“)
+
+Die App braucht im Prebuilt-Betrieb nur ~50–100 MB. Voll wird die Quota
+durch alte On-Node-Builds (`node_modules` ~500 MB, `.next` ~400 MB, npm-Cache
+oft GB).
+
+Sofort per **Web-SSH**:
+
+```bash
+bash ~/ROOT/scripts/jelastic-disk-cleanup.sh
+# Falls das Skript noch nicht auf dem Node ist:
+rm -rf ~/ROOT/node_modules ~/ROOT/.next ~/.npm/_cacache /tmp/pv-dash-prebuilt-*.tgz
+df -h ~
+```
+
+Danach erneut **Veröffentlichen**. Der Post-Hook räumt Legacy-Müll künftig
+selbst vor dem Extract weg.
