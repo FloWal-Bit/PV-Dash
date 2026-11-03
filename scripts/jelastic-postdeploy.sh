@@ -76,7 +76,13 @@ install_from_tarball() {
     --exclude 'scripts/' \
     "$tmp"/ "$PWD"/
   rm -rf "$tmp"
-  rm -f pv-dash-prebuilt.tgz /tmp/pv-dash-prebuilt-*.tgz 2>/dev/null || true
+  # Tarball unter $HOME behalten: start.sh stellt damit node_modules wieder her,
+  # wenn Jelastic vor dem Start `npm install` ausführt und next wegpruned.
+  if [ -f "$tarball" ]; then
+    cp -f "$tarball" "$HOME/pv-dash-prebuilt.tgz"
+    log "cached $HOME/pv-dash-prebuilt.tgz for start-restore"
+  fi
+  rm -f "$PWD/pv-dash-prebuilt.tgz" /tmp/pv-dash-prebuilt-*.tgz 2>/dev/null || true
 }
 
 download_github_release() {
@@ -135,8 +141,9 @@ preserve_data
 if [ -f server.js ] && [ -d .next/static ] && [ -f .prebuilt-version ]; then
   log "existing prebuilt server.js — light cleanup only"
   rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" dist 2>/dev/null || true
-  rm -f /tmp/pv-dash-prebuilt-*.tgz pv-dash-prebuilt.tgz 2>/dev/null || true
-  log "version=$(cat .prebuilt-version)"
+  rm -f /tmp/pv-dash-prebuilt-*.tgz "$PWD/pv-dash-prebuilt.tgz" 2>/dev/null || true
+  # $HOME/pv-dash-prebuilt.tgz bewusst behalten (start-restore nach npm prune).
+  log "version=$(cat .prebuilt-version) home-tarball=$([ -f "$HOME/pv-dash-prebuilt.tgz" ] && echo yes || echo no)"
   exit 0
 fi
 
@@ -184,11 +191,12 @@ Erwartet:
 Sofort per Web-SSH (Workaround):
   cd ~/ROOT
   curl -fsSL -L -o /tmp/pv-dash-prebuilt.tgz \\
-    https://github.com/FloWal-Bit/PV-Dash/releases/download/v1.5.7.3/pv-dash-prebuilt.tgz
+    https://github.com/FloWal-Bit/PV-Dash/releases/download/v${VERSION:-X.Y.Z}/pv-dash-prebuilt.tgz
+  cp -f /tmp/pv-dash-prebuilt.tgz ~/pv-dash-prebuilt.tgz
   mkdir -p /tmp/pb && tar -xzf /tmp/pv-dash-prebuilt.tgz -C /tmp/pb
   rsync -a --delete --exclude '.data/' --exclude '.env' --exclude '.env.*' --exclude 'scripts/' /tmp/pb/ ~/ROOT/
   rm -rf /tmp/pb /tmp/pv-dash-prebuilt.tgz
-  # Danach App neu starten (Dashboard → Restart)
+  # Danach Knoten neu starten (start.sh restored nach npm-prune)
 
 Notfall (teuer): ALLOW_LEGACY_BUILD=1 bash ~/ROOT/scripts/jelastic-postdeploy.sh
 EOF

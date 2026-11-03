@@ -25,6 +25,17 @@ npm start
 Das startet `start.sh` → zwingend `HOSTNAME=0.0.0.0 node server.js` (PORT von Jelastic).
 Ohne festes `0.0.0.0` bindet Next an den Container-Hostnamen → **502** am Proxy.
 
+**Wichtig:** Jelastic führt vor dem Start oft `npm install` aus. Unser Prebuilt-`package.json`
+listet keine dependencies (sonst Cloudlet-Kosten). Dadurch pruned npm die getrace’ten
+`node_modules` (Symptom: `Cannot find module 'next'`). `start.sh` stellt sie aus
+`$HOME/pv-dash-prebuilt.tgz` wieder her — der Post-Hook legt diese Datei ab und löscht sie
+nicht. Manuell einmalig:
+
+```bash
+curl -fsSL -L -o ~/pv-dash-prebuilt.tgz \
+  https://github.com/FloWal-Bit/PV-Dash/releases/download/vX.Y.Z/pv-dash-prebuilt.tgz
+```
+
 ## Lokal packen (ohne CI)
 
 ```bash
