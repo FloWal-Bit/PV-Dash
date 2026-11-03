@@ -9,7 +9,11 @@ const nextConfig: NextConfig = {
   // hydrates (stuck showing the server-rendered skeleton forever).
   allowedDevOrigins: ["127.0.0.1", "localhost"],
 
-  // Weniger Peak-RAM beim Production-Build auf Infomaniak/Jelastic.
+  // Prebuilt-Deploy für Infomaniak: `.next/standalone` enthält server.js +
+  // getrace'te node_modules. Jelastic baut nicht mehr selbst (Cloudlet-Kosten).
+  output: "standalone",
+
+  // Weniger Peak-RAM beim Production-Build (lokal/CI).
   // Kein custom `webpack()`-Hook: sonst fällt der Default-Build-Worker weg.
   productionBrowserSourceMaps: false,
   enablePrerenderSourceMaps: false,
