@@ -127,9 +127,13 @@ export function SwipePageSurface({
     swipeEnabled,
     ignoreSwipeSelector,
   );
+  const { className: swipeClassName, ...swipeHandlers } = bindSwipeSurface;
 
   return (
-    <div className={cn("flex flex-col gap-2", className)} {...bindSwipeSurface}>
+    <div
+      className={cn("flex flex-col gap-2", swipeClassName, className)}
+      {...swipeHandlers}
+    >
       {children}
       <SwipePageDots labels={labels} page={page} onPageChange={onPageChange} />
     </div>
