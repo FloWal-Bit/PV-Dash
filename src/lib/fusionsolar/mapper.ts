@@ -331,29 +331,51 @@ export function mapDaySeriesToWeek(
     });
 }
 
+function emptyDailyPoint(label: string): DailyEnergyPoint {
+  return {
+    label,
+    yieldKwh: 0,
+    consumptionKwh: 0,
+    directSolarKwh: 0,
+    batteryKwh: 0,
+  };
+}
+
+function daysInCalendarMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
 export function mapDaySeriesToMonth(
   items: StationKpiTimeseriesItem[],
   hasBattery: boolean,
 ): DailyEnergyPoint[] {
-  return [...items]
-    .sort((a, b) => a.collectTime - b.collectTime)
-    .map((item) => {
-      const parts = zurichParts(item.collectTime);
-      const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
-      const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
-      const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
-        yieldKwhRounded,
-        consumptionKwhRounded,
-        hasBattery,
-      );
-      return {
-        label: String(parts.day),
-        yieldKwh: yieldKwhRounded,
-        consumptionKwh: consumptionKwhRounded,
-        directSolarKwh,
-        batteryKwh,
-      };
+  const now = zurichParts(Date.now());
+  const byDay = new Map<string, DailyEnergyPoint>();
+  for (const item of [...items].sort((a, b) => a.collectTime - b.collectTime)) {
+    const parts = zurichParts(item.collectTime);
+    const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
+    const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
+    const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
+      yieldKwhRounded,
+      consumptionKwhRounded,
+      hasBattery,
+    );
+    byDay.set(String(parts.day), {
+      label: String(parts.day),
+      yieldKwh: yieldKwhRounded,
+      consumptionKwh: consumptionKwhRounded,
+      directSolarKwh,
+      batteryKwh,
     });
+  }
+  // Alle Kalendertage des laufenden Monats, auch ohne Messwerte (als 0).
+  const days = daysInCalendarMonth(now.year, now.month);
+  const points: DailyEnergyPoint[] = [];
+  for (let day = 1; day <= days; day++) {
+    const label = String(day);
+    points.push(byDay.get(label) ?? emptyDailyPoint(label));
+  }
+  return points;
 }
 
 const MONTHS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
@@ -361,32 +383,39 @@ const MONTHS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep
 /**
  * getKpiStationMonth liefert einen Eintrag pro Kalendermonat des Jahres
  * um `collectTime` – für die "Jahr"-Ansicht im Verlaufs-Chart.
+ * Fehlende und künftige Monate werden mit 0 aufgefüllt (Jan–Dez).
  */
 export function mapMonthSeriesToYear(
   items: StationKpiTimeseriesItem[],
   hasBattery: boolean,
 ): DailyEnergyPoint[] {
   const now = zurichParts(Date.now());
-  return [...items]
-    .sort((a, b) => a.collectTime - b.collectTime)
-    .map((item) => {
-      const parts = zurichParts(item.collectTime);
-      const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
-      const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
-      const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
-        yieldKwhRounded,
-        consumptionKwhRounded,
-        hasBattery,
-      );
-      const isCurrentMonth = parts.year === now.year && parts.month === now.month;
-      return {
-        label: isCurrentMonth ? "Dieser Monat" : MONTHS_DE[parts.month - 1],
-        yieldKwh: yieldKwhRounded,
-        consumptionKwh: consumptionKwhRounded,
-        directSolarKwh,
-        batteryKwh,
-      };
+  const byMonth = new Map<number, DailyEnergyPoint>();
+  for (const item of [...items].sort((a, b) => a.collectTime - b.collectTime)) {
+    const parts = zurichParts(item.collectTime);
+    const yieldKwhRounded = stationYieldKwh(item.dataItemMap);
+    const consumptionKwhRounded = stationConsumptionKwh(item.dataItemMap);
+    const { directSolarKwh, batteryKwh } = splitConsumptionApprox(
+      yieldKwhRounded,
+      consumptionKwhRounded,
+      hasBattery,
+    );
+    const isCurrentMonth = parts.year === now.year && parts.month === now.month;
+    byMonth.set(parts.month, {
+      label: isCurrentMonth ? "Dieser Monat" : MONTHS_DE[parts.month - 1],
+      yieldKwh: yieldKwhRounded,
+      consumptionKwh: consumptionKwhRounded,
+      directSolarKwh,
+      batteryKwh,
     });
+  }
+  const points: DailyEnergyPoint[] = [];
+  for (let month = 1; month <= 12; month++) {
+    const label = month === now.month ? "Dieser Monat" : MONTHS_DE[month - 1];
+    const existing = byMonth.get(month);
+    points.push(existing ? { ...existing, label } : emptyDailyPoint(label));
+  }
+  return points;
 }
 
 /**
