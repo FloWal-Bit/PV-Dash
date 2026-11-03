@@ -336,7 +336,43 @@ export function meterTotalsSinceZurichDayStart(
 }
 
 /**
+ * Manueller Tageswert plus Zählerdelta seit dem Speichern.
+ * Fehlt die Anheftung noch, wird sie mit dem aktuellen Zählerstand gesetzt.
+ */
+function resolveManualTodayChange(
+  state: PersistedState,
+  cumulativeImportKwh: number,
+  cumulativeExportKwh: number,
+  now: Date,
+): { changeTodayKwh: number; state: PersistedState } | null {
+  const today = state.today;
+  if (!today || today.day !== appDayKey(now)) return null;
+
+  if (today.importKwh == null || today.exportKwh == null) {
+    const anchored: PersistedState = {
+      ...state,
+      today: {
+        ...today,
+        importKwh: cumulativeImportKwh,
+        exportKwh: cumulativeExportKwh,
+      },
+    };
+    saveState(anchored);
+    return { changeTodayKwh: round(today.changeKwh), state: anchored };
+  }
+
+  const deltaExport = cumulativeExportKwh - today.exportKwh;
+  const deltaImport = cumulativeImportKwh - today.importKwh;
+  return {
+    changeTodayKwh: round(today.changeKwh + deltaExport - deltaImport),
+    state,
+  };
+}
+
+/**
  * Berechnet Stromkonto aus kumulierten Zählerständen und Tagesdeltas.
+ * Ein manuell gesetzter Tageswert (Dev-Settings) überschreibt die reine
+ * Mitternachts-Differenz und läuft danach mit dem Zähler weiter.
  */
 export function computeStromkonto(
   cumulativeImportKwh: number,
@@ -377,7 +413,14 @@ export function computeStromkonto(
     baseline.exportBaseline -
     (cumulativeImportKwh - baseline.importBaseline);
 
-  const changeTodayKwh = round(gridFeedInTodayKwh - gridImportTodayKwh);
+  const manualToday = resolveManualTodayChange(
+    state,
+    cumulativeImportKwh,
+    cumulativeExportKwh,
+    now,
+  );
+  const changeTodayKwh =
+    manualToday?.changeTodayKwh ?? round(gridFeedInTodayKwh - gridImportTodayKwh);
 
   return {
     balanceKwh: round(state.configuredBalanceKwh + netDeltaKwh),
@@ -409,10 +452,12 @@ export function applyStromkontoToSnapshot(
   }
 
   const base = getStromkontoBaseBalance();
+  const manualToday = getStromkontoTodayChange();
   const changeToday =
-    snapshot.gridFeedInTodayKwh != null
+    manualToday ??
+    (snapshot.gridFeedInTodayKwh != null
       ? round(snapshot.gridFeedInTodayKwh - (snapshot.gridImportTodayKwh ?? 0))
-      : null;
+      : null);
 
   if (changeToday != null) {
     return {
