@@ -234,7 +234,10 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
 
   const devSettings = getSharedDevSettings();
   const yieldForecast = await getOpenMeteoTodayAndTomorrowYieldKwh(
-    defaultYieldForecastPlant(),
+    {
+      ...defaultYieldForecastPlant(),
+      performanceRatio: devSettings.performanceRatio,
+    },
     new Date(snapshot.timestamp),
   );
 

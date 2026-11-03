@@ -1,6 +1,8 @@
 /**
  * Anlagenwerte für die Ertragsprognose.
  * Stundenweise Einstrahlung (GTI) × kWp / 1000 × Leistungsfaktor.
+ * Der Leistungsfaktor (PR) liegt in den Dev Settings auf dem Server und gilt für alle Clients.
+ * Geometrie (Koordinaten, Neigung, Azimut, kWp) bleibt vorerst lokal.
  */
 
 import {
@@ -96,6 +98,14 @@ function emit() {
   for (const listener of listeners) listener();
 }
 
+function writeState(next: YieldForecastPlant): void {
+  state = next;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  }
+  emit();
+}
+
 export const yieldForecastStore = {
   subscribe(listener: Listener): () => void {
     state = readYieldForecastPlant();
@@ -115,12 +125,36 @@ export const yieldForecastStore = {
       performanceRatio: DEFAULT_OPEN_METEO_PERFORMANCE_RATIO,
     };
   },
+  /** Speichert Geometrie lokal; PR separat über persistPerformanceRatio. */
   save(plant: YieldForecastPlant): void {
-    const normalized = normalizeYieldForecastPlant(plant);
-    state = normalized;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    writeState(normalizeYieldForecastPlant(plant));
+  },
+  /**
+   * Schreibt den Leistungsfaktor auf den Server (gilt für alle Clients)
+   * und aktualisiert die lokale Anzeige optimistisch.
+   */
+  persistPerformanceRatio(performanceRatio: number): Promise<void> {
+    const previous = state;
+    writeState(normalizeYieldForecastPlant({ ...state, performanceRatio }));
+    return import("@/lib/dev-settings-sync").then(({ putDevSettings }) =>
+      putDevSettings({ performanceRatio })
+        .then(() => undefined)
+        .catch((error: unknown) => {
+          writeState(previous);
+          throw error;
+        }),
+    );
+  },
+  /** Übernimmt den serverseitigen PR aus den Dev Settings. */
+  applyRemotePerformanceRatio(performanceRatio: number): void {
+    if (
+      !Number.isFinite(performanceRatio) ||
+      performanceRatio <= 0 ||
+      performanceRatio > 1.2 ||
+      performanceRatio === state.performanceRatio
+    ) {
+      return;
     }
-    emit();
+    writeState(normalizeYieldForecastPlant({ ...state, performanceRatio }));
   },
 };
