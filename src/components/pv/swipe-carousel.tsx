@@ -5,11 +5,21 @@ import { cn } from "@/lib/utils";
 
 const SWIPE_THRESHOLD_PX = 48;
 
+function eventFromIgnoredZone(
+  target: EventTarget | null,
+  ignoreSelector?: string,
+): boolean {
+  if (!ignoreSelector || !(target instanceof Element)) return false;
+  return Boolean(target.closest(ignoreSelector));
+}
+
 function useSwipePageNavigation(
   page: number,
   pageCount: number,
   onPageChange?: (page: number) => void,
   enabled = true,
+  /** Gesten aus diesem Selektor (z. B. `.recharts-wrapper`) wechseln keine Seite. */
+  ignoreSwipeSelector?: string,
 ) {
   const touchStartX = useRef<number | null>(null);
 
@@ -24,7 +34,7 @@ function useSwipePageNavigation(
   const bindSwipeSurface = {
     className: enabled ? "touch-pan-y" : "touch-none",
     onTouchStart: (e: TouchEvent) => {
-      if (!enabled) {
+      if (!enabled || eventFromIgnoredZone(e.target, ignoreSwipeSelector)) {
         touchStartX.current = null;
         return;
       }
@@ -38,7 +48,7 @@ function useSwipePageNavigation(
       else if (delta >= SWIPE_THRESHOLD_PX) goTo(page - 1);
     },
     onPointerDown: (e: PointerEvent) => {
-      if (!enabled) {
+      if (!enabled || eventFromIgnoredZone(e.target, ignoreSwipeSelector)) {
         touchStartX.current = null;
         return;
       }
@@ -95,6 +105,7 @@ export function SwipePageSurface({
   children,
   className,
   swipeEnabled = true,
+  ignoreSwipeSelector,
 }: {
   labels: string[];
   page: number;
@@ -103,17 +114,23 @@ export function SwipePageSurface({
   className?: string;
   /** Aus, solange z. B. das Chart-Overlay offen ist und horizontal gescrollt wird. */
   swipeEnabled?: boolean;
+  /**
+   * Wischgesten, die in diesem Element starten (CSS-Selektor), wechseln keine
+   * Seite — z. B. `.recharts-wrapper`, damit das Diagramm selbst tipp-/scrubbar bleibt.
+   */
+  ignoreSwipeSelector?: string;
 }) {
   const { bindSwipeSurface } = useSwipePageNavigation(
     page,
     labels.length,
     onPageChange,
     swipeEnabled,
+    ignoreSwipeSelector,
   );
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <div {...bindSwipeSurface}>{children}</div>
+    <div className={cn("flex flex-col gap-2", className)} {...bindSwipeSurface}>
+      {children}
       <SwipePageDots labels={labels} page={page} onPageChange={onPageChange} />
     </div>
   );

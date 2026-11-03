@@ -45,7 +45,7 @@ import {
   promptHomeScreenInstall,
   subscribeHomeScreenInstall,
 } from "@/lib/install-prompt";
-import { APP_NAME, APP_VERSION_LABEL } from "@/lib/version";
+import { APP_NAME } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
 const inputClassName =
@@ -455,6 +455,7 @@ function YieldForecastEditor() {
   const [azimuth, setAzimuth] = useState(String(plant.azimuthDeg));
   const [peakKwp, setPeakKwp] = useState(String(plant.peakKwp));
   const [performanceRatio, setPerformanceRatio] = useState(String(plant.performanceRatio));
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -467,7 +468,7 @@ function YieldForecastEditor() {
     setPerformanceRatio(String(plant.performanceRatio));
   }, [plant]);
 
-  function handleSave() {
+  async function handleSave() {
     const next = {
       latitude: parseYieldForecastInput(latitude),
       longitude: parseYieldForecastInput(longitude),
@@ -506,16 +507,31 @@ function YieldForecastEditor() {
       setSuccess(null);
       return;
     }
-    yieldForecastStore.save({
-      latitude: next.latitude,
-      longitude: next.longitude,
-      tiltDeg: next.tiltDeg,
-      azimuthDeg: next.azimuthDeg,
-      peakKwp: next.peakKwp,
-      performanceRatio: next.performanceRatio,
-    });
+
+    setSaving(true);
     setError(null);
-    setSuccess("Gespeichert. Die Prognose rechnet vorerst mit den festen Anlagenwerten.");
+    setSuccess(null);
+    try {
+      // Geometrie lokal; PR auf dem Server für alle Clients.
+      yieldForecastStore.save({
+        latitude: next.latitude,
+        longitude: next.longitude,
+        tiltDeg: next.tiltDeg,
+        azimuthDeg: next.azimuthDeg,
+        peakKwp: next.peakKwp,
+        performanceRatio: next.performanceRatio,
+      });
+      await yieldForecastStore.persistPerformanceRatio(next.performanceRatio);
+      const { pvStore } = await import("@/lib/pv-store");
+      pvStore.reload();
+      setSuccess(
+        "Gespeichert. Der Leistungsfaktor gilt für alle Geräte; die Prognose wird neu berechnet.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -526,7 +542,8 @@ function YieldForecastEditor() {
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
         Stundenweise Einstrahlung am Standort, mal Leistung, mal Leistungsfaktor. Neigung
-        beschreibt die Module, Azimut 0° ist Süden.
+        beschreibt die Module, Azimut 0° ist Süden. Der Leistungsfaktor liegt auf dem Server und
+        gilt für alle Geräte.
       </p>
       <ForecastField id="forecast-lat" label="Breite" value={latitude} onChange={setLatitude} />
       <ForecastField id="forecast-lon" label="Länge" value={longitude} onChange={setLongitude} />
@@ -534,7 +551,7 @@ function YieldForecastEditor() {
       <ForecastField id="forecast-azimuth" label="Azimut (°)" value={azimuth} onChange={setAzimuth} />
       <ForecastField id="forecast-kwp" label="Leistung (kWp)" value={peakKwp} onChange={setPeakKwp} />
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="forecast-pr">Leistungsfaktor</Label>
+        <Label htmlFor="forecast-pr">Leistungsfaktor (PR)</Label>
         <div className="flex items-center gap-2">
           <input
             id="forecast-pr"
@@ -542,13 +559,21 @@ function YieldForecastEditor() {
             inputMode="decimal"
             className={cn(inputClassName, "min-w-0 flex-1")}
             value={performanceRatio}
+            disabled={saving}
             onChange={(event) => {
               setPerformanceRatio(event.target.value);
               setSuccess(null);
             }}
           />
-          <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={handleSave}>
-            Prognose speichern
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            disabled={saving}
+            onClick={() => void handleSave()}
+          >
+            {saving ? "…" : "Prognose speichern"}
           </Button>
         </div>
       </div>
@@ -674,7 +699,7 @@ export function DeveloperPlantSettings() {
   );
 }
 
-/** Open-Meteo-Zeile mit PR aus den Dev-Einstellungen (Ertragsprognose). */
+/** Open-Meteo-Zeile mit PR aus den serverweiten Dev-Einstellungen. */
 function AboutOpenMeteoSource() {
   const plant = useSyncExternalStore(
     yieldForecastStore.subscribe,
@@ -798,16 +823,6 @@ export function SettingsDialog() {
               Florian Walther, Herbst 2026.
             </p>
           </SettingsSection>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-muted/30 px-5 py-3">
-          <div className="flex min-w-0 flex-col">
-            <span className="text-sm font-medium">{APP_NAME}</span>
-            <span className="text-xs text-muted-foreground">PV-Monitor</span>
-          </div>
-          <span className="rounded-full bg-background px-2.5 py-1 text-[11px] font-medium tabular-nums text-muted-foreground ring-1 ring-border">
-            {APP_VERSION_LABEL}
-          </span>
         </div>
       </DialogContent>
     </Dialog>

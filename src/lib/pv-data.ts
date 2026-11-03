@@ -329,9 +329,20 @@ export function getMonthHistory(now: Date = new Date()): DailyEnergyPoint[] {
   const year = now.getFullYear();
   const month = now.getMonth();
   const todayDate = now.getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  for (let day = 1; day <= todayDate; day++) {
-    const sample = new Date(year, month, day);
+  for (let day = 1; day <= daysInMonth; day++) {
+    // Künftige Tage ohne Messwerte: Achse trotzdem mit 0 füllen.
+    if (day > todayDate) {
+      points.push({
+        label: String(day),
+        yieldKwh: 0,
+        consumptionKwh: 0,
+        directSolarKwh: 0,
+        batteryKwh: 0,
+      });
+      continue;
+    }
     const seed = year * 400 + month * 31 + day;
     const weatherScale = 0.55 + smoothNoise(seed) * 0.5;
     const yieldKwh =
@@ -341,7 +352,9 @@ export function getMonthHistory(now: Date = new Date()): DailyEnergyPoint[] {
     const consumptionKwh = round(24 + smoothNoise(seed * 5.3) * 10);
     const { directSolarKwh, batteryKwh } = splitConsumption(yieldKwh, consumptionKwh, seed);
     points.push({
-      label: day === todayDate ? "Heute" : String(day),
+      // Numerisches Label wie in FusionSolar (`mapDaySeriesToMonth`), damit
+      // Live-Overlay und Monats-Padding denselben Schlüssel nutzen.
+      label: String(day),
       yieldKwh: round(yieldKwh),
       consumptionKwh,
       directSolarKwh,
@@ -361,7 +374,8 @@ const MONTHS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep
 
 /**
  * Monatsübersicht des laufenden Kalenderjahres. Vergangene Monate zählen
- * voll, der aktuelle Monat nur bis heute. Die Ertragskurve folgt grob der
+ * voll, der aktuelle Monat nur bis heute; künftige Monate erscheinen mit 0,
+ * damit die Achse immer Jan–Dez zeigt. Die Ertragskurve folgt grob der
  * saisonalen Einstrahlung in der Schweiz (Sommer höher, Winter niedriger).
  */
 export function getYearHistory(now: Date = new Date()): DailyEnergyPoint[] {
@@ -369,7 +383,17 @@ export function getYearHistory(now: Date = new Date()): DailyEnergyPoint[] {
   const year = now.getFullYear();
   const currentMonth = now.getMonth();
 
-  for (let month = 0; month <= currentMonth; month++) {
+  for (let month = 0; month < 12; month++) {
+    if (month > currentMonth) {
+      points.push({
+        label: MONTHS_DE[month],
+        yieldKwh: 0,
+        consumptionKwh: 0,
+        directSolarKwh: 0,
+        batteryKwh: 0,
+      });
+      continue;
+    }
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const elapsedDays = month === currentMonth ? now.getDate() : daysInMonth;
     const seed = year * 400 + month * 31 + 19;
