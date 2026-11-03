@@ -1057,104 +1057,106 @@ export function ChartsSection({
         }
       }}
     >
-      <CardHeader className="-mt-(--card-spacing) pt-(--card-spacing)">
-        <div className="flex flex-col gap-1">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Ertrag / Verbrauch / Stromkonto
-          </CardTitle>
-          <span className="text-xs text-muted-foreground">
-            {hidePv ? (
-              "Simulierte Verläufe sind ausgeblendet"
-            ) : (
-              <RangeTotal text={total} />
-            )}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="yield-chart-body">
-        <SwipePageSurface
-          labels={RANGE_LABELS}
-          page={page}
-          swipeEnabled={!tooltipOpen}
-          onPageChange={(next) => {
-            setTooltipDismissed(true);
-            if (next !== page) suppressChartOpenUntil.current = Date.now() + 400;
-            setPage(next);
-            if (next !== page) pvStore.refreshHistory();
-          }}
-          className="yield-chart-surface pb-1"
-        >
-          <div className="yield-chart-stack flex flex-col gap-3">
-            <div
-              className={cn(
-                "yield-chart-plot h-56 min-w-0 landscape:h-64 sm:h-72 transition-opacity",
-                tooltipOpen && "touch-none",
-                !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
-              )}
-              style={
-                hidePv || todayEnergyMissing
-                  ? undefined
-                  : { marginLeft: -CHART_PULL_LEFT, width: `calc(100% + ${CHART_PULL_LEFT}px)` }
-              }
-            >
-              {hidePv ? (
-                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-                  Keine gemessenen Verlaufsdaten.
-                </div>
-              ) : todayEnergyMissing ? (
-                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-                  Für heute liegen noch keine Ertrags- und Verbrauchsdaten vor.
-                </div>
-              ) : range === "heute" ? (
-                <TodayPowerChart data={todayChartData} series={series} tooltipActive={tooltipOpen} />
-              ) : (
-                <YieldConsumptionChart
-                  data={barData}
-                  unit={range === "jahr" || range === "lebensdauer" ? "MWh" : "kWh"}
-                  trimDecimal={range === "jahr"}
-                  expandWeekdayLabel={range === "woche"}
-                  expandMonthDayLabel={range === "monat"}
-                  expandMonthNameLabel={range === "jahr"}
-                  showStromkonto={range !== "lebensdauer"}
-                  series={series}
-                  tooltipActive={tooltipOpen}
-                />
-              )}
+      <SwipePageSurface
+        labels={RANGE_LABELS}
+        page={page}
+        ignoreSwipeSelector=".recharts-wrapper"
+        onPageChange={(next) => {
+          setTooltipDismissed(true);
+          if (next !== page) suppressChartOpenUntil.current = Date.now() + 400;
+          setPage(next);
+          if (next !== page) pvStore.refreshHistory();
+        }}
+        className="yield-chart-surface min-h-0 flex-1 pb-1"
+      >
+        <div className="flex min-h-0 flex-1 flex-col gap-(--card-spacing)">
+          <CardHeader className="-mt-(--card-spacing) pt-(--card-spacing)">
+            <div className="flex flex-col gap-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Ertrag / Verbrauch / Stromkonto
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                {hidePv ? (
+                  "Simulierte Verläufe sind ausgeblendet"
+                ) : (
+                  <RangeTotal text={total} />
+                )}
+              </span>
             </div>
-            <div
-              className={cn(
-                "flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground transition-opacity",
-                !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
-                hidePv && "invisible",
-              )}
-            >
-              {(
-                [
-                  ["ertrag", "Ertrag", "bg-chart-3", "border-chart-3"],
-                  ["verbrauch", "Verbrauch", "bg-chart-5", "border-chart-5"],
-                  ["eigenverbrauch", "Eigenverbrauch", "bg-eigenverbrauch", "border-eigenverbrauch"],
-                ] as const
-              ).map(([key, label, fill, ring]) => (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={series[key]}
-                  onClick={() => setSeries((current) => ({ ...current, [key]: !current[key] }))}
-                  className="flex cursor-pointer items-center gap-1.5"
-                >
-                  <span
-                    className={cn(
-                      "size-2 rounded-full box-border",
-                      series[key] ? fill : `border ${ring}`,
-                    )}
+          </CardHeader>
+          <CardContent className="yield-chart-body">
+            <div className="yield-chart-stack flex flex-col gap-3">
+              <div
+                className={cn(
+                  "yield-chart-plot h-56 min-w-0 landscape:h-64 sm:h-72 transition-opacity",
+                  tooltipOpen && "touch-none",
+                  !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
+                )}
+                style={
+                  hidePv || todayEnergyMissing
+                    ? undefined
+                    : { marginLeft: -CHART_PULL_LEFT, width: `calc(100% + ${CHART_PULL_LEFT}px)` }
+                }
+              >
+                {hidePv ? (
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                    Keine gemessenen Verlaufsdaten.
+                  </div>
+                ) : todayEnergyMissing ? (
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                    Für heute liegen noch keine Ertrags- und Verbrauchsdaten vor.
+                  </div>
+                ) : range === "heute" ? (
+                  <TodayPowerChart data={todayChartData} series={series} tooltipActive={tooltipOpen} />
+                ) : (
+                  <YieldConsumptionChart
+                    data={barData}
+                    unit={range === "jahr" || range === "lebensdauer" ? "MWh" : "kWh"}
+                    trimDecimal={range === "jahr"}
+                    expandWeekdayLabel={range === "woche"}
+                    expandMonthDayLabel={range === "monat"}
+                    expandMonthNameLabel={range === "jahr"}
+                    showStromkonto={range !== "lebensdauer"}
+                    series={series}
+                    tooltipActive={tooltipOpen}
                   />
-                  {label}
-                </button>
-              ))}
+                )}
+              </div>
+              <div
+                className={cn(
+                  "flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground transition-opacity",
+                  !hidePv && pvSimulated && SIMULATED_OPACITY_CLASS,
+                  hidePv && "invisible",
+                )}
+              >
+                {(
+                  [
+                    ["ertrag", "Ertrag", "bg-chart-3", "border-chart-3"],
+                    ["verbrauch", "Verbrauch", "bg-chart-5", "border-chart-5"],
+                    ["eigenverbrauch", "Eigenverbrauch", "bg-eigenverbrauch", "border-eigenverbrauch"],
+                  ] as const
+                ).map(([key, label, fill, ring]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={series[key]}
+                    onClick={() => setSeries((current) => ({ ...current, [key]: !current[key] }))}
+                    className="flex cursor-pointer items-center gap-1.5"
+                  >
+                    <span
+                      className={cn(
+                        "size-2 rounded-full box-border",
+                        series[key] ? fill : `border ${ring}`,
+                      )}
+                    />
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </SwipePageSurface>
-      </CardContent>
+          </CardContent>
+        </div>
+      </SwipePageSurface>
     </Card>
   );
 }
