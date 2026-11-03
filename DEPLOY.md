@@ -8,7 +8,9 @@ Kosten niedrig bleiben. Der Build läuft auf GitHub Actions (oder lokal).
 1. Änderungen nach `main` mergen (Version in `package.json` / `src/lib/version.ts` setzen).
 2. Workflow **Prebuilt release** abwarten (grün) — erzeugt Release `vX.Y.Z` mit Asset `pv-dash-prebuilt.tgz`.
 3. In Jelastic **Veröffentlichen** (Git-Sync + Post-Hook).
-4. Post-Hook lädt das Release-Asset, entpackt es nach `~/ROOT`, erhält `.data/`.
+4. Post-Hook lädt das Release-Asset, entpackt es nach `~/ROOT`.
+   Runtime-Daten liegen unter `~/pv-dash-persist/.data` (Symlink `~/ROOT/.data`),
+   damit Git-Publish/Stromkonto die Werte nicht bei jedem Veröffentlichen löscht.
 
 Post-Hook im Dashboard:
 

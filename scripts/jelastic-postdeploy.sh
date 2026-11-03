@@ -16,8 +16,24 @@ log() { echo "[postdeploy] $*" >&2; }
 
 log "mode=prebuilt cwd=$PWD"
 
+# Runtime-Daten (Stromkonto, whatwatt-Samples, Dev-Settings, …) liegen bewusst
+# ausserhalb von ROOT. Jelastics Git-Publish macht oft `git clean` und löscht
+# sonst untracked `.data/` bei jedem Veröffentlichen.
+PERSIST_ROOT="${HOME}/pv-dash-persist"
+PERSIST_DATA="${PERSIST_ROOT}/.data"
+
 preserve_data() {
-  mkdir -p .data
+  mkdir -p "$PERSIST_DATA"
+  if [ -d .data ] && [ ! -L .data ]; then
+    log "migrating ROOT/.data → $PERSIST_DATA"
+    rsync -a .data/ "$PERSIST_DATA/"
+    rm -rf .data
+  elif [ -L .data ]; then
+    # kaputter Symlink nach git clean → neu setzen
+    rm -f .data
+  fi
+  ln -sfn "$PERSIST_DATA" .data
+  log "data → $(readlink -f .data 2>/dev/null || readlink .data) (stromkonto=$([ -f .data/stromkonto.json ] && echo yes || echo no))"
 }
 
 # Alte On-Node-Builds füllen die Quota (node_modules ~500MB, .next ~400MB, npm-Cache GB).
@@ -83,6 +99,7 @@ install_from_tarball() {
     log "cached $HOME/pv-dash-prebuilt.tgz for start-restore"
   fi
   rm -f "$PWD/pv-dash-prebuilt.tgz" /tmp/pv-dash-prebuilt-*.tgz 2>/dev/null || true
+  preserve_data
 }
 
 download_github_release() {
@@ -143,6 +160,7 @@ if [ -f server.js ] && [ -d .next/static ] && [ -f .prebuilt-version ]; then
   rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" dist 2>/dev/null || true
   rm -f /tmp/pv-dash-prebuilt-*.tgz "$PWD/pv-dash-prebuilt.tgz" 2>/dev/null || true
   # $HOME/pv-dash-prebuilt.tgz bewusst behalten (start-restore nach npm prune).
+  preserve_data
   log "version=$(cat .prebuilt-version) home-tarball=$([ -f "$HOME/pv-dash-prebuilt.tgz" ] && echo yes || echo no)"
   exit 0
 fi

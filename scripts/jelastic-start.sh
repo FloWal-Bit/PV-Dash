@@ -13,11 +13,23 @@ export HOSTNAME=0.0.0.0
 # Jelastic setzt PORT; Fallback nur für lokale Smoke-Tests.
 export PORT="${PORT:-3000}"
 
-# Prefers artifact start.sh (stellt node_modules nach npm-prune wieder her).
+# Prefers artifact start.sh (stellt node_modules nach npm-prune wieder her
+# und verlinkt ~/pv-dash-persist/.data).
 if [ -f start.sh ] && [ -f server.js ]; then
   echo "[start] delegating to ./start.sh"
   exec bash start.sh
 fi
+
+# Fallback ohne start.sh: Daten-Symlink trotzdem setzen.
+persist="${HOME}/pv-dash-persist/.data"
+mkdir -p "$persist"
+if [ -d .data ] && [ ! -L .data ]; then
+  rsync -a .data/ "$persist/"
+  rm -rf .data
+elif [ -L .data ]; then
+  rm -f .data
+fi
+ln -sfn "$persist" .data
 
 if [ -f server.js ] && [ -d .next/static ]; then
   echo "[start] prebuilt root server.js PORT=$PORT"

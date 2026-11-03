@@ -55,6 +55,19 @@ export NODE_ENV=production
 export HOSTNAME=0.0.0.0
 export PORT="${PORT:-3000}"
 
+# Stromkonto & Co. ausserhalb ROOT (überlebt Git-Publish / git clean).
+ensure_persistent_data() {
+  local persist="${HOME}/pv-dash-persist/.data"
+  mkdir -p "$persist"
+  if [ -d .data ] && [ ! -L .data ]; then
+    rsync -a .data/ "$persist/"
+    rm -rf .data
+  elif [ -L .data ]; then
+    rm -f .data
+  fi
+  ln -sfn "$persist" .data
+}
+
 restore_prebuilt_if_needed() {
   if [ -f node_modules/next/package.json ] && [ -f server.js ] && [ -d .next/static ]; then
     return 0
@@ -96,6 +109,7 @@ restore_prebuilt_if_needed() {
   fi
 }
 
+ensure_persistent_data
 restore_prebuilt_if_needed
 echo "[start] prebuilt node server.js PORT=$PORT HOSTNAME=$HOSTNAME"
 exec node server.js
