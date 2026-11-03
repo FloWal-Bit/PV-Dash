@@ -42,6 +42,7 @@ export function BacklogDialog({
     eventDetails: { reason: string; event: Event; cancel: () => void },
   ) => void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
   const { items, loading, error } = useSyncExternalStore(
     backlogStore.subscribe,
     backlogStore.getSnapshot,
@@ -76,7 +77,12 @@ export function BacklogDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] gap-0 overflow-hidden p-0 sm:max-w-md">
+      <DialogContent
+        ref={panelRef}
+        // Sonst landet der Fokus im Info-Banner-Textarea (Caret/Tastatur).
+        initialFocus={panelRef}
+        className="max-h-[90dvh] gap-0 overflow-hidden p-0 sm:max-w-md"
+      >
         <div className="border-b border-border/70 bg-muted/40 px-5 py-4">
           <DialogHeader className="gap-1.5">
             <DialogTitle className="text-lg">Dev Settings</DialogTitle>
