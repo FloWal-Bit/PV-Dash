@@ -1,37 +1,143 @@
 #!/bin/bash
-# Post-Deploy-Hook für Infomaniak Jelastic Cloud.
+# Post-Deploy-Hook für Infomaniak Jelastic Cloud (Prebuilt).
 # Im Deploy-Dialog unter "Hooks" → Post:
 #   bash ~/ROOT/scripts/jelastic-postdeploy.sh
+#
+# Erwartet ein fertiges Artifact (kein npm run build auf dem Node):
+#   1) GitHub Release Asset zur package.json-Version, oder
+#   2) lokale Datei ~/ROOT/pv-dash-prebuilt.tgz, oder
+#   3) bereits entpacktes server.js (Archive-Upload).
+#
+# Notfall (teuer, Dynamic-Cloudlets): ALLOW_LEGACY_BUILD=1
 set -euo pipefail
 cd ~/ROOT
 
-available_mb=$(awk '/MemAvailable:/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
-echo "[postdeploy] MemAvailable≈${available_mb} MB"
+echo "[postdeploy] mode=prebuilt cwd=$PWD"
 
-# Früher reichten ~5 Cloudlets (≈640 MB), wenn der Heap klein blieb (~768).
-# Ein erzwungener 2-GB-Heap auf kleinem Container führt zu Exit 137.
-# Ziel: mit ~700–1200 MB freiem RAM durchkommen; darunter klar abbrechen.
-MIN_AVAILABLE_MB=500
-if [ "$available_mb" -lt "$MIN_AVAILABLE_MB" ]; then
-  echo "[postdeploy] ERROR: Nur ${available_mb} MB frei (braucht ≥${MIN_AVAILABLE_MB} MB)." >&2
-  echo "[postdeploy] Reserved/Scaling erhöhen ODER laufenden Node-Prozess stoppen (hält RAM), dann erneut Veröffentlichen." >&2
-  exit 137
+preserve_data() {
+  mkdir -p .data
+}
+
+install_from_tarball() {
+  local tarball="$1"
+  echo "[postdeploy] extracting $(basename "$tarball")"
+  local tmp
+  tmp="$(mktemp -d)"
+  tar -xzf "$tarball" -C "$tmp"
+  if [ ! -f "$tmp/server.js" ]; then
+    echo "[postdeploy] ERROR: server.js fehlt im Artifact." >&2
+    rm -rf "$tmp"
+    exit 1
+  fi
+  # Runtime-Daten und Secrets behalten; Rest durch Prebuilt ersetzen.
+  rsync -a --delete \
+    --exclude '.data/' \
+    --exclude '.env' \
+    --exclude '.env.*' \
+    --exclude 'pv-dash-prebuilt.tgz' \
+    "$tmp"/ "$PWD"/
+  rm -rf "$tmp"
+}
+
+download_github_release() {
+  local version="$1"
+  local tag="v${version}"
+  local url="https://github.com/FloWal-Bit/PV-Dash/releases/download/${tag}/pv-dash-prebuilt.tgz"
+  local out="/tmp/pv-dash-prebuilt-${version}.tgz"
+  echo "[postdeploy] downloading $url"
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8; do
+    if curl -fsSL --retry 2 --connect-timeout 20 -o "$out" "$url"; then
+      echo "$out"
+      return 0
+    fi
+    echo "[postdeploy] Asset noch nicht da (Versuch $attempt/8) — warte 45s (CI-Build?)"
+    sleep 45
+  done
+  return 1
+}
+
+legacy_build() {
+  echo "[postdeploy] ALLOW_LEGACY_BUILD=1 — teurer Fallback (npm install + build)"
+  local available_mb
+  available_mb=$(awk '/MemAvailable:/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
+  echo "[postdeploy] MemAvailable≈${available_mb} MB"
+  local MIN_AVAILABLE_MB=500
+  if [ "$available_mb" -lt "$MIN_AVAILABLE_MB" ]; then
+    echo "[postdeploy] ERROR: Nur ${available_mb} MB frei (braucht ≥${MIN_AVAILABLE_MB} MB)." >&2
+    exit 137
+  fi
+  local heap_mb=$((available_mb * 55 / 100))
+  if [ "$heap_mb" -lt 512 ]; then heap_mb=512; fi
+  if [ "$heap_mb" -gt 1536 ]; then heap_mb=1536; fi
+  local max_heap=$((available_mb - 150))
+  if [ "$max_heap" -lt 384 ]; then max_heap=384; fi
+  if [ "$heap_mb" -gt "$max_heap" ]; then heap_mb=$max_heap; fi
+  export NODE_OPTIONS="--max-old-space-size=${heap_mb}"
+  export NEXT_TELEMETRY_DISABLED=1
+  export npm_config_audit=false
+  export npm_config_fund=false
+  npm install --include=dev --no-audit --no-fund --maxsockets=1
+  export NODE_ENV=production
+  npm run build
+  if [ -f .next/standalone/server.js ]; then
+    mkdir -p .next/standalone/.next
+    cp -a .next/static .next/standalone/.next/static
+    if [ -d public ]; then cp -a public .next/standalone/public; fi
+  fi
+}
+
+preserve_data
+
+# Schon ein Prebuilt-Root (z. B. Archive-Upload)?
+if [ -f server.js ] && [ -d .next/static ]; then
+  echo "[postdeploy] existing prebuilt server.js — skip download/build"
+  if [ -f .prebuilt-version ]; then
+    echo "[postdeploy] version=$(cat .prebuilt-version)"
+  fi
+  exit 0
 fi
 
-# Heap: ca. 55 % von MemAvailable, Deckel 512–1536 MB (nicht 2048+ erzwingen).
-heap_mb=$((available_mb * 55 / 100))
-if [ "$heap_mb" -lt 512 ]; then heap_mb=512; fi
-if [ "$heap_mb" -gt 1536 ]; then heap_mb=1536; fi
-max_heap=$((available_mb - 150))
-if [ "$max_heap" -lt 384 ]; then max_heap=384; fi
-if [ "$heap_mb" -gt "$max_heap" ]; then heap_mb=$max_heap; fi
-export NODE_OPTIONS="--max-old-space-size=${heap_mb}"
-export NEXT_TELEMETRY_DISABLED=1
-export npm_config_audit=false
-export npm_config_fund=false
-echo "[postdeploy] NODE_OPTIONS=${NODE_OPTIONS}"
+VERSION=""
+if [ -f package.json ]; then
+  VERSION="$(node -p "require('./package.json').version" 2>/dev/null || true)"
+fi
 
-# Weniger parallele Downloads → niedrigerer Peak-RAM bei npm install.
-npm install --include=dev --no-audit --no-fund --maxsockets=1
-export NODE_ENV=production
-npm run build
+TARBALL=""
+if [ -f pv-dash-prebuilt.tgz ]; then
+  TARBALL="$PWD/pv-dash-prebuilt.tgz"
+elif [ -n "$VERSION" ]; then
+  if TARBALL="$(download_github_release "$VERSION")"; then
+    :
+  else
+    TARBALL=""
+  fi
+fi
+
+if [ -n "$TARBALL" ] && [ -f "$TARBALL" ]; then
+  install_from_tarball "$TARBALL"
+  echo "[postdeploy] prebuilt installed"
+  if [ -f .prebuilt-version ]; then
+    echo "[postdeploy] version=$(cat .prebuilt-version)"
+  fi
+  exit 0
+fi
+
+if [ "${ALLOW_LEGACY_BUILD:-0}" = "1" ]; then
+  legacy_build
+  exit 0
+fi
+
+cat >&2 <<EOF
+[postdeploy] ERROR: Kein Prebuilt gefunden.
+
+Erwartet eine der Varianten:
+  • GitHub Release Asset: v\${version}/pv-dash-prebuilt.tgz
+    (Workflow „Prebuilt release“ nach Merge abwarten, dann Veröffentlichen)
+  • Datei ~/ROOT/pv-dash-prebuilt.tgz
+  • Archive-Upload des Pack-Inhalts (server.js + .next/static)
+
+Lokal packen:  npm run pack:prebuilt
+Notfall (teuer): ALLOW_LEGACY_BUILD=1 bash ~/ROOT/scripts/jelastic-postdeploy.sh
+EOF
+exit 1
