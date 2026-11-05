@@ -1,20 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Roboto } from "next/font/google";
+import localFont from "next/font/local";
 import { StatusBarController } from "@/components/pv/status-bar-controller";
 import { ThemeModeController } from "@/components/pv/theme-mode-controller";
 import { ThemeProvider } from "@/components/theme-provider";
 import { APP_ICON_SRC, APP_MANIFEST_SRC } from "@/lib/version";
 import "./globals.css";
 
-const roboto = Roboto({
+/** Lokal gebündelt — Prebuilt-CI braucht keinen Google-Fonts-Download. */
+const roboto = localFont({
+  src: [
+    { path: "./fonts/roboto-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/roboto-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/roboto-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/GeistMono-Variable.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
