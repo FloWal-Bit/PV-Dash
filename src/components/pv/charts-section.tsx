@@ -165,7 +165,22 @@ function halfHourTicks(): string[] {
   return ticks;
 }
 
-function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
+/** Nächste beschriftete 2-Stunden-Marke zur Hover-Zeit (z. B. 07:30 → 06:00). */
+function todayAxisLabelForSelection(selectedTime: string | null): string | null {
+  if (!selectedTime) return null;
+  const [hourText] = selectedTime.split(":");
+  const hour = Number(hourText);
+  if (!Number.isFinite(hour)) return null;
+  const evenHour = hour - (hour % 2);
+  return `${String(evenHour).padStart(2, "0")}:00`;
+}
+
+function TodayAxisTick({
+  x,
+  y,
+  payload,
+  selectedTime,
+}: XAxisTickContentProps & { selectedTime: string | null }) {
   const value = String(payload?.value ?? "");
   const [hour = "00", minute = "00"] = value.split(":");
   const halfHour = minute === "30";
@@ -173,6 +188,8 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
   const showLabel = !halfHour && hourNumber % 2 === 0;
   const hideOnPhonePortrait = showLabel && hourNumber % 4 !== 0;
   const shownLabelHour = !halfHour && hourNumber % 4 === 0;
+  const selectedLabel = todayAxisLabelForSelection(selectedTime);
+  const selected = selectedLabel != null && value === selectedLabel;
   return (
     <g transform={`translate(${Number(x)},${Number(y)})`}>
       {showLabel ? (
@@ -180,8 +197,9 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
           className={hideOnPhonePortrait ? "today-axis-extra" : undefined}
           y={8}
           textAnchor="middle"
-          fill="var(--muted-foreground)"
+          fill={selected ? "var(--card-foreground)" : "var(--muted-foreground)"}
           fontSize={11}
+          fontWeight={selected ? 600 : 400}
         >
           {hour}:00
         </text>
@@ -190,8 +208,8 @@ function TodayAxisTick({ x, y, payload }: XAxisTickContentProps) {
         <line
           className={hideOnPhonePortrait ? "today-axis-fallback-tick" : "today-axis-tick"}
           y2={halfHour ? 4 : 6}
-          stroke="var(--muted-foreground)"
-          strokeOpacity={halfHour ? 0.55 : 0.85}
+          stroke={selected ? "var(--card-foreground)" : "var(--muted-foreground)"}
+          strokeOpacity={selected ? 0.9 : halfHour ? 0.55 : 0.85}
         />
       )}
     </g>
@@ -214,11 +232,29 @@ function TodayPowerChart({
   /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
   tooltipActive: boolean;
 }) {
+  const [hoverLabel, setHoverLabel] = useState<string | null>(null);
+  const [pointerInChart, setPointerInChart] = useState(false);
   const hourTicks = halfHourTicks().filter((tick) => data.some((point) => point.label === tick));
+
+  useEffect(() => {
+    if (!tooltipActive && !pointerInChart) setHoverLabel(null);
+  }, [tooltipActive, pointerInChart]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={data} margin={CHART_MARGIN}>
+      <ComposedChart
+        data={data}
+        margin={CHART_MARGIN}
+        onMouseMove={(state) => {
+          setPointerInChart(true);
+          const label = state?.activeLabel;
+          setHoverLabel(label == null ? null : String(label));
+        }}
+        onMouseLeave={() => {
+          setPointerInChart(false);
+          if (!tooltipActive) setHoverLabel(null);
+        }}
+      >
         <defs>
           <linearGradient id="fill-pv" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.45} />
@@ -237,7 +273,7 @@ function TodayPowerChart({
           height={X_AXIS_HEIGHT}
           tickLine={false}
           axisLine={false}
-          tick={TodayAxisTick}
+          tick={(props) => <TodayAxisTick {...props} selectedTime={hoverLabel} />}
           padding={{ left: 0, right: 0 }}
         />
         <YAxis
@@ -252,7 +288,8 @@ function TodayPowerChart({
         />
         <Tooltip
           trigger="hover"
-          active={tooltipActive}
+          // Cursor/Achsen-Highlight bei Hover; Overlay-Inhalt nur nach Tap.
+          active={tooltipActive || pointerInChart}
           // Y fix an der Einheitenbeschriftung; X bleibt im Diagramm (klappt am Rand).
           position={{ y: CHART_TOOLTIP_TOP }}
           allowEscapeViewBox={{ x: false, y: true }}
@@ -261,11 +298,11 @@ function TodayPowerChart({
           offset={{ x: 16, y: 0 }}
           cursor={{
             stroke: "var(--foreground)",
-            strokeOpacity: 0.55,
-            strokeWidth: 2,
+            strokeOpacity: 0.4,
+            strokeWidth: 1,
           }}
           content={(props) => {
-            if (!props.active || !props.payload?.length) return null;
+            if (!tooltipActive || !props.payload?.length) return null;
             const row = props.payload[0]?.payload as TodayChartPoint | undefined;
             if (!row) return null;
             const hours = sampleIntervalHours(data);
@@ -637,6 +674,7 @@ function YieldConsumptionChart({
   tooltipActive: boolean;
 }) {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [pointerInChart, setPointerInChart] = useState(false);
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
     () =>
@@ -662,8 +700,8 @@ function YieldConsumptionChart({
   );
 
   useEffect(() => {
-    if (!tooltipActive) setSelectedLabel(null);
-  }, [tooltipActive]);
+    if (!tooltipActive && !pointerInChart) setSelectedLabel(null);
+  }, [tooltipActive, pointerInChart]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -672,9 +710,13 @@ function YieldConsumptionChart({
         margin={CHART_MARGIN}
         barGap={2}
         onMouseMove={(state) => {
-          if (!tooltipActive) return;
+          setPointerInChart(true);
           const label = state?.activeLabel;
           setSelectedLabel(label == null ? null : String(label));
+        }}
+        onMouseLeave={() => {
+          setPointerInChart(false);
+          if (!tooltipActive) setSelectedLabel(null);
         }}
       >
         <defs>
@@ -713,14 +755,15 @@ function YieldConsumptionChart({
         />
         <Tooltip
           trigger="hover"
-          active={tooltipActive}
+          // Selection-Spalte/Achse bei Hover; Overlay-Inhalt nur nach Tap.
+          active={tooltipActive || pointerInChart}
           position={{ y: CHART_TOOLTIP_TOP }}
           allowEscapeViewBox={{ x: false, y: true }}
           isAnimationActive={false}
           offset={{ x: 12, y: 0 }}
           cursor={<BarSelectionCursor />}
           content={(props) => {
-            if (!props.active || !props.payload?.length) return null;
+            if (!tooltipActive || !props.payload?.length) return null;
             const row = props.payload[0]?.payload as
               | {
                   dayKey?: string;
