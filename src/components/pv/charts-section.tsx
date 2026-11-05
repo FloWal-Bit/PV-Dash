@@ -256,11 +256,13 @@ function TodayPowerChart({
           // Y fix an der Einheitenbeschriftung; X bleibt im Diagramm (klappt am Rand).
           position={{ y: CHART_TOOLTIP_TOP }}
           allowEscapeViewBox={{ x: false, y: true }}
-          offset={8}
+          // Kein Slide-Delay; seitlicher Abstand, damit die Cursor-Linie nicht unter dem Overlay verschwindet.
+          isAnimationActive={false}
+          offset={{ x: 16, y: 0 }}
           cursor={{
             stroke: "var(--foreground)",
-            strokeOpacity: 0.45,
-            strokeWidth: 1.5,
+            strokeOpacity: 0.55,
+            strokeWidth: 2,
           }}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
@@ -714,7 +716,8 @@ function YieldConsumptionChart({
           active={tooltipActive}
           position={{ y: CHART_TOOLTIP_TOP }}
           allowEscapeViewBox={{ x: false, y: true }}
-          offset={8}
+          isAnimationActive={false}
+          offset={{ x: 12, y: 0 }}
           cursor={<BarSelectionCursor />}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
