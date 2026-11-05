@@ -261,8 +261,8 @@ function TodayPowerChart({
           offset={{ x: 16, y: 0 }}
           cursor={{
             stroke: "var(--foreground)",
-            strokeOpacity: 0.55,
-            strokeWidth: 2,
+            strokeOpacity: 0.4,
+            strokeWidth: 1,
           }}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
