@@ -6,7 +6,7 @@ import {
   setStromkontoBaseBalance,
   setStromkontoTodayChange,
 } from "@/lib/stromkonto";
-import { getYearEndForecast } from "@/lib/stromkonto-year-end-forecast";
+import { getAboEndForecast } from "@/lib/stromkonto-abo-end-forecast";
 import { getLatestWhatWattMeterTotals } from "@/lib/whatwatt/service";
 import { getHistoryPayload, getLiveDashboardPayload } from "@/lib/pv-source";
 
@@ -16,23 +16,23 @@ export async function GET() {
   const balanceKwh = getStromkontoBaseBalance();
   const todayChangeKwh = getStromkontoTodayChange();
 
-  let yearEndForecast = null;
+  let aboEndForecast = null;
   try {
     const [live, history] = await Promise.all([getLiveDashboardPayload(), getHistoryPayload()]);
     const currentBalanceKwh = live.snapshot.stromkontoBalanceKwh ?? balanceKwh;
-    yearEndForecast = getYearEndForecast({
+    aboEndForecast = getAboEndForecast({
       currentBalanceKwh,
       yearMonths: history.year,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-    console.error("[stromkonto] Jahresend-Prognose fehlgeschlagen:", message);
+    console.error("[stromkonto] Abo-Ende-Prognose fehlgeschlagen:", message);
   }
 
   return NextResponse.json({
     balanceKwh,
     todayChangeKwh,
-    yearEndForecast,
+    aboEndForecast,
   });
 }
 
