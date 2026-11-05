@@ -6,14 +6,33 @@ import {
   setStromkontoBaseBalance,
   setStromkontoTodayChange,
 } from "@/lib/stromkonto";
+import { getYearEndForecast } from "@/lib/stromkonto-year-end-forecast";
 import { getLatestWhatWattMeterTotals } from "@/lib/whatwatt/service";
+import { getHistoryPayload, getLiveDashboardPayload } from "@/lib/pv-source";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const balanceKwh = getStromkontoBaseBalance();
+  const todayChangeKwh = getStromkontoTodayChange();
+
+  let yearEndForecast = null;
+  try {
+    const [live, history] = await Promise.all([getLiveDashboardPayload(), getHistoryPayload()]);
+    const currentBalanceKwh = live.snapshot.stromkontoBalanceKwh ?? balanceKwh;
+    yearEndForecast = getYearEndForecast({
+      currentBalanceKwh,
+      yearMonths: history.year,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+    console.error("[stromkonto] Jahresend-Prognose fehlgeschlagen:", message);
+  }
+
   return NextResponse.json({
-    balanceKwh: getStromkontoBaseBalance(),
-    todayChangeKwh: getStromkontoTodayChange(),
+    balanceKwh,
+    todayChangeKwh,
+    yearEndForecast,
   });
 }
 
