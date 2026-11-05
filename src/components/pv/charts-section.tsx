@@ -83,6 +83,14 @@ const X_AXIS_HEIGHT = 28;
 /** „MWh“ ist die breiteste Einheitenbeschriftung. So weit rückt das Diagramm nach links, damit sie mit „Diese Woche“ abschließt. */
 const Y_UNIT_LABEL_WIDTH = 25;
 const CHART_PULL_LEFT = Y_AXIS_WIDTH - Y_UNIT_LABEL_WIDTH;
+/** Abstand der Y-Einheiten-Baseline vom oberen Plot-Rand (`viewBox.y`). */
+const Y_UNIT_LABEL_GAP = 14;
+const Y_UNIT_FONT_SIZE = 11;
+/**
+ * Oberkante des Punktwert-Overlays = Oberkante der Y-Einheitenbeschriftung
+ * (kW / kWh / MWh). Horizontal folgt das Overlay weiter dem Punkt.
+ */
+const CHART_TOOLTIP_TOP = CHART_MARGIN.top - Y_UNIT_LABEL_GAP - Y_UNIT_FONT_SIZE;
 
 /** Zeichenfläche der Kurven, ohne Achsen. Darüber bis zum Kartenrand schliesst ein Tipp die Punktwerte. */
 function pointerInDiagram(card: HTMLElement, clientX: number, clientY: number): boolean {
@@ -136,10 +144,10 @@ function YAxisUnit({
   return (
     <text
       x={viewBox.x + viewBox.width - Y_UNIT_LABEL_WIDTH}
-      y={viewBox.y - 14}
+      y={viewBox.y - Y_UNIT_LABEL_GAP}
       textAnchor="start"
       fill="var(--muted-foreground)"
-      fontSize={11}
+      fontSize={Y_UNIT_FONT_SIZE}
     >
       {value}
     </text>
@@ -244,6 +252,10 @@ function TodayPowerChart({
         <Tooltip
           trigger="hover"
           active={tooltipActive}
+          // Nur Y fix: Oberkante = Y-Einheitenbeschriftung; X folgt dem Punkt.
+          position={{ y: CHART_TOOLTIP_TOP }}
+          allowEscapeViewBox={{ x: true, y: true }}
+          offset={8}
           cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
@@ -635,6 +647,9 @@ function YieldConsumptionChart({
         <Tooltip
           trigger="hover"
           active={tooltipActive}
+          position={{ y: CHART_TOOLTIP_TOP }}
+          allowEscapeViewBox={{ x: true, y: true }}
+          offset={8}
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
