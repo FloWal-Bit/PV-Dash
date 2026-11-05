@@ -331,9 +331,11 @@ type AboEndForecastDto = {
   computedAt: string;
   avgDailyNetKwh: number;
   remainingDays: number;
+  projectedNetKwh: number;
   basisYieldKwh: number;
   basisConsumptionKwh: number;
   basisDays: number;
+  methodLabel: string;
 };
 
 function formatForecastComputedAt(iso: string): string {
@@ -550,11 +552,13 @@ function StromkontoEditor() {
               {formatSignedKwh(aboEndForecast.balanceKwh, 1)}
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Mittel {formatSignedKwh(aboEndForecast.avgDailyNetKwh, 2)}/Tag aus{" "}
+              Rest laut Monatsprofil {formatSignedKwh(aboEndForecast.projectedNetKwh, 0)} (
               {formatYieldKwh(aboEndForecast.basisYieldKwh, 0)} Ertrag /{" "}
-              {formatYieldKwh(aboEndForecast.basisConsumptionKwh, 0)} Verbrauch
-              über {aboEndForecast.basisDays} Tage · noch {aboEndForecast.remainingDays} Tage
-              bis zur Nullung. Wird ca. 2× täglich neu berechnet
+              {formatYieldKwh(aboEndForecast.basisConsumptionKwh, 0)} Verbrauch) · Mittel{" "}
+              {formatSignedKwh(aboEndForecast.avgDailyNetKwh, 2)}/Tag · noch{" "}
+              {aboEndForecast.remainingDays} Tage bis zur Nullung
+              {aboEndForecast.methodLabel ? ` · ${aboEndForecast.methodLabel}` : ""}. Wird ca.
+              2× täglich neu berechnet
               {aboEndForecast.computedAt
                 ? ` · Stand ${formatForecastComputedAt(aboEndForecast.computedAt)}`
                 : ""}

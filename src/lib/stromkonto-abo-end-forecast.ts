@@ -1,19 +1,29 @@
 /**
  * Prognose Stromkonto-Kontostand per Ende der Abo-Laufzeit
  * (Nacht vom 3. auf den 4. August, vor der Nullung).
- * Wird höchstens zweimal täglich neu berechnet (Cache ca. 12 Stunden)
- * und in `.data/` persistiert.
+ *
+ * Resttage werden mit dem saisonalen FusionSolar-Monatsprofil
+ * (Ertrag − Verbrauch) projiziert. Wird höchstens zweimal täglich neu
+ * berechnet (Cache ca. 12 Stunden) und in `.data/` persistiert.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import type { DailyEnergyPoint } from "@/lib/pv-data";
 import { appDayKey, latestAugustResetYear } from "@/lib/stromkonto";
+import {
+  MONTHLY_PROFILE_LABEL,
+  daysInCalendarMonth,
+  profileDailyNetKwh,
+  profileForMonth,
+} from "@/lib/stromkonto-monthly-profile";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "stromkonto-abo-end-forecast.json");
 /** Zwei Berechnungen pro Tag ≈ alle 12 Stunden. */
 const REFRESH_AFTER_MS = 12 * 60 * 60 * 1000;
+/** Cache-Version: invalidiert alte YTD-Mittel-Caches. */
+const FORECAST_METHOD = "seasonal-monthly-profile-v1";
 
 /** Abo startet am 4. August und endet am 3. August des Folgejahres. */
 const ABO_RESET_MONTH = 8;
@@ -27,13 +37,23 @@ export type AboEndForecast = {
   /** Kontojahr = Kalenderjahr des letzten 4. August-Resets. */
   accountYear: number;
   computedAt: string;
-  /** Mittlerer Tagesnetto (Ertrag − Verbrauch) der Basisperiode. */
+  /**
+   * Durchschnittliches Tagesnetto der Resttage laut Monatsprofil
+   * (projizierter Restnetto / remainingDays).
+   */
   avgDailyNetKwh: number;
   /** Verbleibende volle Tage nach heute bis einschliesslich periodEndsOn. */
   remainingDays: number;
+  /** Projizierter Netto-Zuwachs bis Abo-Ende (Ertrag − Verbrauch). */
+  projectedNetKwh: number;
+  /** Summe Profil-Ertrag der Resttage (anteilig). */
   basisYieldKwh: number;
+  /** Summe Profil-Verbrauch der Resttage (anteilig). */
   basisConsumptionKwh: number;
+  /** Gleich remainingDays — Profilbasis für die Restperiode. */
   basisDays: number;
+  /** Kurzbeschreibung der Prognose-Methode. */
+  methodLabel: string;
 };
 
 function round(value: number): number {
@@ -92,7 +112,6 @@ export function daysSinceAugustReset(now: Date = new Date()): number {
     );
     return Math.max(1, zurichDayOfYear(now) - dayOfAug4 + 1);
   }
-  // Jan … 3.8. des Folgejahres: Rest von accountYear + Tage im neuen Jahr
   const dayOfAug4 = zurichDayOfYear(
     new Date(Date.UTC(accountYear, ABO_RESET_MONTH - 1, ABO_RESET_DAY, 12)),
   );
@@ -122,12 +141,78 @@ export function remainingDaysUntilAboEnd(now: Date = new Date()): number {
   return 0;
 }
 
+/**
+ * Projiziert Ertrag/Verbrauch/Netto für alle Tage nach `now` bis Abo-Ende
+ * anhand des Monatsprofils (tageweise anteilig).
+ */
+export function projectRemainingWithMonthlyProfile(now: Date = new Date()): {
+  yieldKwh: number;
+  consumptionKwh: number;
+  netKwh: number;
+  days: number;
+} {
+  const remainingDays = remainingDaysUntilAboEnd(now);
+  if (remainingDays <= 0) {
+    return { yieldKwh: 0, consumptionKwh: 0, netKwh: 0, days: 0 };
+  }
+
+  const { year: startYear, month: startMonth, day: startDay } = zurichParts(now);
+  const endYear = latestAugustResetYear(now) + 1;
+  const endMonth = ABO_RESET_MONTH;
+  const endDay = ABO_RESET_DAY - 1;
+
+  let yieldKwh = 0;
+  let consumptionKwh = 0;
+  let cursorYear = startYear;
+  let cursorMonth = startMonth;
+
+  while (
+    cursorYear < endYear ||
+    (cursorYear === endYear && cursorMonth < endMonth) ||
+    (cursorYear === endYear && cursorMonth === endMonth)
+  ) {
+    const profile = profileForMonth(cursorMonth);
+    const daysInMonth = daysInCalendarMonth(cursorYear, cursorMonth);
+    if (!profile || daysInMonth <= 0) break;
+
+    let fromDay = 1;
+    let toDay = daysInMonth;
+    if (cursorYear === startYear && cursorMonth === startMonth) {
+      fromDay = startDay + 1; // Resttage nach heute
+    }
+    if (cursorYear === endYear && cursorMonth === endMonth) {
+      toDay = Math.min(toDay, endDay);
+    }
+
+    const days = Math.max(0, toDay - fromDay + 1);
+    if (days > 0) {
+      yieldKwh += (profile.yieldKwh / daysInMonth) * days;
+      consumptionKwh += (profile.consumptionKwh / daysInMonth) * days;
+    }
+
+    if (cursorYear === endYear && cursorMonth === endMonth) break;
+    cursorMonth += 1;
+    if (cursorMonth > 12) {
+      cursorMonth = 1;
+      cursorYear += 1;
+    }
+  }
+
+  return {
+    yieldKwh: round(yieldKwh),
+    consumptionKwh: round(consumptionKwh),
+    netKwh: round(yieldKwh - consumptionKwh),
+    days: remainingDays,
+  };
+}
+
 function readCache(): AboEndForecast | null {
   try {
     if (!existsSync(DATA_FILE)) return null;
     const parsed: unknown = JSON.parse(readFileSync(DATA_FILE, "utf8"));
     if (typeof parsed !== "object" || parsed === null) return null;
     const v = parsed as Record<string, unknown>;
+    if (v.method !== FORECAST_METHOD) return null;
     if (!Number.isFinite(Number(v.balanceKwh)) || typeof v.periodEndsOn !== "string") {
       return null;
     }
@@ -139,9 +224,11 @@ function readCache(): AboEndForecast | null {
       computedAt: v.computedAt,
       avgDailyNetKwh: Number(v.avgDailyNetKwh) || 0,
       remainingDays: Number(v.remainingDays) || 0,
+      projectedNetKwh: Number(v.projectedNetKwh) || 0,
       basisYieldKwh: Number(v.basisYieldKwh) || 0,
       basisConsumptionKwh: Number(v.basisConsumptionKwh) || 0,
       basisDays: Number(v.basisDays) || 0,
+      methodLabel: typeof v.methodLabel === "string" ? v.methodLabel : MONTHLY_PROFILE_LABEL,
     };
   } catch {
     return null;
@@ -150,7 +237,11 @@ function readCache(): AboEndForecast | null {
 
 function writeCache(forecast: AboEndForecast): void {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(DATA_FILE, JSON.stringify(forecast, null, 2), "utf8");
+  writeFileSync(
+    DATA_FILE,
+    JSON.stringify({ ...forecast, method: FORECAST_METHOD }, null, 2),
+    "utf8",
+  );
 }
 
 function cacheIsFresh(cache: AboEndForecast, now: Date): boolean {
@@ -162,8 +253,7 @@ function cacheIsFresh(cache: AboEndForecast, now: Date): boolean {
 
 /**
  * Summiert Ertrag/Verbrauch der Monate in der laufenden Abo-Periode, soweit
- * die Jahres-Serie sie abdeckt. Vor dem 4.8. fehlen Aug–Dez des Vorjahres in
- * der aktuellen Jahr-Serie — dann YTD ab Januar als Näherung.
+ * die Jahres-Serie sie abdeckt (nur noch Info/Fallback, nicht mehr Hauptpfad).
  */
 export function sumAboPeriodToDateEnergy(
   yearMonths: DailyEnergyPoint[],
@@ -171,9 +261,8 @@ export function sumAboPeriodToDateEnergy(
 ): { yieldKwh: number; consumptionKwh: number } {
   const { year, month } = zurichParts(now);
   const accountYear = latestAugustResetYear(now);
-  let startMonthIndex = 0; // 0 = Januar
+  let startMonthIndex = 0;
   if (year === accountYear) {
-    // Abo läuft seit 4.8. dieses Jahres → Monate ab August
     startMonthIndex = ABO_RESET_MONTH - 1;
   }
   let yieldKwh = 0;
@@ -188,20 +277,16 @@ export function sumAboPeriodToDateEnergy(
 
 export function computeAboEndForecast(input: {
   currentBalanceKwh: number;
-  yearMonths: DailyEnergyPoint[];
+  yearMonths?: DailyEnergyPoint[];
   now?: Date;
 }): AboEndForecast {
   const now = input.now ?? new Date();
-  const { year } = zurichParts(now);
   const accountYear = latestAugustResetYear(now);
-  const basis = sumAboPeriodToDateEnergy(input.yearMonths, now);
-  // Vor dem 4.8. fehlen Aug–Dez des Vorjahres in der Jahr-Serie → YTD-Tage.
-  // Ab dem 4.8. passen Serie (Monate ab August) und Tage seit Reset zusammen.
-  const basisDays =
-    year === accountYear ? daysSinceAugustReset(now) : Math.max(1, zurichDayOfYear(now));
-  const avgDailyNetKwh = round((basis.yieldKwh - basis.consumptionKwh) / Math.max(1, basisDays));
   const remainingDays = remainingDaysUntilAboEnd(now);
-  const balanceKwh = round(input.currentBalanceKwh + avgDailyNetKwh * remainingDays);
+  const projected = projectRemainingWithMonthlyProfile(now);
+  const avgDailyNetKwh =
+    remainingDays > 0 ? round(projected.netKwh / remainingDays) : 0;
+  const balanceKwh = round(input.currentBalanceKwh + projected.netKwh);
 
   return {
     balanceKwh,
@@ -210,9 +295,11 @@ export function computeAboEndForecast(input: {
     computedAt: now.toISOString(),
     avgDailyNetKwh,
     remainingDays,
-    basisYieldKwh: basis.yieldKwh,
-    basisConsumptionKwh: basis.consumptionKwh,
-    basisDays,
+    projectedNetKwh: projected.netKwh,
+    basisYieldKwh: projected.yieldKwh,
+    basisConsumptionKwh: projected.consumptionKwh,
+    basisDays: projected.days,
+    methodLabel: MONTHLY_PROFILE_LABEL,
   };
 }
 
@@ -222,7 +309,7 @@ export function computeAboEndForecast(input: {
  */
 export function getAboEndForecast(input: {
   currentBalanceKwh: number;
-  yearMonths: DailyEnergyPoint[];
+  yearMonths?: DailyEnergyPoint[];
   now?: Date;
   force?: boolean;
 }): AboEndForecast {
@@ -247,4 +334,9 @@ export function peekAboEndForecast(): AboEndForecast | null {
 
 export function forecastDayKey(date: Date = new Date()): string {
   return appDayKey(date);
+}
+
+/** Exponiert für Tests/Diagnose. */
+export function sampleProfileDailyNet(year: number, month: number): number | null {
+  return profileDailyNetKwh(year, month);
 }
