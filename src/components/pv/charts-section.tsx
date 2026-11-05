@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Area,
   Bar,
@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -252,11 +253,17 @@ function TodayPowerChart({
         <Tooltip
           trigger="hover"
           active={tooltipActive}
-          // Nur Y fix: Oberkante = Y-Einheitenbeschriftung; X folgt dem Punkt.
+          // Y fix an der Einheitenbeschriftung; X bleibt im Diagramm (klappt am Rand).
           position={{ y: CHART_TOOLTIP_TOP }}
-          allowEscapeViewBox={{ x: true, y: true }}
-          offset={8}
-          cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
+          allowEscapeViewBox={{ x: false, y: true }}
+          // Kein Slide-Delay; seitlicher Abstand, damit die Cursor-Linie nicht unter dem Overlay verschwindet.
+          isAnimationActive={false}
+          offset={{ x: 16, y: 0 }}
+          cursor={{
+            stroke: "var(--foreground)",
+            strokeOpacity: 0.55,
+            strokeWidth: 2,
+          }}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
             const row = props.payload[0]?.payload as TodayChartPoint | undefined;
@@ -365,6 +372,51 @@ function axisTickLabel(value: unknown): string {
   if (text !== "Dieser Monat") return text;
   const { month } = zurichYearMonth();
   return MONTHS_DE[month - 1] ?? text;
+}
+
+/** X-Achsen-Tick: ausgewählter Tag/Monat/Jahr fett und stärker kontrastiert. */
+function BarAxisTick({
+  x,
+  y,
+  payload,
+  selectedLabel,
+}: XAxisTickContentProps & { selectedLabel: string | null }) {
+  const raw = String(payload?.value ?? "");
+  const selected = selectedLabel != null && raw === selectedLabel;
+  return (
+    <text
+      x={Number(x)}
+      y={Number(y) + 12}
+      textAnchor="middle"
+      fill={selected ? "var(--card-foreground)" : "var(--muted-foreground)"}
+      fontSize={11}
+      fontWeight={selected ? 600 : 400}
+    >
+      {axisTickLabel(raw)}
+    </text>
+  );
+}
+
+/** Kräftigere Selection-Spalte hinter dem aktiven Balken (Option D). */
+function BarSelectionCursor(props: {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}) {
+  const { x = 0, y = 0, width = 0, height = 0 } = props;
+  if (width <= 0 || height <= 0) return null;
+  return (
+    <Rectangle
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      fill="var(--foreground)"
+      fillOpacity={0.1}
+      radius={4}
+    />
+  );
 }
 
 function zurichYearMonth(now = new Date()): { year: number; month: number } {
@@ -496,6 +548,11 @@ const tooltipBoxStyle = {
   fontSize: 12,
   color: "var(--popover-foreground)",
   padding: "8px 10px",
+  // Schmal genug, damit Recharts am rechten Rand nach links klappen kann.
+  maxWidth: 180,
+  boxSizing: "border-box" as const,
+  whiteSpace: "normal" as const,
+  overflowWrap: "anywhere" as const,
 };
 
 function DetailTooltip({
@@ -579,6 +636,7 @@ function YieldConsumptionChart({
   /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
   tooltipActive: boolean;
 }) {
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
   const chartData = useMemo(
     () =>
@@ -602,12 +660,22 @@ function YieldConsumptionChart({
       }),
     [data, series.eigenverbrauch, series.ertrag, unit],
   );
+
+  useEffect(() => {
+    if (!tooltipActive) setSelectedLabel(null);
+  }, [tooltipActive]);
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={chartData}
         margin={CHART_MARGIN}
         barGap={2}
+        onMouseMove={(state) => {
+          if (!tooltipActive) return;
+          const label = state?.activeLabel;
+          setSelectedLabel(label == null ? null : String(label));
+        }}
       >
         <defs>
           <linearGradient id="bar-yield" x1="0" y1="0" x2="0" y2="1">
@@ -631,8 +699,7 @@ function YieldConsumptionChart({
           height={X_AXIS_HEIGHT}
           interval={tickInterval}
           padding={{ left: 0, right: 0 }}
-          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          tickFormatter={axisTickLabel}
+          tick={(props) => <BarAxisTick {...props} selectedLabel={selectedLabel} />}
         />
         <YAxis
           allowDecimals={false}
@@ -648,9 +715,10 @@ function YieldConsumptionChart({
           trigger="hover"
           active={tooltipActive}
           position={{ y: CHART_TOOLTIP_TOP }}
-          allowEscapeViewBox={{ x: true, y: true }}
-          offset={8}
-          cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+          allowEscapeViewBox={{ x: false, y: true }}
+          isAnimationActive={false}
+          offset={{ x: 12, y: 0 }}
+          cursor={<BarSelectionCursor />}
           content={(props) => {
             if (!props.active || !props.payload?.length) return null;
             const row = props.payload[0]?.payload as
