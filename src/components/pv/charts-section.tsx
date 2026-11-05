@@ -252,9 +252,9 @@ function TodayPowerChart({
         <Tooltip
           trigger="hover"
           active={tooltipActive}
-          // Nur Y fix: Oberkante = Y-Einheitenbeschriftung; X folgt dem Punkt.
+          // Y fix an der Einheitenbeschriftung; X bleibt im Diagramm (klappt am Rand).
           position={{ y: CHART_TOOLTIP_TOP }}
-          allowEscapeViewBox={{ x: true, y: true }}
+          allowEscapeViewBox={{ x: false, y: true }}
           offset={8}
           cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.35 }}
           content={(props) => {
@@ -496,6 +496,11 @@ const tooltipBoxStyle = {
   fontSize: 12,
   color: "var(--popover-foreground)",
   padding: "8px 10px",
+  // Schmal genug, damit Recharts am rechten Rand nach links klappen kann.
+  maxWidth: 180,
+  boxSizing: "border-box" as const,
+  whiteSpace: "normal" as const,
+  overflowWrap: "anywhere" as const,
 };
 
 function DetailTooltip({
@@ -648,7 +653,7 @@ function YieldConsumptionChart({
           trigger="hover"
           active={tooltipActive}
           position={{ y: CHART_TOOLTIP_TOP }}
-          allowEscapeViewBox={{ x: true, y: true }}
+          allowEscapeViewBox={{ x: false, y: true }}
           offset={8}
           cursor={{ fill: "var(--muted)", opacity: 0.5 }}
           content={(props) => {
