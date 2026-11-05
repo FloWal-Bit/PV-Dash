@@ -324,16 +324,18 @@ function SiteLocationEditor({
   );
 }
 
-type YearEndForecastDto = {
+type AboEndForecastDto = {
   balanceKwh: number;
-  asOfYear: number;
+  periodEndsOn: string;
+  accountYear: number;
   computedAt: string;
   avgDailyNetKwh: number;
   remainingDays: number;
+  projectedNetKwh: number;
   basisYieldKwh: number;
   basisConsumptionKwh: number;
   basisDays: number;
-  augustResetPending: boolean;
+  methodLabel: string;
 };
 
 function formatForecastComputedAt(iso: string): string {
@@ -349,10 +351,16 @@ function formatForecastComputedAt(iso: string): string {
   });
 }
 
+function formatAboPeriodEnd(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) return isoDate;
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
 function StromkontoEditor() {
   const [balanceInput, setBalanceInput] = useState(String(DEFAULT_STROMKONTO_BALANCE_KWH));
   const [todayInput, setTodayInput] = useState("0");
-  const [yearEndForecast, setYearEndForecast] = useState<YearEndForecastDto | null>(null);
+  const [aboEndForecast, setAboEndForecast] = useState<AboEndForecastDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingBalance, setSavingBalance] = useState(false);
   const [savingToday, setSavingToday] = useState(false);
@@ -368,14 +376,14 @@ function StromkontoEditor() {
         const data: {
           balanceKwh: number;
           todayChangeKwh: number | null;
-          yearEndForecast?: YearEndForecastDto | null;
+          aboEndForecast?: AboEndForecastDto | null;
         } = await response.json();
         if (!cancelled) {
           setBalanceInput(String(data.balanceKwh));
           setTodayInput(
             data.todayChangeKwh == null ? "0" : String(data.todayChangeKwh),
           );
-          setYearEndForecast(data.yearEndForecast ?? null);
+          setAboEndForecast(data.aboEndForecast ?? null);
         }
       } catch {
         if (!cancelled) {
@@ -533,27 +541,26 @@ function StromkontoEditor() {
 
       <div className="flex flex-col gap-1 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5">
         <p className="text-xs font-medium text-card-foreground">
-          Prognose Kontostand 31.12.
-          {yearEndForecast ? ` ${yearEndForecast.asOfYear}` : ""}
+          Prognose Kontostand Abo-Ende
+          {aboEndForecast ? ` ${formatAboPeriodEnd(aboEndForecast.periodEndsOn)}` : ""}
         </p>
         {loading ? (
           <p className="text-sm text-muted-foreground">Berechne…</p>
-        ) : yearEndForecast ? (
+        ) : aboEndForecast ? (
           <>
             <p className="text-lg font-semibold tabular-nums text-card-foreground">
-              {formatSignedKwh(yearEndForecast.balanceKwh, 1)}
+              {formatSignedKwh(aboEndForecast.balanceKwh, 1)}
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Mittel {formatSignedKwh(yearEndForecast.avgDailyNetKwh, 2)}/Tag aus{" "}
-              {formatYieldKwh(yearEndForecast.basisYieldKwh, 0)} Ertrag /{" "}
-              {formatYieldKwh(yearEndForecast.basisConsumptionKwh, 0)} Verbrauch
-              über {yearEndForecast.basisDays} Tage
-              {yearEndForecast.augustResetPending
-                ? " · ab 4.8. von 0 (August-Nullung steht noch aus)"
-                : ` · noch ${yearEndForecast.remainingDays} Tage`}
-              . Wird ca. 2× täglich neu berechnet
-              {yearEndForecast.computedAt
-                ? ` · Stand ${formatForecastComputedAt(yearEndForecast.computedAt)}`
+              Rest laut Monatsprofil {formatSignedKwh(aboEndForecast.projectedNetKwh, 0)} (
+              {formatYieldKwh(aboEndForecast.basisYieldKwh, 0)} Ertrag /{" "}
+              {formatYieldKwh(aboEndForecast.basisConsumptionKwh, 0)} Verbrauch) · Mittel{" "}
+              {formatSignedKwh(aboEndForecast.avgDailyNetKwh, 2)}/Tag · noch{" "}
+              {aboEndForecast.remainingDays} Tage bis zur Nullung
+              {aboEndForecast.methodLabel ? ` · ${aboEndForecast.methodLabel}` : ""}. Wird ca.
+              2× täglich neu berechnet
+              {aboEndForecast.computedAt
+                ? ` · Stand ${formatForecastComputedAt(aboEndForecast.computedAt)}`
                 : ""}
               .
             </p>
