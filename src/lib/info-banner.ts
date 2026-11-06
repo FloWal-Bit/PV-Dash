@@ -1,16 +1,27 @@
 /**
  * Hinweistext für das Banner oberhalb der Wetterkarte.
  * Der Text liegt in den Dev-Einstellungen und gilt für alle Geräte.
+ * Optionales Zeitfenster (Sichtbar ab/bis) steuert die Anzeige.
  * Das Schliessen gilt nur auf diesem Gerät, bis der Text sich ändert.
  */
 
+import {
+  isInfoBannerActiveNow,
+  type InfoBannerSchedule,
+} from "@/lib/dev-settings-shared";
+
 const TEXT_KEY = "pv-dash:info-banner";
+const FROM_KEY = "pv-dash:info-banner-from";
+const UNTIL_KEY = "pv-dash:info-banner-until";
 const DISMISS_KEY = "pv-dash:info-banner-dismissed";
 
 type Listener = () => void;
 const textListeners = new Set<Listener>();
+const scheduleListeners = new Set<Listener>();
 const dismissListeners = new Set<Listener>();
 let infoBanner = "";
+let visibleFrom: string | null = null;
+let visibleUntil: string | null = null;
 let dismissed = "";
 
 function readText(): string {
@@ -18,17 +29,48 @@ function readText(): string {
   return window.localStorage.getItem(TEXT_KEY) ?? "";
 }
 
+function readStoredInstant(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(key);
+  if (!raw) return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
 function readDismissed(): string {
   if (typeof window === "undefined") return "";
   return window.localStorage.getItem(DISMISS_KEY) ?? "";
+}
+
+function writeInstant(key: string, value: string | null) {
+  if (typeof window === "undefined") return;
+  if (value) window.localStorage.setItem(key, value);
+  else window.localStorage.removeItem(key);
 }
 
 function emitText() {
   for (const listener of textListeners) listener();
 }
 
+function emitSchedule() {
+  for (const listener of scheduleListeners) listener();
+}
+
 function emitDismiss() {
   for (const listener of dismissListeners) listener();
+}
+
+function currentSchedule(): InfoBannerSchedule {
+  return { visibleFrom, visibleUntil };
+}
+
+function applySchedule(nextFrom: string | null, nextUntil: string | null) {
+  if (nextFrom === visibleFrom && nextUntil === visibleUntil) return;
+  visibleFrom = nextFrom;
+  visibleUntil = nextUntil;
+  writeInstant(FROM_KEY, nextFrom);
+  writeInstant(UNTIL_KEY, nextUntil);
+  emitSchedule();
 }
 
 export const infoBannerStore = {
@@ -49,6 +91,19 @@ export const infoBannerStore = {
   getServerSnapshot(): string {
     return "";
   },
+  subscribeSchedule(listener: Listener): () => void {
+    if (typeof window !== "undefined") {
+      applySchedule(readStoredInstant(FROM_KEY), readStoredInstant(UNTIL_KEY));
+    }
+    scheduleListeners.add(listener);
+    return () => scheduleListeners.delete(listener);
+  },
+  getScheduleSnapshot(): InfoBannerSchedule {
+    return currentSchedule();
+  },
+  getScheduleServerSnapshot(): InfoBannerSchedule {
+    return { visibleFrom: null, visibleUntil: null };
+  },
   subscribeDismissed(listener: Listener): () => void {
     if (typeof window !== "undefined") {
       const next = readDismissed();
@@ -66,22 +121,41 @@ export const infoBannerStore = {
   getDismissedServerSnapshot(): string {
     return "";
   },
-  set(text: string): Promise<void> {
-    const previous = infoBanner;
-    infoBanner = text;
+  isActive(nowMs: number = Date.now()): boolean {
+    return isInfoBannerActiveNow(infoBanner, currentSchedule(), nowMs);
+  },
+  set(input: {
+    text: string;
+    visibleFrom?: string | null;
+    visibleUntil?: string | null;
+  }): Promise<void> {
+    const previousText = infoBanner;
+    const previousFrom = visibleFrom;
+    const previousUntil = visibleUntil;
+    const nextFrom = "visibleFrom" in input ? (input.visibleFrom ?? null) : visibleFrom;
+    const nextUntil = "visibleUntil" in input ? (input.visibleUntil ?? null) : visibleUntil;
+
+    infoBanner = input.text;
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(TEXT_KEY, text);
+      window.localStorage.setItem(TEXT_KEY, input.text);
     }
     emitText();
+    applySchedule(nextFrom, nextUntil);
+
     return import("@/lib/dev-settings-sync").then(({ putDevSettings }) =>
-      putDevSettings({ infoBanner: text })
+      putDevSettings({
+        infoBanner: input.text,
+        infoBannerVisibleFrom: nextFrom,
+        infoBannerVisibleUntil: nextUntil,
+      })
         .then(() => undefined)
         .catch((error: unknown) => {
-          infoBanner = previous;
+          infoBanner = previousText;
           if (typeof window !== "undefined") {
-            window.localStorage.setItem(TEXT_KEY, previous);
+            window.localStorage.setItem(TEXT_KEY, previousText);
           }
           emitText();
+          applySchedule(previousFrom, previousUntil);
           throw error;
         }),
     );
@@ -93,12 +167,20 @@ export const infoBannerStore = {
     }
     emitDismiss();
   },
-  applyRemote(text: string): void {
-    if (text === infoBanner) return;
-    infoBanner = text;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(TEXT_KEY, text);
+  applyRemote(data: {
+    text: string;
+    visibleFrom?: string | null;
+    visibleUntil?: string | null;
+  }): void {
+    if (data.text !== infoBanner) {
+      infoBanner = data.text;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(TEXT_KEY, data.text);
+      }
+      emitText();
     }
-    emitText();
+    if ("visibleFrom" in data || "visibleUntil" in data) {
+      applySchedule(data.visibleFrom ?? null, data.visibleUntil ?? null);
+    }
   },
 };
