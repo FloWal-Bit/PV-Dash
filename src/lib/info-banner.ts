@@ -19,9 +19,11 @@ type Listener = () => void;
 const textListeners = new Set<Listener>();
 const scheduleListeners = new Set<Listener>();
 const dismissListeners = new Set<Listener>();
+const EMPTY_SCHEDULE: InfoBannerSchedule = { visibleFrom: null, visibleUntil: null };
 let infoBanner = "";
 let visibleFrom: string | null = null;
 let visibleUntil: string | null = null;
+let schedule: InfoBannerSchedule = EMPTY_SCHEDULE;
 let dismissed = "";
 
 function readText(): string {
@@ -61,13 +63,17 @@ function emitDismiss() {
 }
 
 function currentSchedule(): InfoBannerSchedule {
-  return { visibleFrom, visibleUntil };
+  return schedule;
 }
 
 function applySchedule(nextFrom: string | null, nextUntil: string | null) {
   if (nextFrom === visibleFrom && nextUntil === visibleUntil) return;
   visibleFrom = nextFrom;
   visibleUntil = nextUntil;
+  schedule =
+    nextFrom === null && nextUntil === null
+      ? EMPTY_SCHEDULE
+      : { visibleFrom: nextFrom, visibleUntil: nextUntil };
   writeInstant(FROM_KEY, nextFrom);
   writeInstant(UNTIL_KEY, nextUntil);
   emitSchedule();
@@ -102,7 +108,7 @@ export const infoBannerStore = {
     return currentSchedule();
   },
   getScheduleServerSnapshot(): InfoBannerSchedule {
-    return { visibleFrom: null, visibleUntil: null };
+    return EMPTY_SCHEDULE;
   },
   subscribeDismissed(listener: Listener): () => void {
     if (typeof window !== "undefined") {

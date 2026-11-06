@@ -13,6 +13,8 @@ const KEY = "pv-dash:server-pause";
 type Listener = () => void;
 const listeners = new Set<Listener>();
 let settings: ServerPauseSettings = { ...DEFAULT_SERVER_PAUSE };
+/** Stabiler SSR-Snapshot — neues Objekt pro Aufruf → Infinite Loop in useSyncExternalStore. */
+const SERVER_SNAPSHOT: ServerPauseSettings = { ...DEFAULT_SERVER_PAUSE };
 
 function readStored(): ServerPauseSettings {
   if (typeof window === "undefined") return { ...DEFAULT_SERVER_PAUSE };
@@ -61,7 +63,7 @@ export const serverPauseSettingsStore = {
     return settings;
   },
   getServerSnapshot(): ServerPauseSettings {
-    return { ...DEFAULT_SERVER_PAUSE };
+    return SERVER_SNAPSHOT;
   },
   applyRemote(next: ServerPauseSettings): void {
     if (
