@@ -15,6 +15,12 @@ export type SharedDevSettings = {
   infoBanner: string;
   infoBannerVisibleFrom: string | null;
   infoBannerVisibleUntil: string | null;
+  /** Tägliche Infomaniak-Pause (Anzeige/Offline-Hinweis). */
+  serverPauseEnabled: boolean;
+  /** HH:mm Europe/Zurich — typischer Stopp. */
+  serverPauseStopAt: string;
+  /** HH:mm Europe/Zurich — Daten wieder erwartet. */
+  serverPauseResumeAt: string;
   /**
    * Leistungsfaktor (PR) für die Open-Meteo-Ertragsprognose.
    * Gilt serverseitig für alle Clients.
@@ -29,6 +35,9 @@ export type DevSettingsUpdate = {
   infoBanner?: string;
   infoBannerVisibleFrom?: string | null;
   infoBannerVisibleUntil?: string | null;
+  serverPauseEnabled?: boolean;
+  serverPauseStopAt?: string;
+  serverPauseResumeAt?: string;
   performanceRatio?: number;
 };
 

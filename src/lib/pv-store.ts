@@ -2,6 +2,10 @@ import type { DataSource, GridSource, PvHistory } from "@/lib/pv-source";
 import type { PvSnapshot } from "@/lib/pv-data";
 import { applyLiveDevSettings, ensureDevSettingsReady } from "@/lib/dev-settings-sync";
 import type { SharedDevSettings } from "@/lib/dev-settings-shared";
+import {
+  readOfflineDashboardCache,
+  writeOfflineDashboardCache,
+} from "@/lib/offline-dashboard-cache";
 
 export type PvStoreState = {
   snapshot: PvSnapshot | null;
@@ -19,6 +23,8 @@ export type PvStoreState = {
   history: PvHistory | null;
   historySource: DataSource | null;
   historyError: string | null;
+  /** true, wenn der letzte Live-Abruf fehlschlug (Server/Netz). */
+  serverUnreachable: boolean;
 };
 
 const LIVE_INTERVAL_MS = 15_000;
@@ -42,6 +48,7 @@ const INITIAL_STATE: PvStoreState = {
   history: null,
   historySource: null,
   historyError: null,
+  serverUnreachable: false,
 };
 
 type Listener = () => void;
@@ -61,6 +68,35 @@ type LiveResponse = {
 
 type HistoryResponse = PvHistory & { source: DataSource };
 
+function hydrateFromOfflineCache(): PvStoreState {
+  const cached = readOfflineDashboardCache();
+  if (!cached) return INITIAL_STATE;
+  return {
+    ...INITIAL_STATE,
+    snapshot: cached.live.snapshot,
+    source: cached.live.source,
+    gridSource: cached.live.gridSource,
+    forecastedTodayYieldKwh: cached.live.forecastedTodayYieldKwh,
+    forecastedTomorrowYieldKwh: cached.live.forecastedTomorrowYieldKwh,
+    forecastSolarError: cached.live.forecastSolarError,
+    warning: cached.live.warning,
+    sourceWarning: cached.live.sourceWarning,
+    gridWarning: cached.live.gridWarning,
+    lastFetchedAt: cached.savedAt,
+    history: cached.history
+      ? {
+          today: cached.history.today,
+          week: cached.history.week,
+          month: cached.history.month,
+          year: cached.history.year,
+          lifetime: cached.history.lifetime,
+        }
+      : null,
+    historySource: cached.history?.source ?? null,
+    serverUnreachable: true,
+  };
+}
+
 /**
  * Live-Zahlen alle 15 Sekunden, Verläufe einmal pro Stunde. Beides pausiert,
  * solange der Tab im Hintergrund ist. whatwatt liefert etwa alle 15 Sekunden
@@ -70,7 +106,8 @@ type HistoryResponse = PvHistory & { source: DataSource };
  */
 class PvStore {
   private listeners = new Set<Listener>();
-  private state: PvStoreState = INITIAL_STATE;
+  private state: PvStoreState =
+    typeof window === "undefined" ? INITIAL_STATE : hydrateFromOfflineCache();
   private liveIntervalId: ReturnType<typeof setInterval> | null = null;
   private historyIntervalId: ReturnType<typeof setInterval> | null = null;
   private visibilityBound = false;
@@ -80,6 +117,28 @@ class PvStore {
 
   private emit() {
     for (const listener of [...this.listeners]) listener();
+  }
+
+  private persistOffline() {
+    if (!this.state.snapshot || this.state.source == null) return;
+    writeOfflineDashboardCache({
+      savedAt: this.state.lastFetchedAt ?? Date.now(),
+      live: {
+        source: this.state.source,
+        gridSource: this.state.gridSource,
+        snapshot: this.state.snapshot,
+        forecastedTodayYieldKwh: this.state.forecastedTodayYieldKwh,
+        forecastedTomorrowYieldKwh: this.state.forecastedTomorrowYieldKwh,
+        forecastSolarError: this.state.forecastSolarError,
+        warning: this.state.warning,
+        sourceWarning: this.state.sourceWarning,
+        gridWarning: this.state.gridWarning,
+      },
+      history:
+        this.state.history && this.state.historySource
+          ? { ...this.state.history, source: this.state.historySource }
+          : null,
+    });
   }
 
   private tickLive = async () => {
@@ -104,13 +163,33 @@ class PvStore {
           sourceWarning: payload.sourceWarning ?? null,
           gridWarning: payload.gridWarning ?? null,
           lastFetchedAt: Date.now(),
+          serverUnreachable: false,
         };
+        this.persistOffline();
       } catch {
-        this.state = {
-          ...this.state,
-          error:
-            "Live-Daten konnten nicht aktualisiert werden. Letzter bekannter Stand wird angezeigt.",
-        };
+        if (!this.state.snapshot) {
+          const cached = hydrateFromOfflineCache();
+          if (cached.snapshot) {
+            this.state = {
+              ...cached,
+              error: null,
+              serverUnreachable: true,
+            };
+          } else {
+            this.state = {
+              ...this.state,
+              serverUnreachable: true,
+              error:
+                "Server nicht erreichbar und keine gespeicherten Werte vorhanden.",
+            };
+          }
+        } else {
+          this.state = {
+            ...this.state,
+            serverUnreachable: true,
+            error: null,
+          };
+        }
       }
       this.emit();
     })().finally(() => {
@@ -139,9 +218,27 @@ class PvStore {
           historySource: payload.source,
           historyError: null,
         };
+        this.persistOffline();
         this.emit();
       } catch {
         if (this.state.history != null) return;
+        const cached = readOfflineDashboardCache();
+        if (cached?.history) {
+          this.state = {
+            ...this.state,
+            history: {
+              today: cached.history.today,
+              week: cached.history.week,
+              month: cached.history.month,
+              year: cached.history.year,
+              lifetime: cached.history.lifetime,
+            },
+            historySource: cached.history.source,
+            historyError: null,
+          };
+          this.emit();
+          return;
+        }
         this.state = {
           ...this.state,
           historyError: "Verlaufsdaten konnten nicht geladen werden.",

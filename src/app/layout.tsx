@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { ServiceWorkerRegister } from "@/components/pv/service-worker-register";
 import { StatusBarController } from "@/components/pv/status-bar-controller";
 import { ThemeModeController } from "@/components/pv/theme-mode-controller";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           <ThemeModeController />
           <StatusBarController />
+          <ServiceWorkerRegister />
           {children}
         </ThemeProvider>
       </body>

@@ -7,6 +7,7 @@ import { KpiGrid } from "@/components/pv/kpi-grid";
 import { EnergyFlow } from "@/components/pv/energy-flow";
 import { SunTimesCard } from "@/components/pv/sun-times-card";
 import { InfoBanner } from "@/components/pv/info-banner";
+import { ServerPauseBanner } from "@/components/pv/server-pause-banner";
 import { ChartsSection } from "@/components/pv/charts-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,8 @@ export function Dashboard({ plantName }: { plantName: string }) {
       />
 
       <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 py-4 sm:py-6">
+        <ServerPauseBanner />
+
         {error ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <span>{error}</span>
