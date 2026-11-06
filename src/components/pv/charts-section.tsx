@@ -53,6 +53,23 @@ type Range = "heute" | "woche" | "monat" | "jahr" | "lebensdauer";
 const RANGE_ORDER: Range[] = ["heute", "woche", "monat", "jahr", "lebensdauer"];
 const RANGE_LABELS = ["Heute", "Woche", "Monat", "Jahr", "Laufzeit"];
 
+/** Genug horizontale Breite, um alle Monatstage auf der X-Achse zu benennen. */
+const WIDE_MONTH_AXIS_QUERY = "(min-width: 1024px)";
+
+function subscribeWideMonthAxis(onChange: () => void): () => void {
+  const media = window.matchMedia(WIDE_MONTH_AXIS_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function getWideMonthAxisSnapshot(): boolean {
+  return window.matchMedia(WIDE_MONTH_AXIS_QUERY).matches;
+}
+
+function getWideMonthAxisServerSnapshot(): boolean {
+  return false;
+}
+
 type TodayChartPoint = {
   time: string;
   label: string;
@@ -469,7 +486,8 @@ function BarAxisTick({
   y,
   payload,
   selectedLabel,
-}: XAxisTickContentProps & { selectedLabel: string | null }) {
+  compact = false,
+}: XAxisTickContentProps & { selectedLabel: string | null; compact?: boolean }) {
   const raw = String(payload?.value ?? "");
   const selected = selectedLabel != null && raw === selectedLabel;
   return (
@@ -478,7 +496,7 @@ function BarAxisTick({
       y={Number(y) + 12}
       textAnchor="middle"
       fill={selected ? "var(--card-foreground)" : "var(--muted-foreground)"}
-      fontSize={11}
+      fontSize={compact ? 9 : 11}
       fontWeight={selected ? 600 : 400}
     >
       {axisTickLabel(raw)}
@@ -706,6 +724,8 @@ function YieldConsumptionChart({
   expandMonthDayLabel = false,
   expandMonthNameLabel = false,
   showStromkonto = true,
+  /** Monat im Widescreen: jeden Tag auf der X-Achse beschriften. */
+  labelAllDays = false,
   series,
   tooltipActive,
 }: {
@@ -721,13 +741,15 @@ function YieldConsumptionChart({
   expandMonthNameLabel?: boolean;
   /** Laufzeit zeigt keine Stromkonto-Zeile. */
   showStromkonto?: boolean;
+  labelAllDays?: boolean;
   series: ChartSeriesVisibility;
   /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
   tooltipActive: boolean;
 }) {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [pointerInChart, setPointerInChart] = useState(false);
-  const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
+  const tickInterval =
+    labelAllDays || data.length <= 14 ? 0 : Math.ceil(data.length / 10) - 1;
   const axisLabels = useMemo(() => data.map((point) => point.label), [data]);
   const highlightedLabel = nearestLabeledBarLabel(axisLabels, selectedLabel, tickInterval);
   const chartData = useMemo(
@@ -795,7 +817,13 @@ function YieldConsumptionChart({
           height={X_AXIS_HEIGHT}
           interval={tickInterval}
           padding={{ left: 0, right: 0 }}
-          tick={(props) => <BarAxisTick {...props} selectedLabel={highlightedLabel} />}
+          tick={(props) => (
+            <BarAxisTick
+              {...props}
+              selectedLabel={highlightedLabel}
+              compact={labelAllDays}
+            />
+          )}
         />
         <YAxis
           allowDecimals={false}
@@ -1090,6 +1118,11 @@ export function ChartsSection({
     hideSimulatedStore.getSnapshot,
     hideSimulatedStore.getServerSnapshot,
   );
+  const wideMonthAxis = useSyncExternalStore(
+    subscribeWideMonthAxis,
+    getWideMonthAxisSnapshot,
+    getWideMonthAxisServerSnapshot,
+  );
   const hidePv = hideSimulated && pvSimulated;
 
   const todayChartData = useMemo((): TodayChartPoint[] => {
@@ -1335,6 +1368,7 @@ export function ChartsSection({
                     expandMonthDayLabel={range === "monat"}
                     expandMonthNameLabel={range === "jahr"}
                     showStromkonto={range !== "lebensdauer"}
+                    labelAllDays={range === "monat" && wideMonthAxis}
                     series={series}
                     tooltipActive={tooltipOpen}
                   />
