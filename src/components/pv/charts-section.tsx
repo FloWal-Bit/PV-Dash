@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import {
   Area,
   Bar,
@@ -44,6 +52,23 @@ type Range = "heute" | "woche" | "monat" | "jahr" | "lebensdauer";
 
 const RANGE_ORDER: Range[] = ["heute", "woche", "monat", "jahr", "lebensdauer"];
 const RANGE_LABELS = ["Heute", "Woche", "Monat", "Jahr", "Laufzeit"];
+
+/** Genug horizontale Breite, um alle Monatstage auf der X-Achse zu benennen. */
+const WIDE_MONTH_AXIS_QUERY = "(min-width: 1024px)";
+
+function subscribeWideMonthAxis(onChange: () => void): () => void {
+  const media = window.matchMedia(WIDE_MONTH_AXIS_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function getWideMonthAxisSnapshot(): boolean {
+  return window.matchMedia(WIDE_MONTH_AXIS_QUERY).matches;
+}
+
+function getWideMonthAxisServerSnapshot(): boolean {
+  return false;
+}
 
 type TodayChartPoint = {
   time: string;
@@ -116,7 +141,8 @@ function pointerClosesPointValues(card: HTMLElement, clientX: number, clientY: n
 
 /**
  * Recharts setzt den Hover-Index nur bei mousemove/touchmove. Nach dem Tippen
- * einmalig einen Move anstoßen, damit der erste Punkt sofort im Overlay steht.
+ * und während Touch-Scrub einen Move anstoßen, damit Overlay und X-Achsen-
+ * Highlight dem Finger folgen.
  */
 function seedChartHoverAt(card: HTMLElement, clientX: number, clientY: number) {
   const wrapper = card.querySelector(".recharts-wrapper");
@@ -130,6 +156,26 @@ function seedChartHoverAt(card: HTMLElement, clientX: number, clientY: number) {
       view: window,
     }),
   );
+}
+
+/**
+ * Hält die X-Achsen-Hervorhebung mit dem aktiven Recharts-Label synchron —
+ * auch wenn Touch-Scrub onMouseMove am Chart nicht zuverlässig feuert.
+ */
+function ChartActiveLabelBridge({
+  label,
+  onChange,
+  children,
+}: {
+  label: unknown;
+  onChange: (label: string | null) => void;
+  children: ReactNode;
+}) {
+  const text = label == null || label === "" ? null : String(label);
+  useEffect(() => {
+    onChange(text);
+  }, [text, onChange]);
+  return <>{children}</>;
 }
 
 /** Einheit über der Y-Skala, links bündig mit der Zeile „Diese Woche“. */
@@ -302,46 +348,51 @@ function TodayPowerChart({
             strokeWidth: 1,
           }}
           content={(props) => {
-            if (!tooltipActive || !props.payload?.length) return null;
-            const row = props.payload[0]?.payload as TodayChartPoint | undefined;
-            if (!row) return null;
+            const row = props.payload?.[0]?.payload as TodayChartPoint | undefined;
             const hours = sampleIntervalHours(data);
             const stromkonto =
-              row.productionKw == null || row.consumptionKw == null
+              !row || row.productionKw == null || row.consumptionKw == null
                 ? "–"
                 : formatSignedKwh((row.productionKw - row.consumptionKw) * hours, 2);
             return (
-              <DetailTooltip
-                title={String(props.label ?? row.label)}
-                rows={[
-                  ...(series.ertrag
-                    ? [
-                        {
-                          label: "Ertrag",
-                          value: row.productionKw == null ? "–" : formatKw(row.productionKw, 2),
-                        },
-                      ]
-                    : []),
-                  ...(series.verbrauch
-                    ? [
-                        {
-                          label: "Verbrauch",
-                          value: row.consumptionKw == null ? "–" : formatKw(row.consumptionKw, 2),
-                        },
-                      ]
-                    : []),
-                  ...(series.eigenverbrauch
-                    ? [
-                        {
-                          label: "Eigenverbrauch",
-                          value:
-                            row.consumedFromPvKw == null ? "–" : formatKw(row.consumedFromPvKw, 2),
-                        },
-                      ]
-                    : []),
-                  { label: "Stromkonto", value: stromkonto },
-                ]}
-              />
+              <ChartActiveLabelBridge label={props.label ?? row?.label} onChange={setHoverLabel}>
+                {!tooltipActive || !row ? null : (
+                  <DetailTooltip
+                    title={String(props.label ?? row.label)}
+                    rows={[
+                      ...(series.ertrag
+                        ? [
+                            {
+                              label: "Ertrag",
+                              value: row.productionKw == null ? "–" : formatKw(row.productionKw, 2),
+                            },
+                          ]
+                        : []),
+                      ...(series.verbrauch
+                        ? [
+                            {
+                              label: "Verbrauch",
+                              value:
+                                row.consumptionKw == null ? "–" : formatKw(row.consumptionKw, 2),
+                            },
+                          ]
+                        : []),
+                      ...(series.eigenverbrauch
+                        ? [
+                            {
+                              label: "Eigenverbrauch",
+                              value:
+                                row.consumedFromPvKw == null
+                                  ? "–"
+                                  : formatKw(row.consumedFromPvKw, 2),
+                            },
+                          ]
+                        : []),
+                      { label: "Stromkonto", value: stromkonto },
+                    ]}
+                  />
+                )}
+              </ChartActiveLabelBridge>
             );
           }}
         />
@@ -411,13 +462,32 @@ function axisTickLabel(value: unknown): string {
   return MONTHS_DE[month - 1] ?? text;
 }
 
+/**
+ * Nächste beschriftete X-Achsen-Marke (Recharts `interval`): Index 0, step, 2·step, …
+ * Damit das Highlight beim Scrubben sichtbar mitläuft, auch wenn nicht jeder Balken
+ * eine Achsenbeschriftung hat.
+ */
+function nearestLabeledBarLabel(
+  labels: string[],
+  selectedLabel: string | null,
+  tickInterval: number,
+): string | null {
+  if (!selectedLabel) return null;
+  const index = labels.indexOf(selectedLabel);
+  if (index < 0) return selectedLabel;
+  const step = Math.max(1, tickInterval + 1);
+  const nearest = Math.min(labels.length - 1, Math.round(index / step) * step);
+  return labels[nearest] ?? selectedLabel;
+}
+
 /** X-Achsen-Tick: ausgewählter Tag/Monat/Jahr fett und stärker kontrastiert. */
 function BarAxisTick({
   x,
   y,
   payload,
   selectedLabel,
-}: XAxisTickContentProps & { selectedLabel: string | null }) {
+  compact = false,
+}: XAxisTickContentProps & { selectedLabel: string | null; compact?: boolean }) {
   const raw = String(payload?.value ?? "");
   const selected = selectedLabel != null && raw === selectedLabel;
   return (
@@ -426,7 +496,7 @@ function BarAxisTick({
       y={Number(y) + 12}
       textAnchor="middle"
       fill={selected ? "var(--card-foreground)" : "var(--muted-foreground)"}
-      fontSize={11}
+      fontSize={compact ? 9 : 11}
       fontWeight={selected ? 600 : 400}
     >
       {axisTickLabel(raw)}
@@ -654,6 +724,8 @@ function YieldConsumptionChart({
   expandMonthDayLabel = false,
   expandMonthNameLabel = false,
   showStromkonto = true,
+  /** Monat im Widescreen: jeden Tag auf der X-Achse beschriften. */
+  labelAllDays = false,
   series,
   tooltipActive,
 }: {
@@ -669,13 +741,17 @@ function YieldConsumptionChart({
   expandMonthNameLabel?: boolean;
   /** Laufzeit zeigt keine Stromkonto-Zeile. */
   showStromkonto?: boolean;
+  labelAllDays?: boolean;
   series: ChartSeriesVisibility;
   /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
   tooltipActive: boolean;
 }) {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [pointerInChart, setPointerInChart] = useState(false);
-  const tickInterval = data.length > 14 ? Math.ceil(data.length / 10) - 1 : 0;
+  const tickInterval =
+    labelAllDays || data.length <= 14 ? 0 : Math.ceil(data.length / 10) - 1;
+  const axisLabels = useMemo(() => data.map((point) => point.label), [data]);
+  const highlightedLabel = nearestLabeledBarLabel(axisLabels, selectedLabel, tickInterval);
   const chartData = useMemo(
     () =>
       data.map((point) => {
@@ -741,7 +817,13 @@ function YieldConsumptionChart({
           height={X_AXIS_HEIGHT}
           interval={tickInterval}
           padding={{ left: 0, right: 0 }}
-          tick={(props) => <BarAxisTick {...props} selectedLabel={selectedLabel} />}
+          tick={(props) => (
+            <BarAxisTick
+              {...props}
+              selectedLabel={highlightedLabel}
+              compact={labelAllDays}
+            />
+          )}
         />
         <YAxis
           allowDecimals={false}
@@ -763,8 +845,7 @@ function YieldConsumptionChart({
           offset={{ x: 12, y: 0 }}
           cursor={<BarSelectionCursor />}
           content={(props) => {
-            if (!tooltipActive || !props.payload?.length) return null;
-            const row = props.payload[0]?.payload as
+            const row = props.payload?.[0]?.payload as
               | {
                   dayKey?: string;
                   yieldKwh?: number;
@@ -773,57 +854,68 @@ function YieldConsumptionChart({
                   stromkontoKwh?: number;
                 }
               | undefined;
-            if (!row) return null;
             return (
-              <DetailTooltip
-                title={barTooltipTitle(props.label, row, {
-                  expandWeekdayLabel,
-                  expandMonthDayLabel,
-                  expandMonthNameLabel,
-                })}
-                rows={[
-                  ...(series.ertrag
-                    ? [
-                        {
-                          label: "Ertrag",
-                          value: formatDetailEnergy(Number(row.yieldKwh ?? 0), unit, trimDecimal),
-                        },
-                      ]
-                    : []),
-                  ...(series.verbrauch
-                    ? [
-                        {
-                          label: "Verbrauch",
-                          value: formatDetailEnergy(Number(row.consumptionKwh ?? 0), unit, trimDecimal),
-                        },
-                      ]
-                    : []),
-                  ...(series.eigenverbrauch
-                    ? [
-                        {
-                          label: "Eigenverbrauch",
-                          value: formatDetailEnergy(
-                            Number(row.eigenverbrauchKwh ?? 0),
-                            unit,
-                            trimDecimal,
-                          ),
-                        },
-                      ]
-                    : []),
-                  ...(showStromkonto
-                    ? [
-                        {
-                          label: "Stromkonto",
-                          value: formatDetailStromkonto(
-                            Number(row.stromkontoKwh ?? 0),
-                            unit,
-                            trimDecimal,
-                          ),
-                        },
-                      ]
-                    : []),
-                ]}
-              />
+              <ChartActiveLabelBridge label={props.label} onChange={setSelectedLabel}>
+                {!tooltipActive || !row ? null : (
+                  <DetailTooltip
+                    title={barTooltipTitle(props.label, row, {
+                      expandWeekdayLabel,
+                      expandMonthDayLabel,
+                      expandMonthNameLabel,
+                    })}
+                    rows={[
+                      ...(series.ertrag
+                        ? [
+                            {
+                              label: "Ertrag",
+                              value: formatDetailEnergy(
+                                Number(row.yieldKwh ?? 0),
+                                unit,
+                                trimDecimal,
+                              ),
+                            },
+                          ]
+                        : []),
+                      ...(series.verbrauch
+                        ? [
+                            {
+                              label: "Verbrauch",
+                              value: formatDetailEnergy(
+                                Number(row.consumptionKwh ?? 0),
+                                unit,
+                                trimDecimal,
+                              ),
+                            },
+                          ]
+                        : []),
+                      ...(series.eigenverbrauch
+                        ? [
+                            {
+                              label: "Eigenverbrauch",
+                              value: formatDetailEnergy(
+                                Number(row.eigenverbrauchKwh ?? 0),
+                                unit,
+                                trimDecimal,
+                              ),
+                            },
+                          ]
+                        : []),
+                      ...(showStromkonto
+                        ? [
+                            {
+                              label: "Stromkonto",
+                              value: formatDetailStromkonto(
+                                Number(row.stromkontoKwh ?? 0),
+                                unit,
+                                trimDecimal,
+                              ),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                )}
+              </ChartActiveLabelBridge>
             );
           }}
         />
@@ -1026,6 +1118,11 @@ export function ChartsSection({
     hideSimulatedStore.getSnapshot,
     hideSimulatedStore.getServerSnapshot,
   );
+  const wideMonthAxis = useSyncExternalStore(
+    subscribeWideMonthAxis,
+    getWideMonthAxisSnapshot,
+    getWideMonthAxisServerSnapshot,
+  );
   const hidePv = hideSimulated && pvSimulated;
 
   const todayChartData = useMemo((): TodayChartPoint[] => {
@@ -1130,6 +1227,7 @@ export function ChartsSection({
           : lifetimeWithout2021(lifetime);
   const todayEnergyMissing = range === "heute" && todayEnergyDataMissing(todayChartData, liveToday);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const scrubPointerId = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     const phone = window.matchMedia("(max-width: 767px)");
@@ -1171,6 +1269,7 @@ export function ChartsSection({
       onPointerDown={(event) => {
         const card = event.currentTarget;
         if (pointerClosesPointValues(card, event.clientX, event.clientY)) {
+          scrubPointerId.current = null;
           setTooltipDismissed(true);
           return;
         }
@@ -1180,7 +1279,33 @@ export function ChartsSection({
         ) {
           setTooltipDismissed(false);
           seedChartHoverAt(card, event.clientX, event.clientY);
+          // Capture: Touch-Scrub liefert weiter pointermove, Achse/Overlay laufen mit.
+          scrubPointerId.current = event.pointerId;
+          try {
+            card.setPointerCapture(event.pointerId);
+          } catch {
+            /* ältere WebViews ohne Capture */
+          }
         }
+      }}
+      onPointerMove={(event) => {
+        if (scrubPointerId.current !== event.pointerId) return;
+        const card = event.currentTarget;
+        if (!pointerInDiagram(card, event.clientX, event.clientY)) return;
+        seedChartHoverAt(card, event.clientX, event.clientY);
+      }}
+      onPointerUp={(event) => {
+        if (scrubPointerId.current !== event.pointerId) return;
+        scrubPointerId.current = null;
+        try {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        } catch {
+          /* bereits freigegeben */
+        }
+      }}
+      onPointerCancel={(event) => {
+        if (scrubPointerId.current !== event.pointerId) return;
+        scrubPointerId.current = null;
       }}
     >
       <SwipePageSurface
@@ -1243,6 +1368,7 @@ export function ChartsSection({
                     expandMonthDayLabel={range === "monat"}
                     expandMonthNameLabel={range === "jahr"}
                     showStromkonto={range !== "lebensdauer"}
+                    labelAllDays={range === "monat" && wideMonthAxis}
                     series={series}
                     tooltipActive={tooltipOpen}
                   />
