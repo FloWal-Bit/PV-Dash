@@ -1268,6 +1268,8 @@ export function ChartsSection({
       className="yield-chart-card shadow-card rounded-2xl"
       onPointerDown={(event) => {
         const card = event.currentTarget;
+        // Nur Öffnen/Schliessen — kein Pointer-Capture auf der ganzen Karte,
+        // sonst blockiert Tab-Swipe ausserhalb des Diagramms.
         if (pointerClosesPointValues(card, event.clientX, event.clientY)) {
           scrubPointerId.current = null;
           setTooltipDismissed(true);
@@ -1279,39 +1281,13 @@ export function ChartsSection({
         ) {
           setTooltipDismissed(false);
           seedChartHoverAt(card, event.clientX, event.clientY);
-          // Capture: Touch-Scrub liefert weiter pointermove, Achse/Overlay laufen mit.
-          scrubPointerId.current = event.pointerId;
-          try {
-            card.setPointerCapture(event.pointerId);
-          } catch {
-            /* ältere WebViews ohne Capture */
-          }
         }
-      }}
-      onPointerMove={(event) => {
-        if (scrubPointerId.current !== event.pointerId) return;
-        const card = event.currentTarget;
-        if (!pointerInDiagram(card, event.clientX, event.clientY)) return;
-        seedChartHoverAt(card, event.clientX, event.clientY);
-      }}
-      onPointerUp={(event) => {
-        if (scrubPointerId.current !== event.pointerId) return;
-        scrubPointerId.current = null;
-        try {
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        } catch {
-          /* bereits freigegeben */
-        }
-      }}
-      onPointerCancel={(event) => {
-        if (scrubPointerId.current !== event.pointerId) return;
-        scrubPointerId.current = null;
       }}
     >
       <SwipePageSurface
         labels={RANGE_LABELS}
         page={page}
-        ignoreSwipeSelector=".recharts-wrapper"
+        ignoreSwipeSelector=".yield-chart-plot"
         onPageChange={(next) => {
           setTooltipDismissed(true);
           if (next !== page) suppressChartOpenUntil.current = Date.now() + 400;
@@ -1348,6 +1324,43 @@ export function ChartsSection({
                     ? undefined
                     : { marginLeft: -CHART_PULL_LEFT, width: `calc(100% + ${CHART_PULL_LEFT}px)` }
                 }
+                onPointerDown={(event) => {
+                  const card = cardRef.current;
+                  if (!card) return;
+                  if (
+                    !pointerInDiagram(card, event.clientX, event.clientY) ||
+                    Date.now() < suppressChartOpenUntil.current
+                  ) {
+                    return;
+                  }
+                  // Capture nur auf dem Plot — Header/Legende bleiben tab-swipebar.
+                  scrubPointerId.current = event.pointerId;
+                  try {
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  } catch {
+                    /* ältere WebViews ohne Capture */
+                  }
+                }}
+                onPointerMove={(event) => {
+                  if (scrubPointerId.current !== event.pointerId) return;
+                  const card = cardRef.current;
+                  if (!card) return;
+                  if (!pointerInDiagram(card, event.clientX, event.clientY)) return;
+                  seedChartHoverAt(card, event.clientX, event.clientY);
+                }}
+                onPointerUp={(event) => {
+                  if (scrubPointerId.current !== event.pointerId) return;
+                  scrubPointerId.current = null;
+                  try {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  } catch {
+                    /* bereits freigegeben */
+                  }
+                }}
+                onPointerCancel={(event) => {
+                  if (scrubPointerId.current !== event.pointerId) return;
+                  scrubPointerId.current = null;
+                }}
               >
                 {hidePv ? (
                   <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
