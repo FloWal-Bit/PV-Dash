@@ -85,7 +85,7 @@ export function parseYieldForecastInput(value: string): number | null {
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
-let state: YieldForecastPlant = {
+const SERVER_SNAPSHOT: YieldForecastPlant = {
   latitude: OPEN_METEO_LATITUDE,
   longitude: OPEN_METEO_LONGITUDE,
   tiltDeg: OPEN_METEO_TILT_DEG,
@@ -93,6 +93,7 @@ let state: YieldForecastPlant = {
   peakKwp: 30.34,
   performanceRatio: DEFAULT_OPEN_METEO_PERFORMANCE_RATIO,
 };
+let state: YieldForecastPlant = { ...SERVER_SNAPSHOT };
 
 function emit() {
   for (const listener of listeners) listener();
@@ -116,14 +117,7 @@ export const yieldForecastStore = {
     return state;
   },
   getServerSnapshot(): YieldForecastPlant {
-    return {
-      latitude: OPEN_METEO_LATITUDE,
-      longitude: OPEN_METEO_LONGITUDE,
-      tiltDeg: OPEN_METEO_TILT_DEG,
-      azimuthDeg: OPEN_METEO_AZIMUTH_DEG,
-      peakKwp: 30.34,
-      performanceRatio: DEFAULT_OPEN_METEO_PERFORMANCE_RATIO,
-    };
+    return SERVER_SNAPSHOT;
   },
   /** Speichert Geometrie lokal; PR separat über persistPerformanceRatio. */
   save(plant: YieldForecastPlant): void {
