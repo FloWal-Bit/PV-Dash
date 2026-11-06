@@ -8,8 +8,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import {
   readInfoBanner,
+  readInfoBannerInstant,
   readPerformanceRatio,
   normalizeInfoBanner,
+  normalizeInfoBannerInstant,
+  normalizeInfoBannerSchedule,
   normalizePerformanceRatio,
   type DevSettingsUpdate,
   type SharedDevSettings,
@@ -22,6 +25,8 @@ type PersistedDevSettings = {
   updatedAt: string;
   hideSimulated: boolean | null;
   infoBanner: string;
+  infoBannerVisibleFrom: string | null;
+  infoBannerVisibleUntil: string | null;
   /** null = noch nicht gesetzt → Env/Default. */
   performanceRatio: number | null;
 };
@@ -37,12 +42,16 @@ function readFile(): PersistedDevSettings | null {
     const v = parsed as Record<string, unknown>;
     const hideSimulated = typeof v.hideSimulated === "boolean" ? v.hideSimulated : null;
     const infoBanner = readInfoBanner(v.infoBanner);
+    const infoBannerVisibleFrom = readInfoBannerInstant(v.infoBannerVisibleFrom);
+    const infoBannerVisibleUntil = readInfoBannerInstant(v.infoBannerVisibleUntil);
     const performanceRatio = readPerformanceRatio(v.performanceRatio);
     const hadLocation = "siteLocation" in v || "yieldForecast" in v;
     const file: PersistedDevSettings = {
       updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : new Date(0).toISOString(),
       hideSimulated,
       infoBanner,
+      infoBannerVisibleFrom,
+      infoBannerVisibleUntil,
       performanceRatio,
     };
     if (hadLocation) writeFile(file);
@@ -61,6 +70,8 @@ function resolve(file: PersistedDevSettings | null): SharedDevSettings {
   return {
     hideSimulated: file?.hideSimulated ?? true,
     infoBanner: file?.infoBanner ?? "",
+    infoBannerVisibleFrom: file?.infoBannerVisibleFrom ?? null,
+    infoBannerVisibleUntil: file?.infoBannerVisibleUntil ?? null,
     performanceRatio: resolvePerformanceRatio(file?.performanceRatio),
     configured: file != null,
     updatedAt: file?.updatedAt ?? null,
@@ -78,6 +89,16 @@ export function getSharedDevSettings(): SharedDevSettings {
 
 export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSettings {
   const current = readFile();
+  const infoBannerVisibleFrom =
+    "infoBannerVisibleFrom" in update
+      ? normalizeInfoBannerInstant(update.infoBannerVisibleFrom)
+      : (current?.infoBannerVisibleFrom ?? null);
+  const infoBannerVisibleUntil =
+    "infoBannerVisibleUntil" in update
+      ? normalizeInfoBannerInstant(update.infoBannerVisibleUntil)
+      : (current?.infoBannerVisibleUntil ?? null);
+  normalizeInfoBannerSchedule(infoBannerVisibleFrom, infoBannerVisibleUntil);
+
   const next: PersistedDevSettings = {
     updatedAt: new Date().toISOString(),
     hideSimulated:
@@ -88,6 +109,8 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
       typeof update.infoBanner === "string"
         ? normalizeInfoBanner(update.infoBanner)
         : (current?.infoBanner ?? ""),
+    infoBannerVisibleFrom,
+    infoBannerVisibleUntil,
     performanceRatio:
       typeof update.performanceRatio === "number"
         ? normalizePerformanceRatio(update.performanceRatio)

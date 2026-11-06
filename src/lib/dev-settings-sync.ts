@@ -12,7 +12,11 @@ let ready = false;
 export function applySharedDevSettings(data: SharedDevSettings): void {
   lastUpdatedAt = data.updatedAt;
   hideSimulatedStore.applyRemote(data.hideSimulated);
-  infoBannerStore.applyRemote(data.infoBanner);
+  infoBannerStore.applyRemote({
+    text: data.infoBanner,
+    visibleFrom: data.infoBannerVisibleFrom,
+    visibleUntil: data.infoBannerVisibleUntil,
+  });
   yieldForecastStore.applyRemotePerformanceRatio(data.performanceRatio);
 }
 

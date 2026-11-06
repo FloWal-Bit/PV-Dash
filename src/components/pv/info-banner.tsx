@@ -1,9 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { isInfoBannerActiveNow } from "@/lib/dev-settings-shared";
 import { infoBannerStore } from "@/lib/info-banner";
 
 /** Hinweis oberhalb der Wetterkarte. Die Höhe folgt dem Text, ohne feste Zeilenzahl. */
@@ -13,13 +14,24 @@ export function InfoBanner() {
     infoBannerStore.getSnapshot,
     infoBannerStore.getServerSnapshot,
   );
+  const schedule = useSyncExternalStore(
+    infoBannerStore.subscribeSchedule,
+    infoBannerStore.getScheduleSnapshot,
+    infoBannerStore.getScheduleServerSnapshot,
+  );
   const dismissed = useSyncExternalStore(
     infoBannerStore.subscribeDismissed,
     infoBannerStore.getDismissedSnapshot,
     infoBannerStore.getDismissedServerSnapshot,
   );
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
-  if (!text || dismissed === text) return null;
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (!isInfoBannerActiveNow(text, schedule, nowMs) || dismissed === text) return null;
 
   return (
     <Card className="shadow-card rounded-2xl">

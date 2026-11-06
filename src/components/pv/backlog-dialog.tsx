@@ -14,7 +14,13 @@ import { backlogStore } from "@/lib/backlog-store";
 import { MAX_BACKLOG_TITLE_LENGTH } from "@/lib/backlog-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
-import { MAX_INFO_BANNER_LENGTH, normalizeInfoBanner } from "@/lib/dev-settings-shared";
+import {
+  MAX_INFO_BANNER_LENGTH,
+  isoToZurichDatetimeLocal,
+  normalizeInfoBanner,
+  normalizeInfoBannerSchedule,
+  zurichDatetimeLocalToIso,
+} from "@/lib/dev-settings-shared";
 import {
   DeveloperPlantSettings,
   PushNotificationSettings,
@@ -425,32 +431,67 @@ function InfoBannerEditor() {
     infoBannerStore.getSnapshot,
     infoBannerStore.getServerSnapshot,
   );
+  const savedSchedule = useSyncExternalStore(
+    infoBannerStore.subscribeSchedule,
+    infoBannerStore.getScheduleSnapshot,
+    infoBannerStore.getScheduleServerSnapshot,
+  );
   const [draft, setDraft] = useState<string | null>(null);
+  const [draftFrom, setDraftFrom] = useState<string | null>(null);
+  const [draftUntil, setDraftUntil] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const savingRef = useRef(false);
   const value = draft ?? saved;
-  const dirty = value !== saved;
+  const fromLocal = draftFrom ?? isoToZurichDatetimeLocal(savedSchedule.visibleFrom);
+  const untilLocal = draftUntil ?? isoToZurichDatetimeLocal(savedSchedule.visibleUntil);
+  const dirty =
+    value !== saved ||
+    fromLocal !== isoToZurichDatetimeLocal(savedSchedule.visibleFrom) ||
+    untilLocal !== isoToZurichDatetimeLocal(savedSchedule.visibleUntil);
 
   async function save() {
     if (savingRef.current) return;
-    let next = value;
+    let nextText = value;
+    let visibleFrom: string | null = null;
+    let visibleUntil: string | null = null;
     try {
-      next = normalizeInfoBanner(value);
+      nextText = normalizeInfoBanner(value);
+      if (fromLocal.trim()) {
+        visibleFrom = zurichDatetimeLocalToIso(fromLocal);
+        if (!visibleFrom) throw new Error("Ungültiger Startzeitpunkt.");
+      }
+      if (untilLocal.trim()) {
+        visibleUntil = zurichDatetimeLocalToIso(untilLocal);
+        if (!visibleUntil) throw new Error("Ungültiger Endzeitpunkt.");
+      }
+      normalizeInfoBannerSchedule(visibleFrom, visibleUntil);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Hinweis konnte nicht gespeichert werden.");
       return;
     }
-    if (next === saved) {
+    if (
+      nextText === saved &&
+      visibleFrom === savedSchedule.visibleFrom &&
+      visibleUntil === savedSchedule.visibleUntil
+    ) {
       setDraft(null);
+      setDraftFrom(null);
+      setDraftUntil(null);
       return;
     }
     savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
-      await infoBannerStore.set(next);
+      await infoBannerStore.set({
+        text: nextText,
+        visibleFrom,
+        visibleUntil,
+      });
       setDraft(null);
+      setDraftFrom(null);
+      setDraftUntil(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Hinweis konnte nicht gespeichert werden.");
     } finally {
@@ -467,7 +508,7 @@ function InfoBannerEditor() {
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
         Steht oberhalb der Wetterkarte. Die Karte wird so hoch, wie der Text braucht.
-        Leer lassen blendet den Hinweis aus.
+        Leer lassen blendet den Hinweis aus. Optional zeitlich begrenzen (Europe/Zurich).
       </p>
       <textarea
         className="flex min-h-24 w-full resize-y rounded-xl border border-border/80 bg-background px-3 py-2 text-sm leading-relaxed shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60"
@@ -478,12 +519,43 @@ function InfoBannerEditor() {
           setDraft(event.target.value);
           if (error) setError(null);
         }}
-        onBlur={() => {
-          if (dirty) void save();
-        }}
         placeholder="Hinweis für das Dashboard…"
         aria-label="Text des Info-Banners"
       />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+          Sichtbar ab
+          <input
+            type="datetime-local"
+            className="h-9 rounded-xl border border-border/80 bg-background px-3 text-sm text-card-foreground outline-none focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:opacity-60"
+            value={fromLocal}
+            disabled={saving}
+            onChange={(event) => {
+              setDraftFrom(event.target.value);
+              if (error) setError(null);
+            }}
+            aria-label="Info-Banner sichtbar ab"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+          Sichtbar bis
+          <input
+            type="datetime-local"
+            className="h-9 rounded-xl border border-border/80 bg-background px-3 text-sm text-card-foreground outline-none focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:opacity-60"
+            value={untilLocal}
+            disabled={saving}
+            onChange={(event) => {
+              setDraftUntil(event.target.value);
+              if (error) setError(null);
+            }}
+            aria-label="Info-Banner sichtbar bis"
+          />
+        </label>
+      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Leer = ohne Begrenzung. Das Banner erscheint nur innerhalb des Fensters; der Text bleibt
+        gespeichert.
+      </p>
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs tabular-nums text-muted-foreground">
           {value.length}/{MAX_INFO_BANNER_LENGTH}
