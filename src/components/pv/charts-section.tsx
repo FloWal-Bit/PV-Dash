@@ -201,12 +201,16 @@ function YAxisUnit({
   );
 }
 
-/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde (ohne Strich an der Label-Position). Smartphone-Hochformat: nur jede vierte Stunde. */
-function halfHourTicks(): string[] {
+/**
+ * Volle Stunden für die Heute-X-Achse.
+ * Beschriftet: jede zweite Stunde (00, 02, …). Strich nur in der Mitte dazwischen
+ * (01, 03, …) — keine Halbstunden-Striche direkt vor/nach den Zahlen.
+ * Smartphone-Hochformat: nur jede vierte Stunde beschriftet (CSS).
+ */
+function todayHourTicks(): string[] {
   const ticks: string[] = [];
   for (let hour = 0; hour < 24; hour++) {
-    const hh = String(hour).padStart(2, "0");
-    ticks.push(`${hh}:00`, `${hh}:30`);
+    ticks.push(`${String(hour).padStart(2, "0")}:00`);
   }
   return ticks;
 }
@@ -228,10 +232,10 @@ function TodayAxisTick({
   selectedTime,
 }: XAxisTickContentProps & { selectedTime: string | null }) {
   const value = String(payload?.value ?? "");
-  const [hour = "00", minute = "00"] = value.split(":");
-  const halfHour = minute === "30";
+  const [hour = "00"] = value.split(":");
   const hourNumber = Number(hour);
-  const showLabel = !halfHour && hourNumber % 2 === 0;
+  const showLabel = hourNumber % 2 === 0;
+  const showTick = hourNumber % 2 === 1;
   const hideOnPhonePortrait = showLabel && hourNumber % 4 !== 0;
   const selectedLabel = todayAxisLabelForSelection(selectedTime);
   const selected = selectedLabel != null && value === selectedLabel;
@@ -249,15 +253,15 @@ function TodayAxisTick({
           {hour}:00
         </text>
       ) : null}
-      {/* Kein Strich direkt an der Zeitangabe — nur zwischen den Labels (z. B. 08:30, 09:00). */}
-      {showLabel ? null : (
+      {/* Nur der mittlere Stundenstrich zwischen zwei Labels — nicht direkt neben der Zahl. */}
+      {showTick ? (
         <line
           className="today-axis-tick"
-          y2={halfHour ? 4 : 6}
+          y2={6}
           stroke={selected ? "var(--card-foreground)" : "var(--muted-foreground)"}
-          strokeOpacity={selected ? 0.9 : halfHour ? 0.55 : 0.85}
+          strokeOpacity={selected ? 0.9 : 0.85}
         />
-      )}
+      ) : null}
     </g>
   );
 }
@@ -280,7 +284,7 @@ function TodayPowerChart({
 }) {
   const [hoverLabel, setHoverLabel] = useState<string | null>(null);
   const [pointerInChart, setPointerInChart] = useState(false);
-  const hourTicks = halfHourTicks().filter((tick) => data.some((point) => point.label === tick));
+  const hourTicks = todayHourTicks().filter((tick) => data.some((point) => point.label === tick));
 
   useEffect(() => {
     if (!tooltipActive && !pointerInChart) setHoverLabel(null);
