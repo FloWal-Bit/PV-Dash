@@ -12,7 +12,7 @@ export function ServerPauseBanner() {
     serverPauseSettingsStore.getSnapshot,
     serverPauseSettingsStore.getServerSnapshot,
   );
-  const { serverUnreachable, lastFetchedAt } = useSyncExternalStore(
+  const { serverUnreachable, lastFetchedAt, liveProbeDone } = useSyncExternalStore(
     pvStore.subscribe,
     pvStore.getSnapshot,
     pvStore.getServerSnapshot,
@@ -25,8 +25,10 @@ export function ServerPauseBanner() {
   }, []);
 
   void nowMs;
+  // Erst nach dem ersten Live-Versuch anzeigen — sonst blitzt der Banner
+  // bei jedem Refresh aus dem Offline-Cache auf, obwohl der Server erreichbar ist.
   const message = formatServerPauseMessage(pause, {
-    unreachable: serverUnreachable,
+    unreachable: liveProbeDone && serverUnreachable,
     lastFetchedAt,
   });
   if (!message) return null;
