@@ -46,7 +46,12 @@ type HeaderProps = {
   gridSource?: GridSource;
   sourceWarning?: string | null;
   gridWarning?: string | null;
+  /** true = nur Offline-/Cache-Werte, keine Live-Verbindung zum Node. */
+  serverUnreachable?: boolean;
 };
+
+const OFFLINE_BADGE_DETAIL =
+  "Server nicht erreichbar. Angezeigt werden gespeicherte Werte.";
 
 const badgeToneClass = {
   green: "bg-chart-3/15 text-chart-3",
@@ -61,10 +66,36 @@ export function DashboardHeader({
   gridSource,
   sourceWarning,
   gridWarning,
+  serverUnreachable = false,
 }: HeaderProps) {
   const [backlogOpen, setBacklogOpen] = useState(false);
   const taps = useRef({ count: 0, last: 0 });
   const backlogOpenedAt = useRef(0);
+
+  const sourceTone = serverUnreachable
+    ? "muted"
+    : source === "fusionsolar"
+      ? "green"
+      : sourceWarning
+        ? "amber"
+        : "muted";
+  const sourceDetail = serverUnreachable
+    ? OFFLINE_BADGE_DETAIL
+    : source === "fusionsolar"
+      ? null
+      : (sourceWarning ?? "FusionSolar liefert keine Livedaten. Angezeigt wird die Simulation.");
+
+  const showStromkonto = gridSource === "whatwatt" || Boolean(gridWarning);
+  const stromkontoTone = serverUnreachable
+    ? "muted"
+    : gridSource === "whatwatt" && !gridWarning
+      ? "green"
+      : "amber";
+  const stromkontoDetail = serverUnreachable
+    ? OFFLINE_BADGE_DETAIL
+    : gridSource === "whatwatt" && !gridWarning
+      ? null
+      : gridWarning;
 
   function handleTitleTap() {
     const now = Date.now();
@@ -114,19 +145,15 @@ export function DashboardHeader({
           {source ? (
             <StatusBadge
               label={source === "fusionsolar" ? "FusionSolar" : "Simulation"}
-              tone={source === "fusionsolar" ? "green" : sourceWarning ? "amber" : "muted"}
-              detail={
-                source === "fusionsolar"
-                  ? null
-                  : (sourceWarning ?? "FusionSolar liefert keine Livedaten. Angezeigt wird die Simulation.")
-              }
+              tone={sourceTone}
+              detail={sourceDetail}
             />
           ) : null}
-          {gridSource === "whatwatt" || gridWarning ? (
+          {showStromkonto ? (
             <StatusBadge
               label="Stromkonto"
-              tone={gridSource === "whatwatt" && !gridWarning ? "green" : "amber"}
-              detail={gridSource === "whatwatt" && !gridWarning ? null : gridWarning}
+              tone={stromkontoTone}
+              detail={stromkontoDetail}
             />
           ) : null}
           <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
