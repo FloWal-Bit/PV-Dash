@@ -300,8 +300,8 @@ async function getMeterFiveMinutesGridCached(): Promise<Map<string, number>> {
 }
 
 /**
- * Fehlende Nachtverbrauchswerte (bis 05:00) in 5-Min-Granularität aus dem
- * FusionSolar-Netz-/Leistungszähler nachladen — einmal täglich.
+ * Fehlende Verbrauchswerte in 5-Min-Granularität aus dem FusionSolar-
+ * Netz-/Leistungszähler nachladen — einmal täglich, nur Messwerte.
  */
 export async function fillTodayConsumptionGapsFromMeterFiveMinutes(
   today: HistoryPoint[],
@@ -313,13 +313,13 @@ export async function fillTodayConsumptionGapsFromMeterFiveMinutes(
     return fillMissingConsumptionFromMeterFiveMinutes(today, gridByLabel);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-    console.error("[fusionsolar] Zähler-5-Min für Nachtlücken nicht verfügbar:", message);
+    console.error("[fusionsolar] Zähler-5-Min für Lücken nicht verfügbar:", message);
     return today;
   }
 }
 
 /**
- * Letzter Fallback: fehlende Verbrauchswerte aus der Stunden-KPI (`use_power`).
+ * Fallback: fehlende Verbrauchswerte aus der gemessenen Stunden-KPI (`use_power`).
  */
 export async function fillTodayConsumptionGapsFromHourKpi(
   today: HistoryPoint[],
@@ -331,7 +331,7 @@ export async function fillTodayConsumptionGapsFromHourKpi(
     return fillMissingConsumptionFromHourKpi(today, hourItems);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-    console.error("[fusionsolar] Stundenverbrauch für Pausen-Lücken nicht verfügbar:", message);
+    console.error("[fusionsolar] Stundenverbrauch für Lücken nicht verfügbar:", message);
     return today;
   }
 }

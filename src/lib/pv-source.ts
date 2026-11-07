@@ -289,20 +289,15 @@ export function refreshFusionSolarDevCache(): Promise<{ ok: true } | { ok: false
 }
 
 /**
- * Heutige Verbrauchskurve:
+ * Heutige Verbrauchskurve — nur Messwerte, keine Interpolation:
  * 1) gemessene whatwatt-Slots
- * 2) FusionSolar-Zähler 5-Min (einmal/Tag, bis 05:00) für Pausen-Lücken
- * 3) whatwatt-Interpolation über Restlücken
- * 4) FusionSolar-Stunden-KPI als letzter Fallback
+ * 2) FusionSolar-Zähler 5-Min (einmal/Tag) für fehlende Punkte
+ * 3) FusionSolar-Stunden-KPI als Fallback, falls der Zähler Lücken hat
  */
 async function withTodayConsumption(today: HistoryPoint[]): Promise<HistoryPoint[]> {
-  const exact = await applyWhatWattHourConsumption(today, { interpolate: false });
-  const fromFusionFiveMin = await fillTodayConsumptionGapsFromMeterFiveMinutes(exact);
-  const interpolated = await applyWhatWattHourConsumption(fromFusionFiveMin, {
-    interpolate: true,
-    onlyMissing: true,
-  });
-  return fillTodayConsumptionGapsFromHourKpi(interpolated);
+  const fromWhatWatt = await applyWhatWattHourConsumption(today);
+  const fromFusionFiveMin = await fillTodayConsumptionGapsFromMeterFiveMinutes(fromWhatWatt);
+  return fillTodayConsumptionGapsFromHourKpi(fromFusionFiveMin);
 }
 
 /** Verlaufsreihen für die Diagramme. */
