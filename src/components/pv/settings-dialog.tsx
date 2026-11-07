@@ -35,12 +35,14 @@ import {
   energyFlowDefaultTabStore,
 } from "@/lib/energy-flow-default-tab";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
+import { hapticsEnabledStore } from "@/lib/haptics";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import {
   canPromptInstall,
   getHomeScreenInstallServerState,
   getHomeScreenInstallState,
   homeScreenHint,
+  isAndroidBrowser,
   isIosBrowser,
   promptHomeScreenInstall,
   subscribeHomeScreenInstall,
@@ -67,6 +69,45 @@ function StatusBarSwitch() {
       }}
       className="data-checked:bg-chart-3"
     />
+  );
+}
+
+function HapticsSwitch() {
+  const enabled = useSyncExternalStore(
+    hapticsEnabledStore.subscribe,
+    hapticsEnabledStore.getSnapshot,
+    hapticsEnabledStore.getServerSnapshot,
+  );
+
+  return (
+    <Switch
+      id="haptics-enabled"
+      checked={enabled}
+      onCheckedChange={(checked) => {
+        hapticsEnabledStore.setEnabled(checked);
+      }}
+      className="data-checked:bg-chart-3"
+    />
+  );
+}
+
+function AndroidHapticsSetting() {
+  const [android, setAndroid] = useState(false);
+  useEffect(() => {
+    setAndroid(isAndroidBrowser());
+  }, []);
+  if (!android) return null;
+
+  return (
+    <div className="flex items-start justify-between gap-3 border-t border-border/70 pt-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <Label htmlFor="haptics-enabled">Haptisches Feedback</Label>
+        <span className="text-xs leading-relaxed text-muted-foreground">
+          Kurze Vibration beim Wechseln der Tabs und beim Scrubben in den Diagrammen.
+        </span>
+      </div>
+      <HapticsSwitch />
+    </div>
   );
 }
 
@@ -916,6 +957,7 @@ export function SettingsDialog() {
               </div>
               <StatusBarSwitch />
             </div>
+            <AndroidHapticsSetting />
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3">
               <span className="text-sm font-medium">Farbschema</span>
               <ThemeModeSetting />
