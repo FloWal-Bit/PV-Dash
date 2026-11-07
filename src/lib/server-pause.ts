@@ -84,7 +84,7 @@ export function formatServerPauseMessage(
           minute: "2-digit",
         })
       : null;
-  const cached = last ? ` Letzter Stand: ${last}.` : "";
+  const cached = last ? ` Letzter Stand: ${last} Uhr.` : "";
 
   if (settings.enabled) {
     const inWindow = isWithinServerPauseWindow(settings);
