@@ -263,7 +263,7 @@ export function fillMissingConsumptionFromHourKpi(
   const byHour = new Map<number, number>();
   for (const item of hourItems) {
     const kwh = stationHourConsumptionKwh(item.dataItemMap);
-    if (kwh == null) continue;
+    if (kwh == null || kwh <= 0) continue;
     const hour = Number(zurichParts(item.collectTime).hour);
     if (!Number.isInteger(hour)) continue;
     byHour.set(hour, kwh);
@@ -271,7 +271,7 @@ export function fillMissingConsumptionFromHourKpi(
   if (byHour.size === 0) return today;
 
   return today.map((point) => {
-    if (point.consumptionKw != null) return point;
+    if (point.consumptionKw != null && point.consumptionKw > 0) return point;
     const hour = Number(point.time.slice(0, 2));
     if (!Number.isInteger(hour)) return point;
     const kw = byHour.get(hour);
@@ -281,8 +281,17 @@ export function fillMissingConsumptionFromHourKpi(
 }
 
 /**
+ * Huawei-Zähler (Plant Power Flow / getDevFiveMinutes): negativ = Netzbezug,
+ * positiv = Einspeisung. App-Konvention ist umgekehrt (positiv = Bezug).
+ * Deshalb Vorzeichen umdrehen.
+ */
+export function huaweiMeterPowerToAppGridKw(huaweiActivePowerKw: number): number {
+  return round(-huaweiActivePowerKw);
+}
+
+/**
  * Netzleistung (kW) pro 5-Minuten-Label aus getDevFiveMinutes für Zähler 17/47.
- * Gleiche Vorzeichenkonvention wie Live: positiv = Netzbezug.
+ * Rückgabe in App-Konvention: positiv = Netzbezug.
  */
 export function mapMeterFiveMinutesGridByLabel(
   items: DevFiveMinutesItem[],
@@ -295,17 +304,18 @@ export function mapMeterFiveMinutesGridByLabel(
   }
 
   const byLabel = new Map<string, number>();
-  for (const [time, gridKw] of [...byTime.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [time, huaweiKw] of [...byTime.entries()].sort((a, b) => a[0] - b[0])) {
     const parts = zurichParts(time);
     const label = `${parts.hour}:${floorFiveMinutes(parts.minute)}`;
-    byLabel.set(label, round(gridKw));
+    byLabel.set(label, huaweiMeterPowerToAppGridKw(huaweiKw));
   }
   return byLabel;
 }
 
 /**
- * Fehlende Verbrauchswerte aus gemessener Zähler-5-Min + Ertrag:
- * Verbrauch = Erzeugung + Netzbezug (wie im Live-Snapshot). Keine Interpolation.
+ * Fehlende oder fälschlich als 0 gesetzte Verbrauchswerte aus Zähler-5-Min + Ertrag.
+ * Verbrauch = Erzeugung + Netzbezug. Keine Interpolation.
+ * whatwatt-Messwerte > 0 bleiben unangetastet.
  */
 export function fillMissingConsumptionFromMeterFiveMinutes(
   today: HistoryPoint[],
@@ -314,7 +324,7 @@ export function fillMissingConsumptionFromMeterFiveMinutes(
   if (gridByLabel.size === 0) return today;
 
   return today.map((point) => {
-    if (point.consumptionKw != null) return point;
+    if (point.consumptionKw != null && point.consumptionKw > 0) return point;
     const gridKw = gridByLabel.get(point.time);
     if (gridKw == null) return point;
     return {
