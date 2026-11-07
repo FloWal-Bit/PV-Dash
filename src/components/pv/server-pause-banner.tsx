@@ -3,43 +3,42 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatServerPauseMessage } from "@/lib/server-pause";
-import { serverPauseSettingsStore } from "@/lib/server-pause-settings";
 import { pvStore } from "@/lib/pv-store";
 
-/** Hinweis bei Server-Pause / unerreichbarem Node — nutzt gespeicherte Werte. */
+function formatUnreachableMessage(lastFetchedAt: number | null): string {
+  const last =
+    lastFetchedAt != null
+      ? new Date(lastFetchedAt).toLocaleString("de-CH", {
+          timeZone: "Europe/Zurich",
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
+  const cached = last ? ` Letzter Stand: ${last} Uhr.` : "";
+  return `Server nicht erreichbar — es werden gespeicherte Werte angezeigt. Die Daten werden aktualisiert, sobald der Server wieder läuft.${cached}`;
+}
+
+/** Hinweis wenn der Node unerreichbar ist (Pause, Offline, Flugmodus) — nutzt gespeicherte Werte. */
 export function ServerPauseBanner() {
-  const pause = useSyncExternalStore(
-    serverPauseSettingsStore.subscribe,
-    serverPauseSettingsStore.getSnapshot,
-    serverPauseSettingsStore.getServerSnapshot,
-  );
   const { serverUnreachable, lastFetchedAt, liveProbeDone } = useSyncExternalStore(
     pvStore.subscribe,
     pvStore.getSnapshot,
     pvStore.getServerSnapshot,
   );
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
 
   // Nach Wiedererreichbarkeit erneut anzeigen, falls der Server später wieder ausfällt.
   useEffect(() => {
     if (!serverUnreachable) setDismissed(false);
   }, [serverUnreachable]);
 
-  void nowMs;
   // Erst nach dem ersten Live-Versuch anzeigen — sonst blitzt der Banner
   // bei jedem Refresh aus dem Offline-Cache auf, obwohl der Server erreichbar ist.
-  const message = formatServerPauseMessage(pause, {
-    unreachable: liveProbeDone && serverUnreachable,
-    lastFetchedAt,
-  });
-  if (!message || dismissed) return null;
+  if (!liveProbeDone || !serverUnreachable || dismissed) return null;
+
+  const message = formatUnreachableMessage(lastFetchedAt);
 
   return (
     <div

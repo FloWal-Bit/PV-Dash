@@ -7,14 +7,11 @@ import {
   EyeOff,
   Info,
   ListTodo,
-  Moon,
   Plus,
   RefreshCcw,
   Smartphone,
   Trash2,
 } from "lucide-react";
-import { serverPauseSettingsStore } from "@/lib/server-pause-settings";
-import { normalizeDayTime } from "@/lib/server-pause";
 import {
   Dialog,
   DialogContent,
@@ -110,7 +107,6 @@ export function BacklogDialog({
 
         <div className="flex max-h-[min(70dvh,36rem)] flex-col gap-3 overflow-y-auto px-5 py-4">
           <DeviceLogSection open={open} />
-          <ServerPauseEditor />
           <InfoBannerEditor />
           <SettingsSection
             icon={<ListTodo className="size-4" />}
@@ -435,116 +431,6 @@ function DeviceLogSection({ open }: { open: boolean }) {
           />
         </div>
       ) : null}
-    </SettingsSection>
-  );
-}
-
-function ServerPauseEditor() {
-  const saved = useSyncExternalStore(
-    serverPauseSettingsStore.subscribe,
-    serverPauseSettingsStore.getSnapshot,
-    serverPauseSettingsStore.getServerSnapshot,
-  );
-  const [enabled, setEnabled] = useState(saved.enabled);
-  const [stopAt, setStopAt] = useState(saved.stopAt);
-  const [resumeAt, setResumeAt] = useState(saved.resumeAt);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setEnabled(saved.enabled);
-    setStopAt(saved.stopAt);
-    setResumeAt(saved.resumeAt);
-  }, [saved.enabled, saved.stopAt, saved.resumeAt]);
-
-  const dirty =
-    enabled !== saved.enabled || stopAt !== saved.stopAt || resumeAt !== saved.resumeAt;
-
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
-      const next = {
-        enabled,
-        stopAt: normalizeDayTime(stopAt, "Stoppzeit"),
-        resumeAt: normalizeDayTime(resumeAt, "Startzeit"),
-      };
-      await serverPauseSettingsStore.set(next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <SettingsSection
-      icon={<Moon className="size-4" />}
-      iconClassName="bg-chart-2/12 text-chart-2"
-      title="Server-Pause"
-    >
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Für die nächtliche Infomaniak-Pause. Die App behält die letzten Werte und zeigt eine
-        Meldung, bis der Server wieder erreichbar ist. Zeiten in Europe/Zurich.
-      </p>
-      <div className="flex items-start justify-between gap-3">
-        <span className="text-xs leading-relaxed text-muted-foreground">
-          Pause-Hinweis aktivieren
-        </span>
-        <Switch
-          id="server-pause-enabled"
-          aria-label="Server-Pause aktivieren"
-          checked={enabled}
-          disabled={saving}
-          onCheckedChange={(checked) => {
-            setEnabled(checked);
-            setError(null);
-          }}
-          className="data-checked:bg-chart-3"
-        />
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-          Stopp um
-          <input
-            type="time"
-            className="h-9 rounded-xl border border-border/80 bg-background px-3 text-sm text-card-foreground outline-none focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:opacity-60"
-            value={stopAt}
-            disabled={saving || !enabled}
-            onChange={(event) => {
-              setStopAt(event.target.value);
-              setError(null);
-            }}
-            aria-label="Server-Stoppzeit"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-          Daten wieder ab
-          <input
-            type="time"
-            className="h-9 rounded-xl border border-border/80 bg-background px-3 text-sm text-card-foreground outline-none focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:opacity-60"
-            value={resumeAt}
-            disabled={saving || !enabled}
-            onChange={(event) => {
-              setResumeAt(event.target.value);
-              setError(null);
-            }}
-            aria-label="Server-Startzeit"
-          />
-        </label>
-      </div>
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={saving || !dirty}
-          onClick={() => void save()}
-        >
-          {saving ? "…" : "Speichern"}
-        </Button>
-      </div>
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </SettingsSection>
   );
 }
