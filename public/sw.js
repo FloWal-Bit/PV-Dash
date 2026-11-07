@@ -1,5 +1,5 @@
 /* PV Dash offline shell — network-first, Cache-Fallback wenn Infomaniak pausiert. */
-const CACHE_NAME = "pv-dash-shell-v1.5.7.16";
+const CACHE_NAME = "pv-dash-shell-v1.5.7.17";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
