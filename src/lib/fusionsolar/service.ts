@@ -29,6 +29,7 @@ import {
 } from "./types";
 import {
   buildSnapshot,
+  fillMissingConsumptionFromHourKpi,
   mapBatteries,
   mapDaySeriesToMonth,
   mapDaySeriesToWeek,
@@ -40,6 +41,7 @@ import {
   sumInverterPower,
   sumMeterGridPower,
 } from "./mapper";
+import type { StationKpiTimeseriesItem } from "./types";
 
 export type FusionSolarDashboardData = {
   snapshot: PvSnapshot;
@@ -216,6 +218,11 @@ async function fetchTodayHistory(): Promise<HistoryPoint[]> {
   const collectTime = zurichMidnight(zurichDayKey());
   if (devices.inverterIds.length === 0) {
     const hourSeries = await api.getStationHourKpi([stationCode], collectTime);
+    hourKpiCache = {
+      dayKey: zurichDayKey(),
+      value: hourSeries,
+      expiresAt: Date.now() + todayHistoryTtlMs(),
+    };
     return mapHourSeriesToToday(hourSeries);
   }
   const series = await api.getDevFiveMinutes(
@@ -224,6 +231,48 @@ async function fetchTodayHistory(): Promise<HistoryPoint[]> {
     collectTime,
   );
   return mapFiveMinutesToToday(series);
+}
+
+type HourKpiCache = { dayKey: string; value: StationKpiTimeseriesItem[]; expiresAt: number };
+let hourKpiCache: HourKpiCache | null = null;
+let hourKpiInFlight: Promise<StationKpiTimeseriesItem[]> | null = null;
+
+async function getStationHourKpiCached(): Promise<StationKpiTimeseriesItem[]> {
+  const dayKey = zurichDayKey();
+  if (hourKpiCache && hourKpiCache.dayKey === dayKey && hourKpiCache.expiresAt > Date.now()) {
+    return hourKpiCache.value;
+  }
+  if (!hourKpiInFlight) {
+    hourKpiInFlight = (async () => {
+      const { stationCode } = await resolveStationInfo();
+      const collectTime = zurichMidnight(dayKey);
+      const value = await api.getStationHourKpi([stationCode], collectTime);
+      hourKpiCache = { dayKey, value, expiresAt: Date.now() + todayHistoryTtlMs() };
+      return value;
+    })().finally(() => {
+      hourKpiInFlight = null;
+    });
+  }
+  return hourKpiInFlight;
+}
+
+/**
+ * Nach whatwatt: fehlende Nacht-/Pausen-Verbrauchswerte einmalig aus der
+ * FusionSolar-Stunden-KPI nachziehen (kein Live-MQTT-Verlauf verfügbar).
+ */
+export async function fillTodayConsumptionGapsFromHourKpi(
+  today: HistoryPoint[],
+): Promise<HistoryPoint[]> {
+  const { hasMissingPastConsumption } = await import("@/lib/whatwatt/hour-samples");
+  if (!hasMissingPastConsumption(today)) return today;
+  try {
+    const hourItems = await getStationHourKpiCached();
+    return fillMissingConsumptionFromHourKpi(today, hourItems);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+    console.error("[fusionsolar] Stundenverbrauch für Pausen-Lücken nicht verfügbar:", message);
+    return today;
+  }
 }
 
 async function fetchRangeHistory(): Promise<{

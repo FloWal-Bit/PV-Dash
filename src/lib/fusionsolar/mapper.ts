@@ -251,6 +251,35 @@ export function mapHourSeriesToToday(items: StationKpiTimeseriesItem[]): History
     });
 }
 
+/**
+ * Füllt fehlende 5-Minuten-Verbrauchswerte aus der Stunden-KPI (`use_power`).
+ * use_power ist kWh/Stunde ≈ mittlere kW — reicht, um Pausen-Lücken zu schliessen,
+ * ohne whatwatt-Live-Samples.
+ */
+export function fillMissingConsumptionFromHourKpi(
+  today: HistoryPoint[],
+  hourItems: StationKpiTimeseriesItem[],
+): HistoryPoint[] {
+  const byHour = new Map<number, number>();
+  for (const item of hourItems) {
+    const kwh = stationHourConsumptionKwh(item.dataItemMap);
+    if (kwh == null) continue;
+    const hour = Number(zurichParts(item.collectTime).hour);
+    if (!Number.isInteger(hour)) continue;
+    byHour.set(hour, kwh);
+  }
+  if (byHour.size === 0) return today;
+
+  return today.map((point) => {
+    if (point.consumptionKw != null) return point;
+    const hour = Number(point.time.slice(0, 2));
+    if (!Number.isInteger(hour)) return point;
+    const kw = byHour.get(hour);
+    if (kw == null) return point;
+    return { ...point, consumptionKw: kw };
+  });
+}
+
 const WEEKDAYS_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 /**
