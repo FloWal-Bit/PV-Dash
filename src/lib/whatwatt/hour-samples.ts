@@ -167,6 +167,60 @@ function nextSlotKey(slotKey: string): string | null {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
+function slotMinutes(key: string): number | null {
+  const [hourText, minuteText] = key.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+/**
+ * Zählerstand zur 5-Minuten-Marke — gemessen oder linear zwischen den
+ * nächsten bekannten Ständen (z. B. nach nächtlicher Server-Pause).
+ */
+function sampleAtSlot(
+  file: HourFile,
+  key: string,
+  options: { interpolate: boolean },
+): Sample | null {
+  const exact = file.firstByHour[key];
+  if (exact) return exact;
+  if (!options.interpolate) return null;
+
+  const target = slotMinutes(key);
+  if (target == null) return null;
+
+  let beforeKey: string | null = null;
+  let afterKey: string | null = null;
+  for (const candidate of Object.keys(file.firstByHour)) {
+    const minutes = slotMinutes(candidate);
+    if (minutes == null) continue;
+    if (minutes <= target && (beforeKey == null || minutes > (slotMinutes(beforeKey) ?? -1))) {
+      beforeKey = candidate;
+    }
+    if (minutes >= target && (afterKey == null || minutes < (slotMinutes(afterKey) ?? Infinity))) {
+      afterKey = candidate;
+    }
+  }
+  if (!beforeKey || !afterKey) return null;
+  if (beforeKey === afterKey) return file.firstByHour[beforeKey] ?? null;
+
+  const t0 = slotMinutes(beforeKey);
+  const t1 = slotMinutes(afterKey);
+  if (t0 == null || t1 == null || t1 <= t0) return null;
+  const ratio = (target - t0) / (t1 - t0);
+  const start = file.firstByHour[beforeKey];
+  const end = file.firstByHour[afterKey];
+  if (!start || !end) return null;
+  return {
+    energyInKwh: start.energyInKwh + (end.energyInKwh - start.energyInKwh) * ratio,
+    energyOutKwh: start.energyOutKwh + (end.energyOutKwh - start.energyOutKwh) * ratio,
+    at: Math.round(start.at + (end.at - start.at) * ratio),
+  };
+}
+
 /** Verbrauch einer abgeschlossenen Stunde. `null`, solange Anfang oder Ende fehlen. */
 export function consumptionFromHourBounds(
   yieldKwh: number,
@@ -179,7 +233,23 @@ export function consumptionFromHourBounds(
   return round(Math.max(0, yieldKwh + imported - exported));
 }
 
-export async function applyWhatWattHourConsumption(today: HistoryPoint[]): Promise<HistoryPoint[]> {
+export type ApplyWhatWattOptions = {
+  /** Fehlende Stände zwischen bekannten Samples linear füllen. */
+  interpolate?: boolean;
+  /** Nur Punkte ohne bestehenden Verbrauch überschreiben. */
+  onlyMissing?: boolean;
+};
+
+/**
+ * Verbrauchskurve aus whatwatt-Zählerständen. Mit `interpolate` werden Lücken
+ * nach einer Server-Pause aus benachbarten Ständen nachgezogen.
+ */
+export async function applyWhatWattHourConsumption(
+  today: HistoryPoint[],
+  options: ApplyWhatWattOptions = {},
+): Promise<HistoryPoint[]> {
+  const interpolate = options.interpolate ?? true;
+  const onlyMissing = options.onlyMissing ?? false;
   await ensureLoaded();
   const file = memory;
   if (!file) return today;
@@ -187,15 +257,27 @@ export async function applyWhatWattHourConsumption(today: HistoryPoint[]): Promi
   if (file.dayKey !== todayKey) return today;
 
   return today.map((point) => {
+    if (onlyMissing && point.consumptionKw != null) return point;
     const endKey = nextSlotKey(point.time);
     if (!endKey) return point;
-    const start = file.firstByHour[point.time];
-    const end = file.firstByHour[endKey];
+    const start = sampleAtSlot(file, point.time, { interpolate });
+    const end = sampleAtSlot(file, endKey, { interpolate });
     if (!start || !end) return point;
     const slotHours = 5 / 60;
     const yieldKwh = point.productionKw * slotHours;
     const consumptionKwh = consumptionFromHourBounds(yieldKwh, start, end);
     if (consumptionKwh == null) return point;
     return { ...point, consumptionKw: round(consumptionKwh / slotHours) };
+  });
+}
+
+/** Ob in der Vergangenheit noch Verbrauchspunkte fehlen (für FusionSolar-Nachzug). */
+export function hasMissingPastConsumption(today: HistoryPoint[], now = Date.now()): boolean {
+  const wall = zurichWall(now);
+  const nowMinutes = wall.hour * 60 + wall.minute;
+  return today.some((point) => {
+    if (point.consumptionKw != null) return false;
+    const minutes = slotMinutes(point.time);
+    return minutes != null && minutes + 5 <= nowMinutes;
   });
 }
