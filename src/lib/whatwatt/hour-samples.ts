@@ -180,9 +180,14 @@ function slotMinutes(key: string): number | null {
  * Zählerstand zur 5-Minuten-Marke — gemessen oder linear zwischen den
  * nächsten bekannten Ständen (z. B. nach nächtlicher Server-Pause).
  */
-function sampleAtSlot(file: HourFile, key: string): Sample | null {
+function sampleAtSlot(
+  file: HourFile,
+  key: string,
+  options: { interpolate: boolean },
+): Sample | null {
   const exact = file.firstByHour[key];
   if (exact) return exact;
+  if (!options.interpolate) return null;
 
   const target = slotMinutes(key);
   if (target == null) return null;
@@ -228,12 +233,23 @@ export function consumptionFromHourBounds(
   return round(Math.max(0, yieldKwh + imported - exported));
 }
 
+export type ApplyWhatWattOptions = {
+  /** Fehlende Stände zwischen bekannten Samples linear füllen. */
+  interpolate?: boolean;
+  /** Nur Punkte ohne bestehenden Verbrauch überschreiben. */
+  onlyMissing?: boolean;
+};
+
 /**
- * Verbrauchskurve aus whatwatt-Zählerständen. Fehlende Intervalle nach einer
- * Server-Pause werden aus den benachbarten Ständen linear nachgezogen — sobald
- * nach dem Restart wieder eine MQTT-Nachricht da ist.
+ * Verbrauchskurve aus whatwatt-Zählerständen. Mit `interpolate` werden Lücken
+ * nach einer Server-Pause aus benachbarten Ständen nachgezogen.
  */
-export async function applyWhatWattHourConsumption(today: HistoryPoint[]): Promise<HistoryPoint[]> {
+export async function applyWhatWattHourConsumption(
+  today: HistoryPoint[],
+  options: ApplyWhatWattOptions = {},
+): Promise<HistoryPoint[]> {
+  const interpolate = options.interpolate ?? true;
+  const onlyMissing = options.onlyMissing ?? false;
   await ensureLoaded();
   const file = memory;
   if (!file) return today;
@@ -241,10 +257,11 @@ export async function applyWhatWattHourConsumption(today: HistoryPoint[]): Promi
   if (file.dayKey !== todayKey) return today;
 
   return today.map((point) => {
+    if (onlyMissing && point.consumptionKw != null) return point;
     const endKey = nextSlotKey(point.time);
     if (!endKey) return point;
-    const start = sampleAtSlot(file, point.time);
-    const end = sampleAtSlot(file, endKey);
+    const start = sampleAtSlot(file, point.time, { interpolate });
+    const end = sampleAtSlot(file, endKey, { interpolate });
     if (!start || !end) return point;
     const slotHours = 5 / 60;
     const yieldKwh = point.productionKw * slotHours;

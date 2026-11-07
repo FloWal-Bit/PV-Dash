@@ -280,6 +280,57 @@ export function fillMissingConsumptionFromHourKpi(
   });
 }
 
+/** Mitternacht bis zu dieser Minute (exklusiv) aus dem FusionSolar-Zähler nachladen. */
+export const FUSION_SOLAR_NIGHT_CONSUMPTION_UNTIL_MINUTES = 5 * 60;
+
+/**
+ * Netzleistung (kW) pro 5-Minuten-Label aus getDevFiveMinutes für Zähler 17/47.
+ * Gleiche Vorzeichenkonvention wie Live: positiv = Netzbezug.
+ */
+export function mapMeterFiveMinutesGridByLabel(
+  items: DevFiveMinutesItem[],
+): Map<string, number> {
+  const byTime = new Map<number, number>();
+  for (const item of items) {
+    const power = num(item.dataItemMap.active_power);
+    if (power == null) continue;
+    byTime.set(item.collectTime, (byTime.get(item.collectTime) ?? 0) + power);
+  }
+
+  const byLabel = new Map<string, number>();
+  for (const [time, gridKw] of [...byTime.entries()].sort((a, b) => a[0] - b[0])) {
+    const parts = zurichParts(time);
+    const label = `${parts.hour}:${floorFiveMinutes(parts.minute)}`;
+    byLabel.set(label, round(gridKw));
+  }
+  return byLabel;
+}
+
+/**
+ * Fehlende Verbrauchswerte bis `untilMinutes` aus Zähler-5-Min + Ertrag:
+ * Verbrauch = Erzeugung + Netzbezug (wie im Live-Snapshot).
+ */
+export function fillMissingConsumptionFromMeterFiveMinutes(
+  today: HistoryPoint[],
+  gridByLabel: Map<string, number>,
+  untilMinutes: number = FUSION_SOLAR_NIGHT_CONSUMPTION_UNTIL_MINUTES,
+): HistoryPoint[] {
+  if (gridByLabel.size === 0) return today;
+
+  return today.map((point) => {
+    if (point.consumptionKw != null) return point;
+    const [hourText, minuteText] = point.time.split(":");
+    const minutes = Number(hourText) * 60 + Number(minuteText);
+    if (!Number.isFinite(minutes) || minutes >= untilMinutes) return point;
+    const gridKw = gridByLabel.get(point.time);
+    if (gridKw == null) return point;
+    return {
+      ...point,
+      consumptionKw: round(Math.max(0, point.productionKw + gridKw)),
+    };
+  });
+}
+
 const WEEKDAYS_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 /**

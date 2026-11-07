@@ -30,11 +30,13 @@ import {
 import {
   buildSnapshot,
   fillMissingConsumptionFromHourKpi,
+  fillMissingConsumptionFromMeterFiveMinutes,
   mapBatteries,
   mapDaySeriesToMonth,
   mapDaySeriesToWeek,
   mapFiveMinutesToToday,
   mapHourSeriesToToday,
+  mapMeterFiveMinutesGridByLabel,
   mapMonthSeriesToYear,
   mapStationRealKpi,
   mapYearSeriesToLifetime,
@@ -256,9 +258,68 @@ async function getStationHourKpiCached(): Promise<StationKpiTimeseriesItem[]> {
   return hourKpiInFlight;
 }
 
+type MeterFiveMinCache = { dayKey: string; gridByLabel: Map<string, number> };
+let meterFiveMinCache: MeterFiveMinCache | null = null;
+let meterFiveMinInFlight: Promise<Map<string, number>> | null = null;
+let meterFiveMinFailedDay: string | null = null;
+
 /**
- * Nach whatwatt: fehlende Nacht-/Pausen-Verbrauchswerte einmalig aus der
- * FusionSolar-Stunden-KPI nachziehen (kein Live-MQTT-Verlauf verfügbar).
+ * Einmal pro Kalendertag: 5-Minuten-Netzleistung des FusionSolar-Zählers.
+ * Extra-Aufruf von getDevFiveMinutes — deshalb nicht im 50-Min-Rhythmus.
+ */
+async function getMeterFiveMinutesGridCached(): Promise<Map<string, number>> {
+  const dayKey = zurichDayKey();
+  if (meterFiveMinCache?.dayKey === dayKey) return meterFiveMinCache.gridByLabel;
+  if (meterFiveMinFailedDay === dayKey) return new Map();
+  if (!meterFiveMinInFlight) {
+    meterFiveMinInFlight = (async () => {
+      const { stationCode } = await resolveStationInfo();
+      const devices = await resolveDevices(stationCode);
+      if (devices.meterIds.length === 0) {
+        meterFiveMinFailedDay = dayKey;
+        return new Map();
+      }
+      const series = await api.getDevFiveMinutes(
+        devices.meterTypeId,
+        devices.meterIds,
+        zurichMidnight(dayKey),
+      );
+      const gridByLabel = mapMeterFiveMinutesGridByLabel(series);
+      meterFiveMinCache = { dayKey, gridByLabel };
+      return gridByLabel;
+    })()
+      .catch((err: unknown) => {
+        meterFiveMinFailedDay = dayKey;
+        throw err;
+      })
+      .finally(() => {
+        meterFiveMinInFlight = null;
+      });
+  }
+  return meterFiveMinInFlight;
+}
+
+/**
+ * Fehlende Nachtverbrauchswerte (bis 05:00) in 5-Min-Granularität aus dem
+ * FusionSolar-Netz-/Leistungszähler nachladen — einmal täglich.
+ */
+export async function fillTodayConsumptionGapsFromMeterFiveMinutes(
+  today: HistoryPoint[],
+): Promise<HistoryPoint[]> {
+  const { hasMissingPastConsumption } = await import("@/lib/whatwatt/hour-samples");
+  if (!hasMissingPastConsumption(today)) return today;
+  try {
+    const gridByLabel = await getMeterFiveMinutesGridCached();
+    return fillMissingConsumptionFromMeterFiveMinutes(today, gridByLabel);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+    console.error("[fusionsolar] Zähler-5-Min für Nachtlücken nicht verfügbar:", message);
+    return today;
+  }
+}
+
+/**
+ * Letzter Fallback: fehlende Verbrauchswerte aus der Stunden-KPI (`use_power`).
  */
 export async function fillTodayConsumptionGapsFromHourKpi(
   today: HistoryPoint[],

@@ -30,6 +30,7 @@ import {
 import { FusionSolarRateLimitError } from "@/lib/fusionsolar/client";
 import {
   fillTodayConsumptionGapsFromHourKpi,
+  fillTodayConsumptionGapsFromMeterFiveMinutes,
   getFusionSolarHistory,
   getFusionSolarLifetimeHistory,
   getFusionSolarLiveSnapshot,
@@ -287,10 +288,21 @@ export function refreshFusionSolarDevCache(): Promise<{ ok: true } | { ok: false
   return devRefreshInFlight;
 }
 
-/** whatwatt-Zähler (+ ggf. FusionSolar-Stunden) für die heutige Verbrauchskurve. */
+/**
+ * Heutige Verbrauchskurve:
+ * 1) gemessene whatwatt-Slots
+ * 2) FusionSolar-Zähler 5-Min (einmal/Tag, bis 05:00) für Pausen-Lücken
+ * 3) whatwatt-Interpolation über Restlücken
+ * 4) FusionSolar-Stunden-KPI als letzter Fallback
+ */
 async function withTodayConsumption(today: HistoryPoint[]): Promise<HistoryPoint[]> {
-  const fromMeters = await applyWhatWattHourConsumption(today);
-  return fillTodayConsumptionGapsFromHourKpi(fromMeters);
+  const exact = await applyWhatWattHourConsumption(today, { interpolate: false });
+  const fromFusionFiveMin = await fillTodayConsumptionGapsFromMeterFiveMinutes(exact);
+  const interpolated = await applyWhatWattHourConsumption(fromFusionFiveMin, {
+    interpolate: true,
+    onlyMissing: true,
+  });
+  return fillTodayConsumptionGapsFromHourKpi(interpolated);
 }
 
 /** Verlaufsreihen für die Diagramme. */
