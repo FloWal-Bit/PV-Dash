@@ -310,7 +310,21 @@ export async function fillTodayConsumptionGapsFromMeterFiveMinutes(
   if (!hasMissingPastConsumption(today)) return today;
   try {
     const gridByLabel = await getMeterFiveMinutesGridCached();
-    return fillMissingConsumptionFromMeterFiveMinutes(today, gridByLabel);
+    const next = fillMissingConsumptionFromMeterFiveMinutes(today, gridByLabel);
+    const filled = next.filter(
+      (point, index) =>
+        point.consumptionKw != null &&
+        point.consumptionKw > 0 &&
+        (today[index]?.consumptionKw == null || today[index]!.consumptionKw === 0),
+    ).length;
+    if (filled > 0) {
+      console.info(`[fusionsolar] Zähler-5-Min: ${filled} Verbrauchspunkte nachgeladen.`);
+    } else if (gridByLabel.size === 0) {
+      console.warn(
+        "[fusionsolar] Zähler-5-Min: keine Netz-/Leistungszähler-Daten (devType 17/47).",
+      );
+    }
+    return next;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
     console.error("[fusionsolar] Zähler-5-Min für Lücken nicht verfügbar:", message);
