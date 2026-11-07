@@ -8,11 +8,11 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Behalte deine Solaranlage im Blick: Erzeugung, Verbrauch, Speicher und Ertrag – schlicht und intuitiv.",
     start_url: "/",
-    display: "fullscreen",
+    // standalone statt fullscreen: unter fullscreen färbt Android die
+    // System-Navigation mit theme_color (früher Orange, blieb trotz dunklem
+    // theme_color oft gecacht). standalone zeigt die Nav-Leiste systemüblich.
+    display: "standalone",
     orientation: "any",
-    // theme_color färbt auf Android die System-Navigation. Nicht das
-    // Akzent-Orange (#e2a33d) — das wirkte seit display:fullscreen als
-    // oranger Balken über den Navigationstasten. Dunkler App-Hintergrund.
     background_color: "#171d2c",
     theme_color: "#171d2c",
     icons: [
