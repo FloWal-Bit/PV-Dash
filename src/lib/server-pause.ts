@@ -84,15 +84,15 @@ export function formatServerPauseMessage(
           minute: "2-digit",
         })
       : null;
-  const cached = last ? ` Letzter Stand: ${last}.` : "";
+  const cached = last ? ` Letzter Stand: ${last} Uhr.` : "";
 
   if (settings.enabled) {
     const inWindow = isWithinServerPauseWindow(settings);
     const when = inWindow
       ? `Aktualisierte Daten voraussichtlich ab ${resume} (Europe/Zurich).`
-      : `Geplante Pause ${stop}–${resume} (Europe/Zurich). Aktualisierte Daten wieder, sobald der Server läuft.`;
+      : `Geplante Pause ${stop}–${resume} (Europe/Zurich). Die Daten werden aktualisiert, sobald der Server wieder läuft.`;
     return `Server nicht erreichbar — es werden gespeicherte Werte angezeigt. ${when}${cached}`;
   }
 
-  return `Server nicht erreichbar — es werden gespeicherte Werte angezeigt. Aktualisierte Daten wieder, sobald der Server läuft.${cached}`;
+  return `Server nicht erreichbar — es werden gespeicherte Werte angezeigt. Die Daten werden aktualisiert, sobald der Server wieder läuft.${cached}`;
 }
