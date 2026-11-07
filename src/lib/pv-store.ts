@@ -25,6 +25,12 @@ export type PvStoreState = {
   historyError: string | null;
   /** true, wenn der letzte Live-Abruf fehlschlug (Server/Netz). */
   serverUnreachable: boolean;
+  /**
+   * true nach dem ersten Live-Abruf (Erfolg oder Fehler).
+   * Verhindert, dass der Offline-Cache beim Refresh fälschlich
+   * «Server nicht erreichbar» aufblitzen lässt.
+   */
+  liveProbeDone: boolean;
 };
 
 const LIVE_INTERVAL_MS = 15_000;
@@ -49,6 +55,7 @@ const INITIAL_STATE: PvStoreState = {
   historySource: null,
   historyError: null,
   serverUnreachable: false,
+  liveProbeDone: false,
 };
 
 type Listener = () => void;
@@ -93,7 +100,9 @@ function hydrateFromOfflineCache(): PvStoreState {
         }
       : null,
     historySource: cached.history?.source ?? null,
-    serverUnreachable: true,
+    // Noch nicht als unreachable markieren — erst nach fehlgeschlagenem Abruf.
+    serverUnreachable: false,
+    liveProbeDone: false,
   };
 }
 
@@ -164,6 +173,7 @@ class PvStore {
           gridWarning: payload.gridWarning ?? null,
           lastFetchedAt: Date.now(),
           serverUnreachable: false,
+          liveProbeDone: true,
         };
         this.persistOffline();
       } catch {
@@ -174,11 +184,13 @@ class PvStore {
               ...cached,
               error: null,
               serverUnreachable: true,
+              liveProbeDone: true,
             };
           } else {
             this.state = {
               ...this.state,
               serverUnreachable: true,
+              liveProbeDone: true,
               error:
                 "Server nicht erreichbar und keine gespeicherten Werte vorhanden.",
             };
@@ -187,6 +199,7 @@ class PvStore {
           this.state = {
             ...this.state,
             serverUnreachable: true,
+            liveProbeDone: true,
             error: null,
           };
         }
