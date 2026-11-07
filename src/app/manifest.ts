@@ -10,8 +10,11 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "fullscreen",
     orientation: "any",
-    background_color: "#fbf9f5",
-    theme_color: "#e2a33d",
+    // theme_color färbt auf Android die System-Navigation. Nicht das
+    // Akzent-Orange (#e2a33d) — das wirkte seit display:fullscreen als
+    // oranger Balken über den Navigationstasten. Dunkler App-Hintergrund.
+    background_color: "#171d2c",
+    theme_color: "#171d2c",
     icons: [
       {
         src: APP_ICON_SRC,
