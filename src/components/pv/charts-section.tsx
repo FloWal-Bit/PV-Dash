@@ -508,14 +508,25 @@ function BarAxisTick({
   );
 }
 
+type BarChartRow = DailyEnergyPoint & {
+  /** false = Zukunft / ohne Werte — nicht anwählbar (Monat/Jahr). */
+  barSelectable?: boolean;
+  stromkontoKwh?: number;
+  eigenverbrauchKwh?: number;
+  yieldSegmentKwh?: number;
+  eigenSegmentKwh?: number;
+};
+
 /** Kräftigere Selection-Spalte hinter dem aktiven Balken (Option D). */
 function BarSelectionCursor(props: {
   x?: number;
   y?: number;
   width?: number;
   height?: number;
+  payload?: ReadonlyArray<{ payload?: BarChartRow }>;
 }) {
-  const { x = 0, y = 0, width = 0, height = 0 } = props;
+  const { x = 0, y = 0, width = 0, height = 0, payload } = props;
+  if (payload?.[0]?.payload?.barSelectable === false) return null;
   if (width <= 0 || height <= 0) return null;
   return (
     <Rectangle
@@ -528,6 +539,21 @@ function BarSelectionCursor(props: {
       radius={4}
     />
   );
+}
+
+/** Monatsbalken: Tag-Nummer ≤ heute (Europe/Zurich). */
+function isMonthBarSelectable(label: string, now = new Date()): boolean {
+  if (!/^\d{1,2}$/.test(label)) return true;
+  return Number(label) <= Number(zurichDayLabel(now));
+}
+
+/** Jahresbalken: Monat ≤ aktueller Monat; „Dieser Monat“ immer wählbar. */
+function isYearBarSelectable(label: string, now = new Date()): boolean {
+  if (label === "Dieser Monat") return true;
+  const index = MONTHS_DE.indexOf(label);
+  if (index < 0) return true;
+  const { month } = zurichYearMonth(now);
+  return index + 1 <= month;
 }
 
 function zurichYearMonth(now = new Date()): { year: number; month: number } {
@@ -730,6 +756,11 @@ function YieldConsumptionChart({
   showStromkonto = true,
   /** Monat im Widescreen: jeden Tag auf der X-Achse beschriften. */
   labelAllDays = false,
+  /**
+   * Monat/Jahr: künftige (leere) Balken nicht anwählbar — kein Cursor, kein Overlay,
+   * keine Achsenhervorhebung.
+   */
+  blockFutureBars = false,
   series,
   tooltipActive,
 }: {
@@ -746,6 +777,7 @@ function YieldConsumptionChart({
   /** Laufzeit zeigt keine Stromkonto-Zeile. */
   showStromkonto?: boolean;
   labelAllDays?: boolean;
+  blockFutureBars?: boolean;
   series: ChartSeriesVisibility;
   /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
   tooltipActive: boolean;
@@ -761,8 +793,15 @@ function YieldConsumptionChart({
       data.map((point) => {
         const eigenKwh = point.directSolarKwh + point.batteryKwh;
         const both = series.ertrag && series.eigenverbrauch;
+        const inPastOrPresent = expandMonthDayLabel
+          ? isMonthBarSelectable(point.label)
+          : expandMonthNameLabel
+            ? isYearBarSelectable(point.label)
+            : true;
         return {
           ...point,
+          // Zukunftsbalken (leere Achsen-Platzhalter) nicht anwählbar.
+          barSelectable: !blockFutureBars || inPastOrPresent,
           stromkontoKwh: point.yieldKwh - point.consumptionKwh,
           yieldKwh: toDisplayEnergy(point.yieldKwh, unit),
           consumptionKwh: toDisplayEnergy(point.consumptionKwh, unit),
@@ -774,9 +813,17 @@ function YieldConsumptionChart({
           eigenSegmentKwh: series.eigenverbrauch
             ? toDisplayEnergy(both ? Math.min(eigenKwh, point.yieldKwh) : eigenKwh, unit)
             : 0,
-        };
+        } satisfies BarChartRow;
       }),
-    [data, series.eigenverbrauch, series.ertrag, unit],
+    [
+      blockFutureBars,
+      data,
+      expandMonthDayLabel,
+      expandMonthNameLabel,
+      series.eigenverbrauch,
+      series.ertrag,
+      unit,
+    ],
   );
 
   useEffect(() => {
@@ -791,8 +838,25 @@ function YieldConsumptionChart({
         barGap={2}
         onMouseMove={(state) => {
           setPointerInChart(true);
-          const label = state?.activeLabel;
-          setSelectedLabel(label == null ? null : String(label));
+          const label = state?.activeLabel == null ? null : String(state.activeLabel);
+          if (label == null) {
+            setSelectedLabel(null);
+            return;
+          }
+          if (blockFutureBars) {
+            const index =
+              typeof state.activeIndex === "number"
+                ? state.activeIndex
+                : typeof state.activeTooltipIndex === "number"
+                  ? state.activeTooltipIndex
+                  : -1;
+            const row = index >= 0 ? chartData[index] : chartData.find((point) => point.label === label);
+            if (row?.barSelectable === false) {
+              setSelectedLabel(null);
+              return;
+            }
+          }
+          setSelectedLabel(label);
         }}
         onMouseLeave={() => {
           setPointerInChart(false);
@@ -849,18 +913,14 @@ function YieldConsumptionChart({
           offset={{ x: 12, y: 0 }}
           cursor={<BarSelectionCursor />}
           content={(props) => {
-            const row = props.payload?.[0]?.payload as
-              | {
-                  dayKey?: string;
-                  yieldKwh?: number;
-                  consumptionKwh?: number;
-                  eigenverbrauchKwh?: number;
-                  stromkontoKwh?: number;
-                }
-              | undefined;
+            const row = props.payload?.[0]?.payload as BarChartRow | undefined;
+            const selectable = row?.barSelectable !== false;
             return (
-              <ChartActiveLabelBridge label={props.label} onChange={setSelectedLabel}>
-                {!tooltipActive || !row ? null : (
+              <ChartActiveLabelBridge
+                label={selectable ? props.label : null}
+                onChange={setSelectedLabel}
+              >
+                {!tooltipActive || !row || !selectable ? null : (
                   <DetailTooltip
                     title={barTooltipTitle(props.label, row, {
                       expandWeekdayLabel,
@@ -1386,6 +1446,7 @@ export function ChartsSection({
                     expandMonthNameLabel={range === "jahr"}
                     showStromkonto={range !== "lebensdauer"}
                     labelAllDays={range === "monat" && wideMonthAxis}
+                    blockFutureBars={range === "monat" || range === "jahr"}
                     series={series}
                     tooltipActive={tooltipOpen}
                   />
