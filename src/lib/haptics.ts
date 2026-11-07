@@ -1,18 +1,23 @@
 /**
- * Kurzes haptisches Feedback (Android Chrome / installierte PWA).
- * iOS Safari unterstützt die Vibration API nicht — dort No-Op.
- * Auf Android in den Einstellungen abschaltbar.
+ * Haptisches Feedback über die Vibration API (Android Chrome / PWA).
+ * iOS: No-Op. Auf Android in den Einstellungen abschaltbar.
+ *
+ * Hinweis: Impulse unter ~20 ms spüren viele Geräte nicht. Chrome verlangt
+ * zudem sticky user activation (mindestens ein Tipp seit dem Laden).
  */
 
-export type HapticKind = "selection" | "tab";
+export type HapticKind = "selection" | "tab" | "confirm";
 
 const STORAGE_KEY = "pv-dash:haptics-enabled";
 
+/** Dauer in ms — bewusst spürbar, nicht nur API-Mindestwert. */
 const PATTERNS: Record<HapticKind, number | number[]> = {
-  /** Beim Scrubben durch Chart-Punkte / Balken. */
-  selection: 8,
-  /** Beim Wechseln eines Karten-Tabs. */
-  tab: 12,
+  /** Chart-Scrubben: kurzer Tick. */
+  selection: 28,
+  /** Tab-Wechsel. */
+  tab: 45,
+  /** Testimpuls beim Einschalten in den Einstellungen. */
+  confirm: 60,
 };
 
 type Listener = () => void;
@@ -55,11 +60,17 @@ export const hapticsEnabledStore = {
   },
 };
 
+export function canUseHaptics(): boolean {
+  return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+}
+
 export function triggerHaptic(kind: HapticKind = "selection"): void {
   if (typeof navigator === "undefined") return;
   if (!readHapticsEnabled()) return;
   if (typeof navigator.vibrate !== "function") return;
   try {
+    // Vorherige Vibration abbrechen, sonst verschluckt Android kurze Folgeimpulse.
+    navigator.vibrate(0);
     navigator.vibrate(PATTERNS[kind]);
   } catch {
     // ältere WebViews / Permission
