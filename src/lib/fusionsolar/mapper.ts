@@ -72,15 +72,14 @@ export function mapBatteries(items: BatteryRealKpiItem[]): BatteryOverview {
 }
 
 /**
- * Momentane Netzleistung aus einem Netz-/Leistungszähler (devTypeId 17/47),
- * sofern die Anlage einen solchen registriert hat. Positiv = Netzbezug,
- * negativ = Einspeisung (gleiche Konvention wie im Rest der App). Das
- * Vorzeichen ist nicht in der Huawei-Doku spezifiziert und sollte nach dem
- * ersten Live-Test verifiziert werden.
+ * Momentane Netzleistung aus einem Netz-/Leistungszähler (devTypeId 17/47).
+ * Huawei liefert `active_power` für Grid Meter in **W** (positiv = Einspeisung,
+ * negativ = Bezug). App-Konvention: kW, positiv = Netzbezug.
  */
 export function sumMeterGridPower(items: MeterRealKpiItem[]): number | null {
   if (items.length === 0) return null;
-  return round(items.reduce((sum, item) => sum + (num(item.dataItemMap.active_power) ?? 0), 0));
+  const watts = items.reduce((sum, item) => sum + (num(item.dataItemMap.active_power) ?? 0), 0);
+  return huaweiMeterPowerToAppGridKw(watts);
 }
 
 export function buildSnapshot(input: {
@@ -251,6 +250,9 @@ export function mapHourSeriesToToday(items: StationKpiTimeseriesItem[]): History
     });
 }
 
+/** Obergrenze: darüber sind Werte fast sicher falsch skaliert (W als kW). */
+const PLAUSIBLE_CONSUMPTION_KW_MAX = 500;
+
 /**
  * Füllt fehlende 5-Minuten-Verbrauchswerte aus der Stunden-KPI (`use_power`).
  * use_power ist kWh/Stunde ≈ mittlere kW — reicht, um Pausen-Lücken zu schliessen,
@@ -271,7 +273,10 @@ export function fillMissingConsumptionFromHourKpi(
   if (byHour.size === 0) return today;
 
   return today.map((point) => {
-    if (point.consumptionKw != null && point.consumptionKw > 0) return point;
+    const existing = point.consumptionKw;
+    if (existing != null && existing > 0 && existing < PLAUSIBLE_CONSUMPTION_KW_MAX) {
+      return point;
+    }
     const hour = Number(point.time.slice(0, 2));
     if (!Number.isInteger(hour)) return point;
     const kw = byHour.get(hour);
@@ -281,12 +286,11 @@ export function fillMissingConsumptionFromHourKpi(
 }
 
 /**
- * Huawei-Zähler (Plant Power Flow / getDevFiveMinutes): negativ = Netzbezug,
- * positiv = Einspeisung. App-Konvention ist umgekehrt (positiv = Bezug).
- * Deshalb Vorzeichen umdrehen.
+ * Huawei Grid Meter `active_power`: Einheit **W**, negativ = Netzbezug,
+ * positiv = Einspeisung. App: kW, positiv = Netzbezug.
  */
-export function huaweiMeterPowerToAppGridKw(huaweiActivePowerKw: number): number {
-  return round(-huaweiActivePowerKw);
+export function huaweiMeterPowerToAppGridKw(huaweiActivePowerWatt: number): number {
+  return round(-huaweiActivePowerWatt / 1000);
 }
 
 /**
@@ -304,18 +308,18 @@ export function mapMeterFiveMinutesGridByLabel(
   }
 
   const byLabel = new Map<string, number>();
-  for (const [time, huaweiKw] of [...byTime.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [time, huaweiWatt] of [...byTime.entries()].sort((a, b) => a[0] - b[0])) {
     const parts = zurichParts(time);
     const label = `${parts.hour}:${floorFiveMinutes(parts.minute)}`;
-    byLabel.set(label, huaweiMeterPowerToAppGridKw(huaweiKw));
+    byLabel.set(label, huaweiMeterPowerToAppGridKw(huaweiWatt));
   }
   return byLabel;
 }
 
 /**
- * Fehlende oder fälschlich als 0 gesetzte Verbrauchswerte aus Zähler-5-Min + Ertrag.
+ * Fehlende, 0- oder unsinnig grosse Verbrauchswerte aus Zähler-5-Min + Ertrag.
  * Verbrauch = Erzeugung + Netzbezug. Keine Interpolation.
- * whatwatt-Messwerte > 0 bleiben unangetastet.
+ * Plausible whatwatt-Messwerte bleiben unangetastet.
  */
 export function fillMissingConsumptionFromMeterFiveMinutes(
   today: HistoryPoint[],
@@ -324,7 +328,10 @@ export function fillMissingConsumptionFromMeterFiveMinutes(
   if (gridByLabel.size === 0) return today;
 
   return today.map((point) => {
-    if (point.consumptionKw != null && point.consumptionKw > 0) return point;
+    const existing = point.consumptionKw;
+    if (existing != null && existing > 0 && existing < PLAUSIBLE_CONSUMPTION_KW_MAX) {
+      return point;
+    }
     const gridKw = gridByLabel.get(point.time);
     if (gridKw == null) return point;
     return {
