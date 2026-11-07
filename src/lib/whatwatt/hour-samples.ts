@@ -176,51 +176,6 @@ function slotMinutes(key: string): number | null {
   return hour * 60 + minute;
 }
 
-/**
- * Zählerstand zur 5-Minuten-Marke — gemessen oder linear zwischen den
- * nächsten bekannten Ständen (z. B. nach nächtlicher Server-Pause).
- */
-function sampleAtSlot(
-  file: HourFile,
-  key: string,
-  options: { interpolate: boolean },
-): Sample | null {
-  const exact = file.firstByHour[key];
-  if (exact) return exact;
-  if (!options.interpolate) return null;
-
-  const target = slotMinutes(key);
-  if (target == null) return null;
-
-  let beforeKey: string | null = null;
-  let afterKey: string | null = null;
-  for (const candidate of Object.keys(file.firstByHour)) {
-    const minutes = slotMinutes(candidate);
-    if (minutes == null) continue;
-    if (minutes <= target && (beforeKey == null || minutes > (slotMinutes(beforeKey) ?? -1))) {
-      beforeKey = candidate;
-    }
-    if (minutes >= target && (afterKey == null || minutes < (slotMinutes(afterKey) ?? Infinity))) {
-      afterKey = candidate;
-    }
-  }
-  if (!beforeKey || !afterKey) return null;
-  if (beforeKey === afterKey) return file.firstByHour[beforeKey] ?? null;
-
-  const t0 = slotMinutes(beforeKey);
-  const t1 = slotMinutes(afterKey);
-  if (t0 == null || t1 == null || t1 <= t0) return null;
-  const ratio = (target - t0) / (t1 - t0);
-  const start = file.firstByHour[beforeKey];
-  const end = file.firstByHour[afterKey];
-  if (!start || !end) return null;
-  return {
-    energyInKwh: start.energyInKwh + (end.energyInKwh - start.energyInKwh) * ratio,
-    energyOutKwh: start.energyOutKwh + (end.energyOutKwh - start.energyOutKwh) * ratio,
-    at: Math.round(start.at + (end.at - start.at) * ratio),
-  };
-}
-
 /** Verbrauch einer abgeschlossenen Stunde. `null`, solange Anfang oder Ende fehlen. */
 export function consumptionFromHourBounds(
   yieldKwh: number,
@@ -233,23 +188,11 @@ export function consumptionFromHourBounds(
   return round(Math.max(0, yieldKwh + imported - exported));
 }
 
-export type ApplyWhatWattOptions = {
-  /** Fehlende Stände zwischen bekannten Samples linear füllen. */
-  interpolate?: boolean;
-  /** Nur Punkte ohne bestehenden Verbrauch überschreiben. */
-  onlyMissing?: boolean;
-};
-
 /**
- * Verbrauchskurve aus whatwatt-Zählerständen. Mit `interpolate` werden Lücken
- * nach einer Server-Pause aus benachbarten Ständen nachgezogen.
+ * Verbrauchskurve nur aus gemessenen whatwatt-Zählerständen (keine Interpolation).
+ * Pausen-Lücken kommen aus FusionSolar-Messwerten.
  */
-export async function applyWhatWattHourConsumption(
-  today: HistoryPoint[],
-  options: ApplyWhatWattOptions = {},
-): Promise<HistoryPoint[]> {
-  const interpolate = options.interpolate ?? true;
-  const onlyMissing = options.onlyMissing ?? false;
+export async function applyWhatWattHourConsumption(today: HistoryPoint[]): Promise<HistoryPoint[]> {
   await ensureLoaded();
   const file = memory;
   if (!file) return today;
@@ -257,11 +200,10 @@ export async function applyWhatWattHourConsumption(
   if (file.dayKey !== todayKey) return today;
 
   return today.map((point) => {
-    if (onlyMissing && point.consumptionKw != null) return point;
     const endKey = nextSlotKey(point.time);
     if (!endKey) return point;
-    const start = sampleAtSlot(file, point.time, { interpolate });
-    const end = sampleAtSlot(file, endKey, { interpolate });
+    const start = file.firstByHour[point.time];
+    const end = file.firstByHour[endKey];
     if (!start || !end) return point;
     const slotHours = 5 / 60;
     const yieldKwh = point.productionKw * slotHours;
