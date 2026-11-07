@@ -175,7 +175,8 @@ function ChartActiveLabelBridge({
 }) {
   const text = label == null || label === "" ? null : String(label);
   const previous = useRef<string | null>(null);
-  useEffect(() => {
+  // Layout-Phase: näher am Touch-Event als useEffect (sticky user activation).
+  useLayoutEffect(() => {
     onChange(text);
     if (text != null && text !== previous.current) {
       triggerHaptic("selection");
