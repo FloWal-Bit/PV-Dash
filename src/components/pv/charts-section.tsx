@@ -201,7 +201,7 @@ function YAxisUnit({
   );
 }
 
-/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde. Im Hochformat auf dem Smartphone nur jede vierte, ohne die kleinen Stundenstriche. */
+/** Volle und halbe Stunde. Beschriftet wird jede zweite Stunde (ohne Strich an der Label-Position). Smartphone-Hochformat: nur jede vierte Stunde. */
 function halfHourTicks(): string[] {
   const ticks: string[] = [];
   for (let hour = 0; hour < 24; hour++) {
@@ -233,7 +233,6 @@ function TodayAxisTick({
   const hourNumber = Number(hour);
   const showLabel = !halfHour && hourNumber % 2 === 0;
   const hideOnPhonePortrait = showLabel && hourNumber % 4 !== 0;
-  const shownLabelHour = !halfHour && hourNumber % 4 === 0;
   const selectedLabel = todayAxisLabelForSelection(selectedTime);
   const selected = selectedLabel != null && value === selectedLabel;
   return (
@@ -250,9 +249,10 @@ function TodayAxisTick({
           {hour}:00
         </text>
       ) : null}
-      {shownLabelHour ? null : (
+      {/* Kein Strich direkt an der Zeitangabe — nur zwischen den Labels (z. B. 08:30, 09:00). */}
+      {showLabel ? null : (
         <line
-          className={hideOnPhonePortrait ? "today-axis-fallback-tick" : "today-axis-tick"}
+          className="today-axis-tick"
           y2={halfHour ? 4 : 6}
           stroke={selected ? "var(--card-foreground)" : "var(--muted-foreground)"}
           strokeOpacity={selected ? 0.9 : halfHour ? 0.55 : 0.85}

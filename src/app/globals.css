@@ -323,10 +323,7 @@
     }
   }
 
-  /* Hochformat: nur jede vierte Stunde als Uhrzeit, ohne die kleinen Stundenstriche. */
-  .today-axis-fallback-tick {
-    display: none;
-  }
+  /* Smartphone-Hochformat: nur jede vierte Stunde als Uhrzeit, ohne Zwischenstriche. */
   @media (max-width: 767px) and (orientation: portrait) {
     .today-axis-extra,
     .today-axis-tick {
