@@ -18,11 +18,6 @@ import {
   type SharedDevSettings,
 } from "@/lib/dev-settings-shared";
 import { resolveOpenMeteoPerformanceRatio } from "@/lib/open-meteo-yield/config";
-import {
-  DEFAULT_SERVER_PAUSE,
-  normalizeDayTime,
-  readDayTime,
-} from "@/lib/server-pause";
 
 export type { DevSettingsUpdate, SharedDevSettings };
 
@@ -32,9 +27,6 @@ type PersistedDevSettings = {
   infoBanner: string;
   infoBannerVisibleFrom: string | null;
   infoBannerVisibleUntil: string | null;
-  serverPauseEnabled: boolean;
-  serverPauseStopAt: string;
-  serverPauseResumeAt: string;
   /** null = noch nicht gesetzt → Env/Default. */
   performanceRatio: number | null;
 };
@@ -52,29 +44,23 @@ function readFile(): PersistedDevSettings | null {
     const infoBanner = readInfoBanner(v.infoBanner);
     const infoBannerVisibleFrom = readInfoBannerInstant(v.infoBannerVisibleFrom);
     const infoBannerVisibleUntil = readInfoBannerInstant(v.infoBannerVisibleUntil);
-    const serverPauseEnabled =
-      typeof v.serverPauseEnabled === "boolean"
-        ? v.serverPauseEnabled
-        : DEFAULT_SERVER_PAUSE.enabled;
-    const serverPauseStopAt = readDayTime(v.serverPauseStopAt, DEFAULT_SERVER_PAUSE.stopAt);
-    const serverPauseResumeAt = readDayTime(
-      v.serverPauseResumeAt,
-      DEFAULT_SERVER_PAUSE.resumeAt,
-    );
     const performanceRatio = readPerformanceRatio(v.performanceRatio);
-    const hadLocation = "siteLocation" in v || "yieldForecast" in v;
+    const hadLegacy =
+      "siteLocation" in v ||
+      "yieldForecast" in v ||
+      "serverPauseEnabled" in v ||
+      "serverPauseStopAt" in v ||
+      "serverPauseResumeAt" in v;
     const file: PersistedDevSettings = {
       updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : new Date(0).toISOString(),
       hideSimulated,
       infoBanner,
       infoBannerVisibleFrom,
       infoBannerVisibleUntil,
-      serverPauseEnabled,
-      serverPauseStopAt,
-      serverPauseResumeAt,
       performanceRatio,
     };
-    if (hadLocation) writeFile(file);
+    // Alte Standort-/Server-Pause-Felder beim nächsten Lesen aus der Datei streichen.
+    if (hadLegacy) writeFile(file);
     return file;
   } catch {
     return null;
@@ -92,9 +78,6 @@ function resolve(file: PersistedDevSettings | null): SharedDevSettings {
     infoBanner: file?.infoBanner ?? "",
     infoBannerVisibleFrom: file?.infoBannerVisibleFrom ?? null,
     infoBannerVisibleUntil: file?.infoBannerVisibleUntil ?? null,
-    serverPauseEnabled: file?.serverPauseEnabled ?? DEFAULT_SERVER_PAUSE.enabled,
-    serverPauseStopAt: file?.serverPauseStopAt ?? DEFAULT_SERVER_PAUSE.stopAt,
-    serverPauseResumeAt: file?.serverPauseResumeAt ?? DEFAULT_SERVER_PAUSE.resumeAt,
     performanceRatio: resolvePerformanceRatio(file?.performanceRatio),
     configured: file != null,
     updatedAt: file?.updatedAt ?? null,
@@ -134,18 +117,6 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
         : (current?.infoBanner ?? ""),
     infoBannerVisibleFrom,
     infoBannerVisibleUntil,
-    serverPauseEnabled:
-      typeof update.serverPauseEnabled === "boolean"
-        ? update.serverPauseEnabled
-        : (current?.serverPauseEnabled ?? DEFAULT_SERVER_PAUSE.enabled),
-    serverPauseStopAt:
-      typeof update.serverPauseStopAt === "string"
-        ? normalizeDayTime(update.serverPauseStopAt, "Stoppzeit")
-        : (current?.serverPauseStopAt ?? DEFAULT_SERVER_PAUSE.stopAt),
-    serverPauseResumeAt:
-      typeof update.serverPauseResumeAt === "string"
-        ? normalizeDayTime(update.serverPauseResumeAt, "Startzeit")
-        : (current?.serverPauseResumeAt ?? DEFAULT_SERVER_PAUSE.resumeAt),
     performanceRatio:
       typeof update.performanceRatio === "number"
         ? normalizePerformanceRatio(update.performanceRatio)

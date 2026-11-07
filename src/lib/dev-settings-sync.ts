@@ -3,7 +3,6 @@
 import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
-import { serverPauseSettingsStore } from "@/lib/server-pause-settings";
 import { yieldForecastStore } from "@/lib/yield-forecast-settings";
 
 let inflightSaves = 0;
@@ -17,11 +16,6 @@ export function applySharedDevSettings(data: SharedDevSettings): void {
     text: data.infoBanner,
     visibleFrom: data.infoBannerVisibleFrom,
     visibleUntil: data.infoBannerVisibleUntil,
-  });
-  serverPauseSettingsStore.applyRemote({
-    enabled: data.serverPauseEnabled,
-    stopAt: data.serverPauseStopAt,
-    resumeAt: data.serverPauseResumeAt,
   });
   yieldForecastStore.applyRemotePerformanceRatio(data.performanceRatio);
 }
