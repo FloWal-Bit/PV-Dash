@@ -213,15 +213,18 @@ export async function applyWhatWattHourConsumption(today: HistoryPoint[]): Promi
   });
 }
 
+/** Werte darüber sind praktisch nie echter Haushaltsverbrauch (oft W als kW). */
+const PLAUSIBLE_CONSUMPTION_KW_MAX = 500;
+
 /**
- * Ob in der Vergangenheit noch Verbrauch fehlt (null) oder nur als 0 steht
- * (z. B. nach falsch vorzeichenbehaftetem FusionSolar-Nachzug).
+ * Ob in der Vergangenheit noch Verbrauch fehlt (null/0) oder unsinnig skaliert ist.
  */
 export function hasMissingPastConsumption(today: HistoryPoint[], now = Date.now()): boolean {
   const wall = zurichWall(now);
   const nowMinutes = wall.hour * 60 + wall.minute;
   return today.some((point) => {
-    if (point.consumptionKw != null && point.consumptionKw > 0) return false;
+    const kw = point.consumptionKw;
+    if (kw != null && kw > 0 && kw < PLAUSIBLE_CONSUMPTION_KW_MAX) return false;
     const minutes = slotMinutes(point.time);
     return minutes != null && minutes + 5 <= nowMinutes;
   });
