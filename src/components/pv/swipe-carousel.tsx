@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, type ReactNode, type TouchEvent, type PointerEvent } from "react";
+import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 const SWIPE_THRESHOLD_PX = 48;
@@ -26,9 +27,11 @@ function useSwipePageNavigation(
   const goTo = useCallback(
     (index: number) => {
       const next = Math.max(0, Math.min(pageCount - 1, index));
+      if (next === page) return;
+      triggerHaptic("tab");
       onPageChange?.(next);
     },
-    [onPageChange, pageCount],
+    [onPageChange, page, pageCount],
   );
 
   const bindSwipeSurface = {
@@ -120,7 +123,7 @@ export function SwipePageSurface({
    */
   ignoreSwipeSelector?: string;
 }) {
-  const { bindSwipeSurface } = useSwipePageNavigation(
+  const { goTo, bindSwipeSurface } = useSwipePageNavigation(
     page,
     labels.length,
     onPageChange,
@@ -135,7 +138,7 @@ export function SwipePageSurface({
       {...swipeHandlers}
     >
       {children}
-      <SwipePageDots labels={labels} page={page} onPageChange={onPageChange} />
+      <SwipePageDots labels={labels} page={page} onPageChange={goTo} />
     </div>
   );
 }
@@ -180,10 +183,12 @@ export function SwipeCarousel({
   const goTo = useCallback(
     (index: number) => {
       const next = Math.max(0, Math.min(pageCount - 1, index));
+      if (next === page) return;
+      triggerHaptic("tab");
       if (controlledPage == null) setInternalPage(next);
       onPageChange?.(next);
     },
-    [controlledPage, onPageChange, pageCount],
+    [controlledPage, onPageChange, page, pageCount],
   );
 
   const onTouchStart = (clientX: number) => {

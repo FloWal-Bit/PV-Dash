@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { triggerHaptic } from "@/lib/haptics";
 import {
   Area,
   Bar,
@@ -161,6 +162,7 @@ function seedChartHoverAt(card: HTMLElement, clientX: number, clientY: number) {
 /**
  * Hält die X-Achsen-Hervorhebung mit dem aktiven Recharts-Label synchron —
  * auch wenn Touch-Scrub onMouseMove am Chart nicht zuverlässig feuert.
+ * Beim Wechsel auf einen neuen Punkt/Balken: kurzes haptisches Feedback.
  */
 function ChartActiveLabelBridge({
   label,
@@ -172,8 +174,13 @@ function ChartActiveLabelBridge({
   children: ReactNode;
 }) {
   const text = label == null || label === "" ? null : String(label);
+  const previous = useRef<string | null>(null);
   useEffect(() => {
     onChange(text);
+    if (text != null && text !== previous.current) {
+      triggerHaptic("selection");
+    }
+    previous.current = text;
   }, [text, onChange]);
   return <>{children}</>;
 }
