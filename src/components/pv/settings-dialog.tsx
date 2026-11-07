@@ -35,7 +35,7 @@ import {
   energyFlowDefaultTabStore,
 } from "@/lib/energy-flow-default-tab";
 import { hideStatusBarStore, setHideStatusBar } from "@/lib/status-bar";
-import { hapticsEnabledStore } from "@/lib/haptics";
+import { canUseHaptics, hapticsEnabledStore, triggerHaptic } from "@/lib/haptics";
 import { ThemeModeSetting } from "@/components/pv/theme-toggle";
 import {
   canPromptInstall,
@@ -85,6 +85,8 @@ function HapticsSwitch() {
       checked={enabled}
       onCheckedChange={(checked) => {
         hapticsEnabledStore.setEnabled(checked);
+        // Direkt im Tipp: Testimpuls, damit klar ist, ob Vibration funktioniert.
+        if (checked) triggerHaptic("confirm");
       }}
       className="data-checked:bg-chart-3"
     />
@@ -93,8 +95,10 @@ function HapticsSwitch() {
 
 function AndroidHapticsSetting() {
   const [android, setAndroid] = useState(false);
+  const [vibrateApi, setVibrateApi] = useState(false);
   useEffect(() => {
     setAndroid(isAndroidBrowser());
+    setVibrateApi(canUseHaptics());
   }, []);
   if (!android) return null;
 
@@ -103,7 +107,9 @@ function AndroidHapticsSetting() {
       <div className="flex min-w-0 flex-col gap-0.5">
         <Label htmlFor="haptics-enabled">Haptisches Feedback</Label>
         <span className="text-xs leading-relaxed text-muted-foreground">
-          Kurze Vibration beim Wechseln der Tabs und beim Scrubben in den Diagrammen.
+          {vibrateApi
+            ? "Vibration beim Wechseln der Tabs und beim Scrubben in den Diagrammen. System-Vibration muss aktiv sein."
+            : "Dieses Gerät meldet keine Vibration-API — Haptik ist hier nicht verfügbar."}
         </span>
       </div>
       <HapticsSwitch />
