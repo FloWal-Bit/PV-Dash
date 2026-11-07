@@ -1,0 +1,67 @@
+/**
+ * Kurzes haptisches Feedback (Android Chrome / installierte PWA).
+ * iOS Safari unterstützt die Vibration API nicht — dort No-Op.
+ * Auf Android in den Einstellungen abschaltbar.
+ */
+
+export type HapticKind = "selection" | "tab";
+
+const STORAGE_KEY = "pv-dash:haptics-enabled";
+
+const PATTERNS: Record<HapticKind, number | number[]> = {
+  /** Beim Scrubben durch Chart-Punkte / Balken. */
+  selection: 8,
+  /** Beim Wechseln eines Karten-Tabs. */
+  tab: 12,
+};
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+let snapshot = true;
+
+function refreshSnapshot() {
+  snapshot = readHapticsEnabled();
+}
+
+export function readHapticsEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function writeHapticsEnabled(enabled: boolean) {
+  window.localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
+  snapshot = enabled;
+  for (const listener of listeners) listener();
+}
+
+export const hapticsEnabledStore = {
+  subscribe(listener: Listener): () => void {
+    if (typeof window !== "undefined") refreshSnapshot();
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
+  getSnapshot(): boolean {
+    return snapshot;
+  },
+  getServerSnapshot(): boolean {
+    return true;
+  },
+  setEnabled(enabled: boolean): void {
+    writeHapticsEnabled(enabled);
+  },
+};
+
+export function triggerHaptic(kind: HapticKind = "selection"): void {
+  if (typeof navigator === "undefined") return;
+  if (!readHapticsEnabled()) return;
+  if (typeof navigator.vibrate !== "function") return;
+  try {
+    navigator.vibrate(PATTERNS[kind]);
+  } catch {
+    // ältere WebViews / Permission
+  }
+}
