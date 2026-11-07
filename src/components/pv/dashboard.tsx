@@ -34,6 +34,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
     history,
     historySource,
     historyError,
+    serverUnreachable,
   } = useSyncExternalStore(pvStore.subscribe, pvStore.getSnapshot, pvStore.getServerSnapshot);
   const { location } = useSyncExternalStore(
     siteLocationStore.subscribe,
@@ -82,6 +83,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
         gridSource={gridSource}
         sourceWarning={sourceWarning}
         gridWarning={gridWarning}
+        serverUnreachable={serverUnreachable}
       />
 
       <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 py-4 sm:py-6">
