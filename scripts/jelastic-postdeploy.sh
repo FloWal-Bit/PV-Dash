@@ -246,8 +246,18 @@ legacy_build() {
 
 preserve_data
 
-# Schon ein Prebuilt-Root?
-if [ -f server.js ] && [ -d .next/static ] && [ -f .prebuilt-version ]; then
+prebuilt_runtime_ok() {
+  # server.js + static allein reichen nicht — ohne .next/server crasht Next mit
+  # «Cannot find module …/middleware-manifest.json».
+  [ -f server.js ] \
+    && [ -f .prebuilt-version ] \
+    && [ -d .next/static ] \
+    && [ -f .next/server/middleware-manifest.json ] \
+    && [ -f node_modules/next/package.json ]
+}
+
+# Schon ein vollständiges Prebuilt-Root?
+if prebuilt_runtime_ok; then
   log "existing prebuilt server.js — light cleanup only"
   rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" dist 2>/dev/null || true
   rm -f /tmp/pv-dash-prebuilt-*.tgz "$PWD/pv-dash-prebuilt.tgz" 2>/dev/null || true
@@ -255,6 +265,10 @@ if [ -f server.js ] && [ -d .next/static ] && [ -f .prebuilt-version ]; then
   preserve_data
   log "version=$(cat .prebuilt-version) home-tarball=$([ -f "$HOME/pv-dash-prebuilt.tgz" ] && echo yes || echo no)"
   exit 0
+fi
+
+if [ -f server.js ] || [ -f .prebuilt-version ]; then
+  log "prebuilt unvollständig (server/static/manifest/next) — erneuter Extract"
 fi
 
 purge_build_debris

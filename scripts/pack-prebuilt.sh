@@ -69,7 +69,11 @@ ensure_persistent_data() {
 }
 
 restore_prebuilt_if_needed() {
-  if [ -f node_modules/next/package.json ] && [ -f server.js ] && [ -d .next/static ]; then
+  # Auch middleware-manifest prüfen — sonst startet Next und crasht mit MODULE_NOT_FOUND.
+  if [ -f node_modules/next/package.json ] \
+    && [ -f server.js ] \
+    && [ -d .next/static ] \
+    && [ -f .next/server/middleware-manifest.json ]; then
     return 0
   fi
   local tb=""
@@ -80,15 +84,17 @@ restore_prebuilt_if_needed() {
     fi
   done
   if [ -z "$tb" ]; then
-    echo "[start] ERROR: next/server.js fehlt und kein pv-dash-prebuilt.tgz unter ~/ oder ROOT." >&2
+    echo "[start] ERROR: Prebuilt unvollständig und kein pv-dash-prebuilt.tgz unter ~/ oder ROOT." >&2
     echo "[start] Fix: UPDATE_PACKAGES_ON_RESTART=false setzen und Tarball nach ~/ kopieren." >&2
     return 1
   fi
-  echo "[start] node_modules unvollständig (npm install prune?) — restore aus $tb" >&2
+  echo "[start] Prebuilt unvollständig (npm prune / fehlendes .next/server?) — restore aus $tb" >&2
   local tmp
   tmp="$(mktemp -d)"
   tar -xzf "$tb" -C "$tmp"
-  if [ ! -f "$tmp/server.js" ] || [ ! -f "$tmp/node_modules/next/package.json" ]; then
+  if [ ! -f "$tmp/server.js" ] \
+    || [ ! -f "$tmp/node_modules/next/package.json" ] \
+    || [ ! -f "$tmp/.next/server/middleware-manifest.json" ]; then
     echo "[start] ERROR: Artifact in $tb ist unvollständig." >&2
     rm -rf "$tmp"
     return 1
@@ -103,8 +109,9 @@ restore_prebuilt_if_needed() {
   if [ -f "$tmp/.prebuilt-version" ]; then cp -f "$tmp/.prebuilt-version" "$PWD/.prebuilt-version"; fi
   if [ -d "$tmp/public" ]; then mkdir -p public; rsync -a "$tmp/public/" "$PWD/public/"; fi
   rm -rf "$tmp"
-  if [ ! -f node_modules/next/package.json ]; then
-    echo "[start] ERROR: restore fehlgeschlagen (next fehlt weiter)." >&2
+  if [ ! -f node_modules/next/package.json ] \
+    || [ ! -f .next/server/middleware-manifest.json ]; then
+    echo "[start] ERROR: restore fehlgeschlagen (next/.next/server fehlt weiter)." >&2
     return 1
   fi
 }

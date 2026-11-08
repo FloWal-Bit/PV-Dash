@@ -106,6 +106,26 @@ Nach stabilem Prebuilt-Betrieb Reserved möglichst auf die **Runtime-Last**
 senken (oft deutlich unter dem früheren Build-Peak). Nicht für den Build
 reservieren — der findet ausserhalb statt.
 
+## Crash: `middleware-manifest.json` fehlt
+
+Symptom: Log zeigt
+`Cannot find module '.../ROOT/.next/server/middleware-manifest.json'`,
+die URL antwortet mit `Internal Server Error`.
+
+Ursache: unvollständiges Prebuilt (z. B. nur `server.js` + `.next/static`),
+während der Post-Hook fälschlich „schon installiert“ annahm.
+
+Sofort (ohne Code-Change), im Jelastic **Config / Dateimanager** oder Web-SSH:
+
+```bash
+rm -f ~/ROOT/.prebuilt-version
+# optional, erzwingt klaren Extract:
+# rm -rf ~/ROOT/.next ~/ROOT/server.js
+```
+
+Danach erneut **Veröffentlichen**. Der Hook lädt das Release neu und extrahiert vollständig.
+Ab v1.5.7.36 prüft der Hook `middleware-manifest.json` mit.
+
 ## Disk voll („keine Speicherkapazität“)
 
 Die App braucht im Prebuilt-Betrieb nur ~50–100 MB. Voll wird die Quota
