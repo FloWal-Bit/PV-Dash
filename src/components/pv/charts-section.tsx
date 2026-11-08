@@ -165,9 +165,9 @@ function seedChartHoverAt(card: HTMLElement, clientX: number, clientY: number) {
  * Beim Wechsel auf einen neuen Punkt/Balken: optional kurzes haptisches Feedback
  * (aus bei Tab „Heute“ — 5-Minuten-Raster wäre zu dicht).
  *
- * Nur von Label → anderes Label vibrieren — nicht beim ersten Setzen nach Mount.
- * Sonst vibriert die App nach dem 15-Minuten-History-Refresh, wenn Recharts
- * den Tooltip-Inhalt neu mountet und das aktive Label erneut setzt.
+ * Nur von Label → anderes Label und nur solange der Finger/Mauszeiger scrubbt.
+ * Sonst vibriert die App bei der 15-Sekunden-Live-Aktualisierung, wenn Recharts
+ * den Tooltip neu mountet oder das aktive Label erneut setzt.
  */
 function ChartActiveLabelBridge({
   label,
@@ -177,7 +177,7 @@ function ChartActiveLabelBridge({
 }: {
   label: unknown;
   onChange: (label: string | null) => void;
-  /** false = kein Vibrate beim Scrubben (Heute-Kurve). */
+  /** false = kein Vibrate (Heute-Kurve oder kein aktiver Scrub). */
   haptic?: boolean;
   children: ReactNode;
 }) {
@@ -788,6 +788,8 @@ function YieldConsumptionChart({
   blockFutureBars = false,
   series,
   tooltipActive,
+  /** true nur während Pointer-Scrub — sonst vibriert der 15s-Live-Refresh. */
+  scrubHaptic = false,
 }: {
   data: DailyEnergyPoint[];
   unit?: EnergyUnit;
@@ -806,6 +808,7 @@ function YieldConsumptionChart({
   series: ChartSeriesVisibility;
   /** true = Overlay bleibt beim Scrubben sichtbar; false = ausgeblendet. */
   tooltipActive: boolean;
+  scrubHaptic?: boolean;
 }) {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [pointerInChart, setPointerInChart] = useState(false);
@@ -944,6 +947,7 @@ function YieldConsumptionChart({
               <ChartActiveLabelBridge
                 label={selectable ? props.label : null}
                 onChange={setSelectedLabel}
+                haptic={scrubHaptic}
               >
                 {!tooltipActive || !row || !selectable ? null : (
                   <DetailTooltip
@@ -1317,6 +1321,8 @@ export function ChartsSection({
   const todayEnergyMissing = range === "heute" && todayEnergyDataMissing(todayChartData, liveToday);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const scrubPointerId = useRef<number | null>(null);
+  /** Finger/Maus auf dem Plot — Chart-Haptik nur dann, nicht beim 15s-Live-Tick. */
+  const [scrubbing, setScrubbing] = useState(false);
 
   useLayoutEffect(() => {
     const phone = window.matchMedia("(max-width: 767px)");
@@ -1361,6 +1367,7 @@ export function ChartsSection({
         // sonst blockiert Tab-Swipe ausserhalb des Diagramms.
         if (pointerClosesPointValues(card, event.clientX, event.clientY)) {
           scrubPointerId.current = null;
+          setScrubbing(false);
           setTooltipDismissed(true);
           return;
         }
@@ -1379,6 +1386,8 @@ export function ChartsSection({
         ignoreSwipeSelector=".yield-chart-plot"
         onPageChange={(next) => {
           setTooltipDismissed(true);
+          setScrubbing(false);
+          scrubPointerId.current = null;
           if (next !== page) suppressChartOpenUntil.current = Date.now() + 400;
           setPage(next);
           if (next !== page) pvStore.refreshHistory();
@@ -1424,6 +1433,7 @@ export function ChartsSection({
                   }
                   // Capture nur auf dem Plot — Header/Legende bleiben tab-swipebar.
                   scrubPointerId.current = event.pointerId;
+                  setScrubbing(true);
                   try {
                     event.currentTarget.setPointerCapture(event.pointerId);
                   } catch {
@@ -1440,6 +1450,7 @@ export function ChartsSection({
                 onPointerUp={(event) => {
                   if (scrubPointerId.current !== event.pointerId) return;
                   scrubPointerId.current = null;
+                  setScrubbing(false);
                   try {
                     event.currentTarget.releasePointerCapture(event.pointerId);
                   } catch {
@@ -1449,6 +1460,7 @@ export function ChartsSection({
                 onPointerCancel={(event) => {
                   if (scrubPointerId.current !== event.pointerId) return;
                   scrubPointerId.current = null;
+                  setScrubbing(false);
                 }}
               >
                 {hidePv ? (
@@ -1474,6 +1486,7 @@ export function ChartsSection({
                     blockFutureBars={range === "monat" || range === "jahr"}
                     series={series}
                     tooltipActive={tooltipOpen}
+                    scrubHaptic={scrubbing}
                   />
                 )}
               </div>
