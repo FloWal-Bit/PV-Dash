@@ -164,6 +164,10 @@ function seedChartHoverAt(card: HTMLElement, clientX: number, clientY: number) {
  * auch wenn Touch-Scrub onMouseMove am Chart nicht zuverlässig feuert.
  * Beim Wechsel auf einen neuen Punkt/Balken: optional kurzes haptisches Feedback
  * (aus bei Tab „Heute“ — 5-Minuten-Raster wäre zu dicht).
+ *
+ * Nur von Label → anderes Label vibrieren — nicht beim ersten Setzen nach Mount.
+ * Sonst vibriert die App nach dem 15-Minuten-History-Refresh, wenn Recharts
+ * den Tooltip-Inhalt neu mountet und das aktive Label erneut setzt.
  */
 function ChartActiveLabelBridge({
   label,
@@ -182,7 +186,12 @@ function ChartActiveLabelBridge({
   // Layout-Phase: näher am Touch-Event als useEffect (sticky user activation).
   useLayoutEffect(() => {
     onChange(text);
-    if (haptic && text != null && text !== previous.current) {
+    if (
+      haptic &&
+      text != null &&
+      previous.current != null &&
+      text !== previous.current
+    ) {
       triggerHaptic("selection");
     }
     previous.current = text;
