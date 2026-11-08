@@ -108,7 +108,7 @@ function AndroidHapticsSetting() {
         <Label htmlFor="haptics-enabled">Haptisches Feedback</Label>
         <span className="text-xs leading-relaxed text-muted-foreground">
           {vibrateApi
-            ? "Vibration beim Wechseln der Tabs und beim Scrubben in den Diagrammen. System-Vibration muss aktiv sein."
+            ? "Standardmässig aus. Vibration beim Wechseln der Tabs und beim Scrubben in den Diagrammen. System-Vibration muss aktiv sein."
             : "Dieses Gerät meldet keine Vibration-API — Haptik ist hier nicht verfügbar."}
         </span>
       </div>

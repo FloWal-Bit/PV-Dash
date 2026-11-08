@@ -22,18 +22,19 @@ const PATTERNS: Record<HapticKind, number | number[]> = {
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
-let snapshot = true;
+/** Standard: aus — Nutzer schaltet in den Einstellungen bewusst ein. */
+let snapshot = false;
 
 function refreshSnapshot() {
   snapshot = readHapticsEnabled();
 }
 
 export function readHapticsEnabled(): boolean {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
   try {
-    return window.localStorage.getItem(STORAGE_KEY) !== "0";
+    return window.localStorage.getItem(STORAGE_KEY) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -53,7 +54,7 @@ export const hapticsEnabledStore = {
     return snapshot;
   },
   getServerSnapshot(): boolean {
-    return true;
+    return false;
   },
   setEnabled(enabled: boolean): void {
     writeHapticsEnabled(enabled);
