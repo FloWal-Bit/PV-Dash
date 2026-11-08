@@ -8,6 +8,9 @@
 #   2) lokale Datei ~/ROOT/pv-dash-prebuilt.tgz, oder
 #   3) bereits entpacktes server.js (Archive-Upload).
 #
+# Privates Repo: Env GITHUB_RELEASE_TOKEN (oder GH_TOKEN) — Fine-grained PAT
+# mit Contents: Read auf FloWal-Bit/PV-Dash. Sonst schlägt der Asset-Download fehl.
+#
 # Notfall (teuer, Dynamic-Cloudlets): ALLOW_LEGACY_BUILD=1
 set -euo pipefail
 cd ~/ROOT
@@ -102,19 +105,108 @@ install_from_tarball() {
   preserve_data
 }
 
+# Privates Repo: Release-Assets nur über die GitHub-API mit Token.
+# Jelastic-Env: GITHUB_RELEASE_TOKEN (Fine-grained PAT, Contents: Read)
+# Fallback-Name: GH_TOKEN. Ohne Token nur öffentlicher Browser-Download.
+github_release_token() {
+  printf '%s' "${GITHUB_RELEASE_TOKEN:-${GH_TOKEN:-}}"
+}
+
+# Asset-ID aus Release-JSON (python3 oder node — Jelastic-Hooks haben oft keins von beidem zuverlässig).
+github_asset_id_from_json() {
+  local json_file="$1"
+  local asset_name="$2"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c '
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+name = sys.argv[2]
+asset = next((a for a in data.get("assets") or [] if a.get("name") == name), None)
+if not asset or asset.get("id") is None:
+    sys.exit(2)
+print(asset["id"])
+' "$json_file" "$asset_name"
+    return $?
+  fi
+  if command -v node >/dev/null 2>&1; then
+    node -e '
+const fs = require("fs");
+const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const name = process.argv[2];
+const asset = (data.assets || []).find((a) => a.name === name);
+if (!asset || asset.id == null) process.exit(2);
+process.stdout.write(String(asset.id));
+' "$json_file" "$asset_name"
+    return $?
+  fi
+  log "ERROR: weder python3 noch node — Asset-ID für privaten Download nicht lesbar"
+  return 1
+}
+
+download_github_release_public() {
+  local tag="$1"
+  local out="$2"
+  local url="https://github.com/FloWal-Bit/PV-Dash/releases/download/${tag}/pv-dash-prebuilt.tgz"
+  log "downloading (public) $url"
+  curl -fsSL --retry 2 --connect-timeout 20 -L -o "$out" "$url" && [ -s "$out" ]
+}
+
+download_github_release_private() {
+  local tag="$1"
+  local out="$2"
+  local token="$3"
+  local repo="FloWal-Bit/PV-Dash"
+  local asset_name="pv-dash-prebuilt.tgz"
+  local api="https://api.github.com/repos/${repo}/releases/tags/${tag}"
+  local meta
+  meta="$(mktemp)"
+  log "downloading (private API) ${api}"
+  if ! curl -fsSL --retry 2 --connect-timeout 20 \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${token}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    -o "$meta" \
+    "$api"; then
+    rm -f "$meta"
+    return 1
+  fi
+  local asset_id
+  if ! asset_id="$(github_asset_id_from_json "$meta" "$asset_name")"; then
+    log "Release ${tag} ohne Asset ${asset_name} (oder JSON nicht parsebar)"
+    rm -f "$meta"
+    return 1
+  fi
+  rm -f "$meta"
+  log "asset id=${asset_id}"
+  curl -fsSL --retry 2 --connect-timeout 20 -L \
+    -H "Accept: application/octet-stream" \
+    -H "Authorization: Bearer ${token}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    -o "$out" \
+    "https://api.github.com/repos/${repo}/releases/assets/${asset_id}" \
+    && [ -s "$out" ]
+}
+
 download_github_release() {
   local version="$1"
   local tag="v${version}"
-  local url="https://github.com/FloWal-Bit/PV-Dash/releases/download/${tag}/pv-dash-prebuilt.tgz"
   local out="/tmp/pv-dash-prebuilt-${version}.tgz"
-  log "downloading $url"
+  local token
+  token="$(github_release_token)"
   local attempt
   for attempt in 1 2 3 4 5 6; do
-    if curl -fsSL --retry 2 --connect-timeout 20 -L -o "$out" "$url"; then
-      if [ -s "$out" ]; then
+    rm -f "$out"
+    if [ -n "$token" ]; then
+      if download_github_release_private "$tag" "$out" "$token"; then
         printf '%s\n' "$out"
         return 0
       fi
+    else
+      if download_github_release_public "$tag" "$out"; then
+        printf '%s\n' "$out"
+        return 0
+      fi
+      log "Hinweis: ohne GITHUB_RELEASE_TOKEN schlägt der Download bei privatem Repo fehl"
     fi
     log "Asset noch nicht da (Versuch $attempt/6) — warte 30s"
     sleep 30
@@ -203,13 +295,22 @@ cat >&2 <<EOF
 [postdeploy] ERROR: Kein Prebuilt gefunden.
 
 Erwartet:
-  • GitHub Release: https://github.com/FloWal-Bit/PV-Dash/releases/download/v${VERSION:-X.Y.Z}/pv-dash-prebuilt.tgz
+  • GitHub Release v${VERSION:-X.Y.Z} Asset pv-dash-prebuilt.tgz
+    (privates Repo: Jelastic-Env GITHUB_RELEASE_TOKEN setzen — siehe DEPLOY.md)
   • oder Datei ~/ROOT/pv-dash-prebuilt.tgz
 
-Sofort per Web-SSH (Workaround):
+Sofort per Web-SSH (Workaround, privates Repo):
   cd ~/ROOT
-  curl -fsSL -L -o /tmp/pv-dash-prebuilt.tgz \\
-    https://github.com/FloWal-Bit/PV-Dash/releases/download/v${VERSION:-X.Y.Z}/pv-dash-prebuilt.tgz
+  TOKEN="\$GITHUB_RELEASE_TOKEN"   # oder PAT einsetzen
+  TAG="v${VERSION:-X.Y.Z}"
+  META=\$(mktemp)
+  curl -fsSL -H "Authorization: Bearer \$TOKEN" -H "Accept: application/vnd.github+json" \\
+    -o "\$META" "https://api.github.com/repos/FloWal-Bit/PV-Dash/releases/tags/\$TAG"
+  AID=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(next(a['id'] for a in d['assets'] if a['name']=='pv-dash-prebuilt.tgz'))" "\$META")
+  curl -fsSL -L -H "Authorization: Bearer \$TOKEN" -H "Accept: application/octet-stream" \\
+    -o /tmp/pv-dash-prebuilt.tgz \\
+    "https://api.github.com/repos/FloWal-Bit/PV-Dash/releases/assets/\$AID"
+  rm -f "\$META"
   cp -f /tmp/pv-dash-prebuilt.tgz ~/pv-dash-prebuilt.tgz
   mkdir -p /tmp/pb && tar -xzf /tmp/pv-dash-prebuilt.tgz -C /tmp/pb
   rsync -a --delete --exclude '.data/' --exclude '.env' --exclude '.env.*' --exclude 'scripts/' /tmp/pb/ ~/ROOT/
