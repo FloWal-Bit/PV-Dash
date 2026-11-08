@@ -151,6 +151,7 @@ download_github_release_public() {
   curl -fsSL --retry 2 --connect-timeout 20 -L -o "$out" "$url" && [ -s "$out" ]
 }
 
+# Exit: 0 ok · 22 Auth (401/403) · 1 sonstiger Fehler (Asset fehlt, Netz, …)
 download_github_release_private() {
   local tag="$1"
   local out="$2"
@@ -158,15 +159,25 @@ download_github_release_private() {
   local repo="FloWal-Bit/PV-Dash"
   local asset_name="pv-dash-prebuilt.tgz"
   local api="https://api.github.com/repos/${repo}/releases/tags/${tag}"
-  local meta
+  local meta http
   meta="$(mktemp)"
   log "downloading (private API) ${api}"
-  if ! curl -fsSL --retry 2 --connect-timeout 20 \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${token}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    -o "$meta" \
-    "$api"; then
+  http="$(
+    curl -sS --retry 2 --connect-timeout 20 \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer ${token}" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -o "$meta" \
+      -w "%{http_code}" \
+      "$api" || true
+  )"
+  if [ "$http" = "401" ] || [ "$http" = "403" ]; then
+    log "GitHub API ${http} — GITHUB_RELEASE_TOKEN ungültig oder ohne Contents:Read"
+    rm -f "$meta"
+    return 22
+  fi
+  if [ "$http" != "200" ]; then
+    log "GitHub API HTTP ${http} für ${tag}"
     rm -f "$meta"
     return 1
   fi
@@ -178,13 +189,26 @@ download_github_release_private() {
   fi
   rm -f "$meta"
   log "asset id=${asset_id}"
-  curl -fsSL --retry 2 --connect-timeout 20 -L \
-    -H "Accept: application/octet-stream" \
-    -H "Authorization: Bearer ${token}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    -o "$out" \
-    "https://api.github.com/repos/${repo}/releases/assets/${asset_id}" \
-    && [ -s "$out" ]
+  http="$(
+    curl -sS --retry 2 --connect-timeout 20 -L \
+      -H "Accept: application/octet-stream" \
+      -H "Authorization: Bearer ${token}" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -o "$out" \
+      -w "%{http_code}" \
+      "https://api.github.com/repos/${repo}/releases/assets/${asset_id}" || true
+  )"
+  if [ "$http" = "401" ] || [ "$http" = "403" ]; then
+    log "Asset-Download HTTP ${http} — Token prüfen"
+    rm -f "$out"
+    return 22
+  fi
+  if [ "$http" != "200" ] || [ ! -s "$out" ]; then
+    log "Asset-Download fehlgeschlagen (HTTP ${http})"
+    rm -f "$out"
+    return 1
+  fi
+  return 0
 }
 
 download_github_release() {
@@ -193,13 +217,45 @@ download_github_release() {
   local out="/tmp/pv-dash-prebuilt-${version}.tgz"
   local token
   token="$(github_release_token)"
-  local attempt
+  local attempt rc
+
+  # Ungültiger Token: einmal private versuchen, dann sofort public — kein 6×30s-Loop.
+  if [ -n "$token" ]; then
+    rm -f "$out"
+    set +e
+    download_github_release_private "$tag" "$out" "$token"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 0 ]; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    if [ "$rc" -eq 22 ]; then
+      log "Token-Auth fehlgeschlagen — Fallback auf öffentlichen Download"
+      rm -f "$out"
+      if download_github_release_public "$tag" "$out"; then
+        printf '%s\n' "$out"
+        return 0
+      fi
+      log "ERROR: Token ungültig und öffentlicher Download fehlgeschlagen (Repo privat? Token neu setzen)"
+      return 1
+    fi
+  fi
+
   for attempt in 1 2 3 4 5 6; do
     rm -f "$out"
     if [ -n "$token" ]; then
-      if download_github_release_private "$tag" "$out" "$token"; then
+      set +e
+      download_github_release_private "$tag" "$out" "$token"
+      rc=$?
+      set -e
+      if [ "$rc" -eq 0 ]; then
         printf '%s\n' "$out"
         return 0
+      fi
+      if [ "$rc" -eq 22 ]; then
+        log "ERROR: Token mitten im Retry ungültig geworden — Abbruch"
+        return 1
       fi
     else
       if download_github_release_public "$tag" "$out"; then

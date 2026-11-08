@@ -38,29 +38,29 @@ Im Panel → Node.js → **Umgebung / Variables** setzen:
 | Start / `npm start` | `npm start` | Nutzt `start.sh` (Bind `0.0.0.0` + Restore-Fallback) |
 | `GITHUB_RELEASE_TOKEN` | Fine-grained PAT | **Pflicht bei privatem Repo** — Post-Hook lädt Release-Assets über die GitHub-API |
 
-### Privates GitHub-Repo
+### Privates GitHub-Repo — Reihenfolge (wichtig)
 
-Sobald `FloWal-Bit/PV-Dash` privat ist, braucht der Post-Hook einen Token:
+**Nie zuerst privat schalten.** Sonst löscht Git-Sync `ROOT` und der Hook
+bekommt 401. Dauer: ca. 10 Minuten, wenn die Schritte **in dieser Ordnung** laufen.
 
-1. GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens**
-2. Token erzeugen, z. B. `pv-dash-jelastic-releases`
-   - Resource owner: dein Account
-   - Repository access: nur `PV-Dash`
-   - Permissions → Repository → **Contents: Read** (reicht für Releases/Assets)
-   - Expiration nach Geschmack (z. B. 90 Tage) — vor Ablauf erneuern
-3. In Jelastic unter Node.js → **Umgebung / Variables**:
-   - Name: `GITHUB_RELEASE_TOKEN`
-   - Wert: der PAT (nicht committen, nicht in `.env` im Repo)
-4. Knoten neu starten / einmal **Veröffentlichen**, damit die Variable im Hook ankommt
+| Schritt | Wo | Was |
+| --- | --- | --- |
+| 1 | GitHub | Fine-grained PAT: nur Repo `PV-Dash`, Permission **Contents: Read** |
+| 2 | Jelastic → Git-Projekt / Repository | URL `https://github.com/FloWal-Bit/PV-Dash.git`, Ast `main`, **Authentifizierung an**, Benutzer `FloWal-Bit`, Passwort = **derselbe PAT** |
+| 3 | Jelastic → Node Variables | `GITHUB_RELEASE_TOKEN` = **derselbe PAT** (Hook lädt Release-Assets) |
+| 4 | GitHub / Jelastic | Sicherstellen, dass mindestens **v1.5.7.38** (oder neuer) deployed ist: resilient `start.sh` + Token-Fallback im Hook |
+| 5 | Test | Einmal **Veröffentlichen** solange das Repo noch **öffentlich** ist — Tasks grün, Seite ok |
+| 6 | GitHub | Erst jetzt: Settings → Danger Zone → **Make private** |
+| 7 | Jelastic | Nochmal **Veröffentlichen** + Knoten-Restart |
 
-Der Hook nutzt dann `GET /repos/.../releases/tags/vX.Y.Z` und lädt das Asset
-`pv-dash-prebuilt.tgz` mit `Accept: application/octet-stream`. Ohne Token
-schlägt der Download bei privatem Repo fehl (öffentlicher Browser-URL-Fallback
-bleibt für den Fall, dass das Repo wieder public ist).
+Ein PAT reicht für **Git-Sync und Release-Download**. Nicht committen, nicht in `.env`.
 
-**Git-Sync (Veröffentlichen):** Infomaniak braucht für ein privates Repo ebenfalls
-Zugang (Deploy Key oder HTTPS mit PAT als Passwort). Das ist unabhängig vom
-Release-Token — beides einrichten, sonst zieht der Node keinen neuen Code.
+**Zurück auf öffentlich:** Variable `GITHUB_RELEASE_TOKEN` darf bleiben; ab v1.5.7.38
+fällt der Hook bei 401 automatisch auf den öffentlichen Download zurück. Ungültigen
+Token trotzdem löschen, damit die Logs klar bleiben.
+
+**Git-Sync ohne Auth bei privatem Repo** → `ROOT` weg, 502. Immer Auth **vor**
+Sichtbarkeitswechsel setzen und einmal testen.
 
 Zusätzlich hält der Post-Hook `$HOME/pv-dash-prebuilt.tgz`; `start.sh` stellt daraus
 `node_modules` wieder her, falls sie fehlen. Einmalig manuell (privates Repo):
