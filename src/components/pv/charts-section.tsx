@@ -162,15 +162,19 @@ function seedChartHoverAt(card: HTMLElement, clientX: number, clientY: number) {
 /**
  * Hält die X-Achsen-Hervorhebung mit dem aktiven Recharts-Label synchron —
  * auch wenn Touch-Scrub onMouseMove am Chart nicht zuverlässig feuert.
- * Beim Wechsel auf einen neuen Punkt/Balken: kurzes haptisches Feedback.
+ * Beim Wechsel auf einen neuen Punkt/Balken: optional kurzes haptisches Feedback
+ * (aus bei Tab „Heute“ — 5-Minuten-Raster wäre zu dicht).
  */
 function ChartActiveLabelBridge({
   label,
   onChange,
+  haptic = true,
   children,
 }: {
   label: unknown;
   onChange: (label: string | null) => void;
+  /** false = kein Vibrate beim Scrubben (Heute-Kurve). */
+  haptic?: boolean;
   children: ReactNode;
 }) {
   const text = label == null || label === "" ? null : String(label);
@@ -178,11 +182,11 @@ function ChartActiveLabelBridge({
   // Layout-Phase: näher am Touch-Event als useEffect (sticky user activation).
   useLayoutEffect(() => {
     onChange(text);
-    if (text != null && text !== previous.current) {
+    if (haptic && text != null && text !== previous.current) {
       triggerHaptic("selection");
     }
     previous.current = text;
-  }, [text, onChange]);
+  }, [text, onChange, haptic]);
   return <>{children}</>;
 }
 
@@ -367,7 +371,11 @@ function TodayPowerChart({
                 ? "–"
                 : formatSignedKwh((row.productionKw - row.consumptionKw) * hours, 2);
             return (
-              <ChartActiveLabelBridge label={props.label ?? row?.label} onChange={setHoverLabel}>
+              <ChartActiveLabelBridge
+                label={props.label ?? row?.label}
+                onChange={setHoverLabel}
+                haptic={false}
+              >
                 {!tooltipActive || !row ? null : (
                   <DetailTooltip
                     title={String(props.label ?? row.label)}
