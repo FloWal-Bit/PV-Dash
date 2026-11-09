@@ -106,6 +106,51 @@ Nach stabilem Prebuilt-Betrieb Reserved möglichst auf die **Runtime-Last**
 senken (oft deutlich unter dem früheren Build-Peak). Nicht für den Build
 reservieren — der findet ausserhalb statt.
 
+## Rollback auf ältere Version
+
+Wenn eine frisch hochgeladene Release die App kaputt macht: **nicht** den
+Source-ZIP von GitHub nehmen, sondern das Release-Asset
+`pv-dash-prebuilt.tgz` (Tag z. B. `v1.5.7.29`).
+
+### Sofort per Web-SSH (ohne auf neues Release zu warten)
+
+Repo ist public → ohne Token:
+
+```bash
+bash ~/ROOT/scripts/jelastic-rollback.sh 1.5.7.29
+# danach Node neu starten (Dashboard → Restart)
+```
+
+Falls das Skript auf dem Node noch fehlt (Git-Sync nicht gelaufen), einzeilig:
+
+```bash
+TAG=1.5.7.29
+curl -fsSL -L -o /tmp/pb.tgz \
+  "https://github.com/FloWal-Bit/PV-Dash/releases/download/v${TAG}/pv-dash-prebuilt.tgz"
+rm -f ~/ROOT/.prebuilt-version
+mkdir -p /tmp/pb && tar -xzf /tmp/pb.tgz -C /tmp/pb
+rsync -a --delete --exclude '.data/' --exclude '.env' --exclude '.env.*' \
+  --exclude 'scripts/' /tmp/pb/ ~/ROOT/
+cp -f /tmp/pb.tgz ~/pv-dash-prebuilt.tgz
+rm -rf /tmp/pb /tmp/pb.tgz
+# Node neu starten
+```
+
+### Dauerhaft per Env-Variable (nach Deploy dieses Hooks)
+
+In Jelastic → Node.js → **Umgebung / Variables**:
+
+| Variable | Wert | Wirkung |
+| --- | --- | --- |
+| `PREBUILT_VERSION` | `1.5.7.29` | Post-Hook lädt dieses Release statt `package.json` |
+
+Danach `.prebuilt-version` löschen oder einmal **Veröffentlichen** — bei
+Versions-Mismatch extrahiert der Hook neu. Variable wieder entfernen, wenn
+`main` erneut die gewünschte Version ist.
+
+Geeignete Kandidaten (Stand Nov 2026): `1.5.7.29` (vor Deploy-Fixes vom 8.11.),
+`1.5.7.22` (früher am 7.11.).
+
 ## Crash: `middleware-manifest.json` fehlt
 
 Symptom: Log zeigt
