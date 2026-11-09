@@ -8,6 +8,10 @@
 #   2) lokale Datei ~/ROOT/pv-dash-prebuilt.tgz, oder
 #   3) bereits entpacktes server.js (Archive-Upload).
 #
+# Rollback: Env PREBUILT_VERSION=1.5.7.29 (ohne v) — lädt dieses Release statt
+# package.json. Bei Versions-Mismatch (.prebuilt-version ≠ desired) wird neu
+# extrahiert. Oder: bash ~/ROOT/scripts/jelastic-rollback.sh 1.5.7.29
+#
 # Privates Repo: Env GITHUB_RELEASE_TOKEN (oder GH_TOKEN) — Fine-grained PAT
 # mit Contents: Read auf FloWal-Bit/PV-Dash. Sonst schlägt der Asset-Download fehl.
 #
@@ -256,25 +260,51 @@ prebuilt_runtime_ok() {
     && [ -f node_modules/next/package.json ]
 }
 
-# Schon ein vollständiges Prebuilt-Root?
+# Welche Prebuilt-Version soll installiert werden?
+# Override: Jelastic-Env PREBUILT_VERSION=1.5.7.29 (ohne führendes v)
+# → Rollback auf älteres Release ohne package.json umzubiegen.
+desired_prebuilt_version() {
+  local override="${PREBUILT_VERSION:-}"
+  override="${override#v}"
+  if [ -n "$override" ]; then
+    printf '%s\n' "$override"
+    return 0
+  fi
+  read_app_version || true
+}
+
+installed_prebuilt_version() {
+  if [ -f .prebuilt-version ]; then
+    tr -d '[:space:]' < .prebuilt-version
+  fi
+}
+
+VERSION="$(desired_prebuilt_version || true)"
+INSTALLED="$(installed_prebuilt_version || true)"
+log "desired version=${VERSION:-<leer>} installed=${INSTALLED:-<leer>} override=${PREBUILT_VERSION:-<none>}"
+
+# Schon ein vollständiges Prebuilt-Root in der gewünschten Version?
 if prebuilt_runtime_ok; then
-  log "existing prebuilt server.js — light cleanup only"
-  rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" dist 2>/dev/null || true
-  rm -f /tmp/pv-dash-prebuilt-*.tgz "$PWD/pv-dash-prebuilt.tgz" 2>/dev/null || true
-  # $HOME/pv-dash-prebuilt.tgz bewusst behalten (start-restore nach npm prune).
-  preserve_data
-  log "version=$(cat .prebuilt-version) home-tarball=$([ -f "$HOME/pv-dash-prebuilt.tgz" ] && echo yes || echo no)"
-  exit 0
+  if [ -n "$VERSION" ] && [ -n "$INSTALLED" ] && [ "$VERSION" != "$INSTALLED" ]; then
+    log "Versions-Mismatch ($INSTALLED → $VERSION) — erzwinge Re-Extract"
+  else
+    log "existing prebuilt server.js — light cleanup only"
+    rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" dist 2>/dev/null || true
+    rm -f /tmp/pv-dash-prebuilt-*.tgz "$PWD/pv-dash-prebuilt.tgz" 2>/dev/null || true
+    # $HOME/pv-dash-prebuilt.tgz bewusst behalten (start-restore nach npm prune).
+    preserve_data
+    log "version=$(cat .prebuilt-version) home-tarball=$([ -f "$HOME/pv-dash-prebuilt.tgz" ] && echo yes || echo no)"
+    exit 0
+  fi
 fi
 
 if [ -f server.js ] || [ -f .prebuilt-version ]; then
-  log "prebuilt unvollständig (server/static/manifest/next) — erneuter Extract"
+  log "prebuilt unvollständig oder falsche Version — erneuter Extract"
 fi
 
 purge_build_debris
 
-VERSION="$(read_app_version || true)"
-log "package.json version=${VERSION:-<leer>}"
+log "package.json/desired version=${VERSION:-<leer>}"
 
 TARBALL=""
 if [ -f pv-dash-prebuilt.tgz ]; then
