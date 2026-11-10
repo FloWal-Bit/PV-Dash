@@ -8,10 +8,10 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Behalte deine Solaranlage im Blick: Erzeugung, Verbrauch, Speicher und Ertrag – schlicht und intuitiv.",
     start_url: "/",
-    // standalone statt fullscreen: unter fullscreen färbt Android die
-    // System-Navigation mit theme_color (früher Orange, blieb trotz dunklem
-    // theme_color oft gecacht). standalone zeigt die Nav-Leiste systemüblich.
-    display: "standalone",
+    // fullscreen: Statusleiste (Uhr/Akku) in der installierten PWA ausblenden.
+    // theme_color muss der dunkle App-Hintergrund bleiben — sonst färbt
+    // Android die System-Navigation mit dem Akzent (früher oranger Balken).
+    display: "fullscreen",
     orientation: "any",
     background_color: "#171d2c",
     theme_color: "#171d2c",

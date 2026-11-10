@@ -957,8 +957,10 @@ export function SettingsDialog() {
               <div className="flex min-w-0 flex-col gap-0.5">
                 <Label htmlFor="hide-status-bar">Statusleiste ausblenden</Label>
                 <span className="text-xs leading-relaxed text-muted-foreground">
-                  Die App startet im Vollbild und blendet Uhrzeit und Akku aus. Lässt
-                  der Browser das beim Öffnen nicht zu, genügt ein Tipp.
+                  Blendet Uhrzeit und Akku aus (Vollbild). Als installierte App auf
+                  Android über den Vollbild-Modus; im Browser-Tab über den Schalter
+                  (Chrome kann kurz einen Hinweis zeigen). Auf dem iPhone/iPad nicht
+                  verfügbar.
                 </span>
               </div>
               <StatusBarSwitch />
