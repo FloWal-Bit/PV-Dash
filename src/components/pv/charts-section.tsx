@@ -79,6 +79,38 @@ type TodayChartPoint = {
   consumedFromPvKw: number | null;
 };
 
+/** Anwählbar, sobald Ertrag oder Verbrauch vorliegt (nicht bei Zukunft/Lücken). */
+function isTodayPointSelectable(point: TodayChartPoint | undefined | null): boolean {
+  if (!point) return false;
+  return point.productionKw != null || point.consumptionKw != null;
+}
+
+/** Vertikale Cursor-Linie; ausgeblendet, wenn der Slot keine Messwerte hat. */
+function TodaySelectionCursor(props: {
+  points?: ReadonlyArray<{ x?: number; y?: number }>;
+  top?: number;
+  height?: number;
+  payload?: ReadonlyArray<{ payload?: TodayChartPoint }>;
+}) {
+  const row = props.payload?.[0]?.payload;
+  if (!isTodayPointSelectable(row)) return null;
+  const x = props.points?.[0]?.x;
+  if (x == null || !Number.isFinite(x)) return null;
+  const y1 = props.top ?? 0;
+  const y2 = y1 + (props.height ?? 0);
+  return (
+    <line
+      x1={x}
+      x2={x}
+      y1={y1}
+      y2={y2}
+      stroke="var(--foreground)"
+      strokeOpacity={0.4}
+      strokeWidth={1}
+    />
+  );
+}
+
 function parseTimeToMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
@@ -318,8 +350,23 @@ function TodayPowerChart({
         margin={CHART_MARGIN}
         onMouseMove={(state) => {
           setPointerInChart(true);
-          const label = state?.activeLabel;
-          setHoverLabel(label == null ? null : String(label));
+          const label = state?.activeLabel == null ? null : String(state.activeLabel);
+          if (label == null) {
+            setHoverLabel(null);
+            return;
+          }
+          const index =
+            typeof state.activeIndex === "number"
+              ? state.activeIndex
+              : typeof state.activeTooltipIndex === "number"
+                ? state.activeTooltipIndex
+                : -1;
+          const row = index >= 0 ? data[index] : data.find((point) => point.label === label);
+          if (!isTodayPointSelectable(row)) {
+            setHoverLabel(null);
+            return;
+          }
+          setHoverLabel(label);
         }}
         onMouseLeave={() => {
           setPointerInChart(false);
@@ -367,13 +414,10 @@ function TodayPowerChart({
           // Kein Slide-Delay; seitlicher Abstand, damit die Cursor-Linie nicht unter dem Overlay verschwindet.
           isAnimationActive={false}
           offset={{ x: 16, y: 0 }}
-          cursor={{
-            stroke: "var(--foreground)",
-            strokeOpacity: 0.4,
-            strokeWidth: 1,
-          }}
+          cursor={<TodaySelectionCursor />}
           content={(props) => {
             const row = props.payload?.[0]?.payload as TodayChartPoint | undefined;
+            const selectable = isTodayPointSelectable(row);
             const hours = sampleIntervalHours(data);
             const stromkonto =
               !row || row.productionKw == null || row.consumptionKw == null
@@ -381,11 +425,11 @@ function TodayPowerChart({
                 : formatSignedKwh((row.productionKw - row.consumptionKw) * hours, 2);
             return (
               <ChartActiveLabelBridge
-                label={props.label ?? row?.label}
+                label={selectable ? (props.label ?? row?.label) : null}
                 onChange={setHoverLabel}
                 haptic={false}
               >
-                {!tooltipActive || !row ? null : (
+                {!tooltipActive || !row || !selectable ? null : (
                   <DetailTooltip
                     title={`${String(props.label ?? row.label)} Uhr`}
                     rows={[
