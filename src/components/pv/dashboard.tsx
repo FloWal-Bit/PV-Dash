@@ -35,6 +35,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
     historySource,
     historyError,
     serverUnreachable,
+    liveProbeDone,
   } = useSyncExternalStore(pvStore.subscribe, pvStore.getSnapshot, pvStore.getServerSnapshot);
   const { location } = useSyncExternalStore(
     siteLocationStore.subscribe,
@@ -51,10 +52,15 @@ export function Dashboard({ plantName }: { plantName: string }) {
   );
   const lastUpdated = lastFetchedAt != null ? new Date(lastFetchedAt) : null;
   const dataSource = source ?? "simulation";
-  const externalServiceErrors = [
-    !weatherLoading && weatherError ? weatherError : null,
-    forecastSolarError,
-  ].filter((message): message is string => message != null);
+  // Bei fehlender Serververbindung reicht der Server-Pause-Banner —
+  // Wetter-/Prognose-Ausfälle nicht zusätzlich anzeigen (oft dieselbe Ursache).
+  const externalServiceErrors =
+    liveProbeDone && !serverUnreachable
+      ? [
+          !weatherLoading && weatherError ? weatherError : null,
+          forecastSolarError,
+        ].filter((message): message is string => message != null)
+      : [];
 
   useEffect(() => {
     void reportDeviceVisit();
@@ -104,7 +110,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
           </div>
         ) : null}
 
-        {!error && warning ? (
+        {!error && !serverUnreachable && warning ? (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
             {warning}
           </div>
