@@ -387,7 +387,7 @@ function TodayPowerChart({
               >
                 {!tooltipActive || !row ? null : (
                   <DetailTooltip
-                    title={String(props.label ?? row.label)}
+                    title={`${String(props.label ?? row.label)} Uhr`}
                     rows={[
                       ...(series.ertrag
                         ? [
