@@ -106,6 +106,30 @@ Nach stabilem Prebuilt-Betrieb Reserved möglichst auf die **Runtime-Last**
 senken (oft deutlich unter dem früheren Build-Peak). Nicht für den Build
 reservieren — der findet ausserhalb statt.
 
+## Nachtpause & Abruf-Budget (Europe/Zurich)
+
+Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
+
+1. **Client:** in der Pause kein 15‑s-Poll mehr — nur ~**20‑Min-Probe** (bzw. kurz nach 06:00), History pausiert bis Live wieder ok.
+2. **Server:** beim ersten Request nach Prozessstart **ein** sequentieller Catch-up (Live → Heute-Kurve → Woche/Monat/Jahr → Laufzeit → Open-Meteo), parallele Tabs warten auf denselben Warmup.
+
+| Daten / Quelle | Intervall | Feste Uhrzeiten? | ≈/Tag* | Anzeige (Card / Tab) |
+| --- | --- | --- | --- | --- |
+| Browser → `/api/pv` | 15 s; in Pause ~20 min Probe | Pause 23:30–06:00 | tagsüber hoch, nachts ~20 Probes | treibt Live (Card 1–3, KPIs, Header) |
+| Browser → `/api/pv/history` | 15 min; in Pause aus | — | ~68 (ohne Pause-Nacht) | **Card 3** alle Tabs |
+| FS Login | 25 min | nein | ~40 (ohne Pause) | nicht sichtbar |
+| FS Live RealKpi | 6 min Cache | nein | ~175 Zyklen (ohne Pause) | **Card 2**, Header, KPI Ertrag |
+| FS Heute `getDevFiveMinutes` | 50 min (05–23), 3 h (23–05) | Fenster 05/23 | ~24, nachts oft 0 wenn Node aus | **Card 3 → Heute** |
+| FS Zähler 5‑Min | 1×/Tag | erster Bedarf | 1 | **Card 3 → Heute** Verbrauchslücken |
+| FS Woche/Monat / Year | 12 h; Catch-up einmal nach Start | ~06:00 Warmup | ~2 + Catch-up | **Card 3** Woche–Laufzeit |
+| whatwatt MQTT | Push | nein | 0 Polls | **Card 2**, KPIs Stromkonto/Verbrauch |
+| Open-Meteo | 45 min; Catch-up nach Start | — | ~32 | **Card 1** Prognose |
+| Wetter-Alarm | 6 h | 00 / 06 / 12 / 18 | 4 Marken | **Card 1** Wetter/Sonne |
+| Nachtpause Node | aus | **23:30–06:00** | — | Banner; keine FS-Aufrufe wenn Node aus |
+| Startup-Catch-up | 1× / Prozess | nach Hochfahren | 1 Sequenz | füllt Caches für alle Cards |
+
+\*Bei dauerhaft laufendem Node + offenem Dashboard; Pause verkürzt die Nachtwerte.
+
 ## Crash: `middleware-manifest.json` fehlt
 
 Symptom: Log zeigt

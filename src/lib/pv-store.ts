@@ -6,6 +6,10 @@ import {
   readOfflineDashboardCache,
   writeOfflineDashboardCache,
 } from "@/lib/offline-dashboard-cache";
+import {
+  isScheduledServerPause,
+  msUntilScheduledPauseEnd,
+} from "@/lib/server-pause-window";
 
 export type PvStoreState = {
   snapshot: PvSnapshot | null;
@@ -38,6 +42,18 @@ const LIVE_INTERVAL_MS = 15_000;
 const HISTORY_INTERVAL_MS = 15 * 60 * 1000;
 /** Beim Wechsel des Diagramm-Zeitraums neu laden, wenn der Stand älter ist. */
 const HISTORY_RANGE_MIN_AGE_MS = 60_000;
+/**
+ * In der geplanten Nachtpause (23:30–06:00): nur selten prüfen, ob der Node
+ * wieder da ist — kein 15-s-Hämmern gegen 502.
+ */
+const PAUSE_PROBE_INTERVAL_MS = 20 * 60 * 1000;
+
+function nextLiveDelayMs(nowMs = Date.now()): number {
+  if (!isScheduledServerPause(nowMs)) return LIVE_INTERVAL_MS;
+  const untilEnd = msUntilScheduledPauseEnd(nowMs);
+  // Spätestens kurz nach Pause-Ende wieder anklopfen.
+  return Math.min(PAUSE_PROBE_INTERVAL_MS, Math.max(5_000, untilEnd + 2_000));
+}
 
 const INITIAL_STATE: PvStoreState = {
   snapshot: null,
@@ -107,18 +123,16 @@ function hydrateFromOfflineCache(): PvStoreState {
 }
 
 /**
- * Live-Zahlen alle 15 Sekunden, Verläufe einmal pro Stunde. Beides pausiert,
- * solange der Tab im Hintergrund ist. whatwatt liefert etwa alle 15 Sekunden
- * einen neuen Zählerstand. Huawei-Livedaten holt der Server höchstens alle
- * 6 Minuten, die heutige Stundenreihe einmal pro Stunde, längere Reihen
- * zweimal täglich.
+ * Live-Zahlen alle 15 Sekunden (in der Nachtpause nur ~20‑Min-Probe),
+ * Verläufe alle 15 Minuten — History in der Pause ausgesetzt, bis Live wieder
+ * ok ist. Beides pausiert, solange der Tab im Hintergrund ist.
  */
 class PvStore {
   private listeners = new Set<Listener>();
   private state: PvStoreState =
     typeof window === "undefined" ? INITIAL_STATE : hydrateFromOfflineCache();
-  private liveIntervalId: ReturnType<typeof setInterval> | null = null;
-  private historyIntervalId: ReturnType<typeof setInterval> | null = null;
+  private liveTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private historyTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private visibilityBound = false;
   private liveInflight: Promise<void> | null = null;
   private historyInflight: Promise<void> | null = null;
@@ -152,6 +166,7 @@ class PvStore {
 
   private tickLive = async () => {
     if (this.liveInflight) return this.liveInflight;
+    const wasUnreachable = this.state.serverUnreachable;
     this.liveInflight = (async () => {
       try {
         await ensureDevSettingsReady();
@@ -176,6 +191,10 @@ class PvStore {
           liveProbeDone: true,
         };
         this.persistOffline();
+        // Nach Offline/Pause: Verlauf sofort nachziehen.
+        if (wasUnreachable) {
+          void this.tickHistory();
+        }
       } catch {
         if (!this.state.snapshot) {
           const cached = hydrateFromOfflineCache();
@@ -270,26 +289,56 @@ class PvStore {
   }
 
   private stopTimers() {
-    if (this.liveIntervalId) {
-      clearInterval(this.liveIntervalId);
-      this.liveIntervalId = null;
+    if (this.liveTimeoutId) {
+      clearTimeout(this.liveTimeoutId);
+      this.liveTimeoutId = null;
     }
-    if (this.historyIntervalId) {
-      clearInterval(this.historyIntervalId);
-      this.historyIntervalId = null;
+    if (this.historyTimeoutId) {
+      clearTimeout(this.historyTimeoutId);
+      this.historyTimeoutId = null;
     }
+  }
+
+  private armLiveTimer() {
+    if (typeof document === "undefined" || document.hidden) return;
+    if (this.liveTimeoutId) clearTimeout(this.liveTimeoutId);
+    const delay = nextLiveDelayMs();
+    this.liveTimeoutId = setTimeout(() => {
+      this.liveTimeoutId = null;
+      void this.tickLive().finally(() => this.armLiveTimer());
+    }, delay);
+  }
+
+  private armHistoryTimer() {
+    if (typeof document === "undefined" || document.hidden) return;
+    if (this.historyTimeoutId) clearTimeout(this.historyTimeoutId);
+    // In der Nachtpause kein History-Poll — Live-Probe reicht; nach Erfolg tickHistory.
+    if (isScheduledServerPause()) {
+      const delay = Math.min(
+        PAUSE_PROBE_INTERVAL_MS,
+        Math.max(5_000, msUntilScheduledPauseEnd() + 2_000),
+      );
+      this.historyTimeoutId = setTimeout(() => {
+        this.historyTimeoutId = null;
+        this.armHistoryTimer();
+      }, delay);
+      return;
+    }
+    this.historyTimeoutId = setTimeout(() => {
+      this.historyTimeoutId = null;
+      void this.tickHistory().finally(() => this.armHistoryTimer());
+    }, HISTORY_INTERVAL_MS);
   }
 
   private startTimers() {
     if (typeof document === "undefined" || document.hidden) return;
-    if (this.liveIntervalId) return;
+    if (this.liveTimeoutId) return;
     void this.tickLive();
-    this.refreshHistoryIfStale(HISTORY_INTERVAL_MS);
-    this.liveIntervalId = setInterval(() => void this.tickLive(), LIVE_INTERVAL_MS);
-    this.historyIntervalId = setInterval(
-      () => void this.tickHistory(),
-      HISTORY_INTERVAL_MS,
-    );
+    if (!isScheduledServerPause()) {
+      this.refreshHistoryIfStale(HISTORY_INTERVAL_MS);
+    }
+    this.armLiveTimer();
+    this.armHistoryTimer();
   }
 
   private onVisibility = () => {

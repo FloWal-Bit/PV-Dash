@@ -585,3 +585,62 @@ export async function getFusionSolarDashboardData(): Promise<FusionSolarDashboar
   ]);
   return { snapshot, ...history, lifetime };
 }
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Einmaliger sequentieller Warmup der FS-Caches (Live → Heute → Woche/Monat/Jahr → Laufzeit).
+ * Fehler in einem Schritt stoppen die folgenden nicht — teilweise warme Caches sind ok.
+ */
+export async function warmFusionSolarCachesSequential(options?: {
+  gapMs?: number;
+}): Promise<void> {
+  const gapMs = options?.gapMs ?? 750;
+
+  try {
+    const snapshot = await fetchLiveSnapshot();
+    liveCache = { value: snapshot, expiresAt: Date.now() + LIVE_TTL_MS };
+    liveFailure = null;
+  } catch (err) {
+    liveFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
+    console.error("[fusionsolar] Catch-up Live fehlgeschlagen:", asError(err).message);
+  }
+
+  await delay(gapMs);
+
+  try {
+    const today = await fetchTodayHistory();
+    todayHistoryCache = { value: today, expiresAt: Date.now() + todayHistoryTtlMs() };
+    todayHistoryFailure = null;
+  } catch (err) {
+    todayHistoryFailure = {
+      value: asError(err),
+      expiresAt: Date.now() + todayHistoryTtlMs(),
+    };
+    console.error("[fusionsolar] Catch-up Heute-Kurve fehlgeschlagen:", asError(err).message);
+  }
+
+  await delay(gapMs);
+
+  try {
+    const ranges = await fetchRangeHistory();
+    rangeHistoryCache = { value: ranges, expiresAt: Date.now() + SLOW_HISTORY_TTL_MS };
+    rangeHistoryFailure = null;
+  } catch (err) {
+    rangeHistoryFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
+    console.error("[fusionsolar] Catch-up Woche/Monat/Jahr fehlgeschlagen:", asError(err).message);
+  }
+
+  await delay(gapMs);
+
+  try {
+    const lifetime = await fetchLifetime();
+    lifetimeCache = { value: lifetime, expiresAt: Date.now() + LIFETIME_TTL_MS };
+    lifetimeFailure = null;
+  } catch (err) {
+    lifetimeFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
+    console.error("[fusionsolar] Catch-up Laufzeit fehlgeschlagen:", asError(err).message);
+  }
+}
