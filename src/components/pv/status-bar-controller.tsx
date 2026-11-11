@@ -3,50 +3,48 @@
 import { useEffect } from "react";
 import {
   consumeIntentionalFullscreenExit,
-  mustNotAutoRequestFullscreen,
   mustNotRequestDocumentFullscreen,
+  needsImmersiveDocumentFullscreen,
   readHideStatusBar,
   requestHideStatusBarFullscreen,
 } from "@/lib/status-bar";
 
-const RESUME_RETRY_MS = [0, 250, 800, 2000] as const;
+const ENSURE_RETRY_MS = [0, 250, 800, 2000, 5000] as const;
 
 /**
- * Hält Vollbild, wenn «Statusleiste ausblenden» aktiv ist.
+ * Hält immersive Vollbild-Ansicht (Status- + Navigationsleiste aus), solange
+ * «Systemleisten ausblenden» aktiv ist.
  *
- * Android/PWA beenden Document-Fullscreen oft beim Schlafen oder App-Wechsel.
- * Beim Sichtbarwerden wird deshalb erneut angefordert (auch ohne Geste —
- * sonst bleibt die Leiste; ein Chrome-Toast kann einmal erscheinen).
- * Zusätzlich: Tipp als Fallback. iOS bleibt ausgenommen.
- * Erstes Öffnen ohne Geste auf Android/PWA weiter ohne Auto-Fullscreen (Toast).
+ * Document-Fullscreen mit navigationUI:"hide". Nach Sleep/App-Wechsel und
+ * wenn die Leisten wieder sichtbar wirken, erneut anfordern. Tipp als Fallback
+ * (Browser verlangen oft eine Geste). iOS: API nicht verfügbar.
  */
 export function StatusBarController() {
   useEffect(() => {
-    /** true nur nach bewusstem Toggle «Leiste anzeigen» bzw. Preference aus. */
+    /** true nur nach bewusstem Toggle «Leisten anzeigen». */
     let userLeft = false;
-    let resumeTimers: ReturnType<typeof setTimeout>[] = [];
+    let ensureTimers: ReturnType<typeof setTimeout>[] = [];
 
-    const clearResumeTimers = () => {
-      for (const id of resumeTimers) clearTimeout(id);
-      resumeTimers = [];
+    const clearEnsureTimers = () => {
+      for (const id of ensureTimers) clearTimeout(id);
+      ensureTimers = [];
     };
 
-    const enter = (opts?: { userGesture?: boolean; resume?: boolean }) => {
-      if (userLeft || !readHideStatusBar() || document.fullscreenElement) return;
+    const enter = () => {
+      if (userLeft || !readHideStatusBar()) return;
       if (mustNotRequestDocumentFullscreen()) return;
-      // Erstes Öffnen: kein Auto-Fullscreen auf Android/PWA. Nach Wake/Tipp schon.
-      if (!opts?.userGesture && !opts?.resume && mustNotAutoRequestFullscreen()) return;
+      if (!needsImmersiveDocumentFullscreen()) return;
       void requestHideStatusBarFullscreen();
     };
 
-    const scheduleResumeEnter = () => {
+    const scheduleEnsure = () => {
       if (userLeft || !readHideStatusBar()) return;
-      clearResumeTimers();
-      for (const delay of RESUME_RETRY_MS) {
-        resumeTimers.push(
+      clearEnsureTimers();
+      for (const delay of ENSURE_RETRY_MS) {
+        ensureTimers.push(
           setTimeout(() => {
-            if (userLeft || !readHideStatusBar() || document.fullscreenElement) return;
-            enter({ resume: true });
+            if (userLeft || !readHideStatusBar()) return;
+            enter();
           }, delay),
         );
       }
@@ -55,20 +53,19 @@ export function StatusBarController() {
     const onFullscreenChange = () => {
       if (document.fullscreenElement) {
         userLeft = false;
-        clearResumeTimers();
+        clearEnsureTimers();
         return;
       }
 
       if (consumeIntentionalFullscreenExit() || !readHideStatusBar()) {
         userLeft = true;
-        clearResumeTimers();
+        clearEnsureTimers();
         return;
       }
 
-      // OS hat Fullscreen beendet (Sleep, Gesture, App-Wechsel) — Preference bleibt an.
       userLeft = false;
       if (!document.hidden) {
-        scheduleResumeEnter();
+        scheduleEnsure();
       }
     };
 
@@ -76,13 +73,13 @@ export function StatusBarController() {
       if (document.hidden) return;
       if (!readHideStatusBar()) return;
       userLeft = false;
-      scheduleResumeEnter();
+      scheduleEnsure();
     };
 
     const onPageShow = () => {
       if (!readHideStatusBar()) return;
       userLeft = false;
-      scheduleResumeEnter();
+      scheduleEnsure();
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -90,22 +87,30 @@ export function StatusBarController() {
       if (target instanceof Element && target.closest("[data-status-bar-toggle]")) return;
       if (!readHideStatusBar()) return;
       userLeft = false;
-      enter({ userGesture: true });
+      enter();
+    };
+
+    const onResize = () => {
+      if (userLeft || !readHideStatusBar() || document.hidden) return;
+      if (needsImmersiveDocumentFullscreen()) {
+        scheduleEnsure();
+      }
     };
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageShow);
-    // capture: true — greift auch, wenn Kinder stopPropagation nutzen.
     window.addEventListener("pointerdown", onPointerDown, true);
-    enter();
+    window.addEventListener("resize", onResize);
+    scheduleEnsure();
 
     return () => {
-      clearResumeTimers();
+      clearEnsureTimers();
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 

@@ -955,11 +955,12 @@ export function SettingsDialog() {
               className="flex items-start justify-between gap-3"
             >
               <div className="flex min-w-0 flex-col gap-0.5">
-                <Label htmlFor="hide-status-bar">Statusleiste ausblenden</Label>
+                <Label htmlFor="hide-status-bar">Systemleisten ausblenden</Label>
                 <span className="text-xs leading-relaxed text-muted-foreground">
-                  Blendet Uhrzeit und Akku aus (Vollbild). Nach dem Aufwachen versucht
-                  die App erneut Vollbild; sonst reicht ein Tipp. Chrome kann dabei
-                  kurz einen Hinweis zeigen. Auf dem iPhone/iPad nicht verfügbar.
+                  Blendet Statusleiste (Uhr/Akku) und Navigationsleiste aus.
+                  Bleibt an, solange die Einstellung aktiv ist; nach dem Aufwachen
+                  oder per Tipp erneut. Chrome kann kurz einen Hinweis zeigen.
+                  Auf dem iPhone/iPad nicht verfügbar.
                 </span>
               </div>
               <StatusBarSwitch />

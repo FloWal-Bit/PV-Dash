@@ -1,18 +1,11 @@
-import { isAndroidBrowser, isInstalledApp, isIosBrowser } from "@/lib/install-prompt";
+import { isIosBrowser } from "@/lib/install-prompt";
 
 const STORAGE_KEY = "pv-dash:hide-status-bar";
 
 /**
- * Ohne Nutzer-Geste kein requestFullscreen auf Android/iOS/PWA beim
- * ersten Öffnen — sonst Systemtoast bzw. wirkungsloser Aufruf.
- * Nach Sleep/App-Wechsel (resume) und bei Tipp darf Android/PWA wieder
- * in den Document-Fullscreen, sonst bleibt die Statusleiste sichtbar.
+ * Document-Fullscreen (navigationUI: hide) blendet auf Android/Chrome
+ * Status- und Navigationsleiste aus. iOS unterstützt die API nicht.
  */
-export function mustNotAutoRequestFullscreen(): boolean {
-  return isAndroidBrowser() || isIosBrowser() || isInstalledApp();
-}
-
-/** Expliziter Toggle / Re-Enter: nur iOS blockieren. */
 export function mustNotRequestDocumentFullscreen(): boolean {
   return isIosBrowser();
 }
@@ -21,7 +14,7 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 let snapshot = true;
 
-/** true, wenn exitFullscreen bewusst vom Toggle (Leiste anzeigen) kam. */
+/** true, wenn exitFullscreen bewusst vom Toggle (Leisten anzeigen) kam. */
 let intentionalFullscreenExit = false;
 
 function refreshSnapshot() {
@@ -69,10 +62,44 @@ export function consumeIntentionalFullscreenExit(): boolean {
   return value;
 }
 
+function isDisplayModeFullscreen(): boolean {
+  return window.matchMedia("(display-mode: fullscreen)").matches;
+}
+
+/**
+ * Heuristik: Systemleisten (Status/Navi) nehmen sichtbare Höhe weg.
+ * In sauberem PWA-Fullscreen ist innerHeight ≈ screen.height — dann keinen
+ * Extra-Document-Fullscreen anfordern (vermeidet Chrome-Toast).
+ */
+export function systemChromeLikelyVisible(): boolean {
+  if (typeof window === "undefined") return false;
+  if (document.fullscreenElement) return false;
+  const screenH = window.screen?.height ?? 0;
+  if (screenH <= 0) return true;
+  return window.innerHeight < screenH - 24;
+}
+
+/**
+ * true, wenn Document-Fullscreen nötig ist, um Status+Navi auszublenden.
+ * PWA mit display:fullscreen und bereits voller Höhe: false.
+ */
+export function needsImmersiveDocumentFullscreen(): boolean {
+  if (typeof document === "undefined") return false;
+  if (!readHideStatusBar()) return false;
+  if (document.fullscreenElement) return false;
+  if (mustNotRequestDocumentFullscreen()) return false;
+  if (!isDisplayModeFullscreen()) return true;
+  return systemChromeLikelyVisible();
+}
+
 type FullscreenElement = Element & {
   webkitRequestFullscreen?: (options?: FullscreenOptions) => Promise<void> | void;
 };
 
+/**
+ * Immersives Document-Fullscreen: Status- und Navigationsleiste aus
+ * (navigationUI: "hide").
+ */
 export async function requestHideStatusBarFullscreen(): Promise<boolean> {
   if (typeof document === "undefined") return false;
   if (mustNotRequestDocumentFullscreen()) return false;
@@ -95,7 +122,7 @@ export async function requestHideStatusBarFullscreen(): Promise<boolean> {
   }
 }
 
-/** Blendet die System-Statusleiste aus, sofern das ohne den Vollbild-Toast geht. */
+/** Preference: Systemleisten (Status + Navi) ausblenden bzw. wieder anzeigen. */
 export async function setHideStatusBar(hide: boolean): Promise<boolean> {
   if (typeof document === "undefined") return false;
   if (!hide) {
@@ -114,10 +141,10 @@ export async function setHideStatusBar(hide: boolean): Promise<boolean> {
   if (mustNotRequestDocumentFullscreen()) {
     return true;
   }
-  const ok = await requestHideStatusBarFullscreen();
-  if (!ok) {
-    // Preference bleibt an — nächster Tipp/Wake versucht erneut.
+  if (!needsImmersiveDocumentFullscreen()) {
     return true;
   }
+  await requestHideStatusBarFullscreen();
+  // Preference bleibt an — Controller retried / Tipp, falls Request scheitert.
   return true;
 }
