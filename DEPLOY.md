@@ -124,7 +124,7 @@ Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 | FS Woche/Monat / Year | 12 h; Catch-up einmal nach Start | ~06:00 Warmup | ~2 + Catch-up | **Card 3** Woche–Laufzeit |
 | whatwatt MQTT | Push | nein | 0 Polls | **Card 2**, KPIs Stromkonto/Verbrauch |
 | Open-Meteo | 45 min; Catch-up nach Start | — | ~32 | **Card 1** Prognose |
-| Wetter-Alarm | 6 h | 00 / 06 / 12 / 18 | 4 Marken | **Card 1** Wetter/Sonne |
+| Wetter-Alarm | Marken | **06 / 12 / 18 / 23** | 4 Marken | **Card 1** Wetter/Sonne |
 | Nachtpause Node | aus | **23:30–06:00** | — | Banner; keine FS-Aufrufe wenn Node aus |
 | Startup-Catch-up | 1× / Prozess | nach Hochfahren | 1 Sequenz | füllt Caches für alle Cards |
 
