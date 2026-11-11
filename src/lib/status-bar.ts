@@ -3,13 +3,21 @@ import { isAndroidBrowser, isInstalledApp, isIosBrowser } from "@/lib/install-pr
 const STORAGE_KEY = "pv-dash:hide-status-bar";
 
 /**
- * Chrome auf Android und Safari auf iOS/iPadOS zeigen beim Eintritt in die
- * Fullscreen-API den Systemtoast «zum Beenden des Vollbildmodus: von oben
- * ziehen». Installierte Home-Bildschirm-Apps haben die Browserleiste bereits
- * ausgeblendet. Dort die API nicht aufrufen.
+ * Automatischer Fullscreen-Versuch (ohne expliziten Toggle): auf Android/iOS
+ * und in installierten PWAs unterlassen — sonst erscheint der Systemtoast, und
+ * installierte Apps steuern die Leiste über display:fullscreen im Manifest.
+ */
+export function mustNotAutoRequestFullscreen(): boolean {
+  return isAndroidBrowser() || isIosBrowser() || isInstalledApp();
+}
+
+/**
+ * Expliziter Toggle «Statusleiste ausblenden»: nur iOS/iPadOS blockieren
+ * (Fullscreen-API dort unbrauchbar). Android darf requestFullscreen —
+ * Chrome kann einmalig einen Hinweis zeigen.
  */
 export function mustNotRequestDocumentFullscreen(): boolean {
-  return isAndroidBrowser() || isIosBrowser() || isInstalledApp();
+  return isIosBrowser();
 }
 
 type Listener = () => void;

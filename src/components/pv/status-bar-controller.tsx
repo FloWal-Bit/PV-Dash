@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { mustNotRequestDocumentFullscreen, readHideStatusBar } from "@/lib/status-bar";
+import { mustNotAutoRequestFullscreen, readHideStatusBar } from "@/lib/status-bar";
 
 /**
  * Startet im Vollbild, wo das ohne den Systemtoast möglich ist.
- * Installierte Apps sind bereits ohne Browserleiste. Android und iOS/iPadOS
- * rufen die Fullscreen-API nicht auf. Ein normaler Tab darf den Vollbildmodus erst nach
- * einem Tipp betreten, deshalb beim ersten Zeigerkontakt. Wer ihn selbst
- * verlässt, bleibt für diese Sitzung im Fenster.
+ * Android/iOS und installierte PWAs: kein Auto-requestFullscreen (Toast /
+ * Manifest-display:fullscreen). Desktop-Tabs erst nach Zeigerkontakt.
+ * Wer Vollbild selbst verlässt, bleibt für diese Sitzung im Fenster.
  */
 export function StatusBarController() {
   useEffect(() => {
@@ -17,7 +16,7 @@ export function StatusBarController() {
 
     const enter = () => {
       if (userLeft || !readHideStatusBar() || document.fullscreenElement) return;
-      if (mustNotRequestDocumentFullscreen()) return;
+      if (mustNotAutoRequestFullscreen()) return;
       if (typeof document.documentElement.requestFullscreen !== "function") return;
       document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
     };

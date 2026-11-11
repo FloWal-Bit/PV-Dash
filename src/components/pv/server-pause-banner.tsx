@@ -5,18 +5,48 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { pvStore } from "@/lib/pv-store";
 
-function formatUnreachableMessage(lastFetchedAt: number | null): string {
-  const last =
-    lastFetchedAt != null
-      ? new Date(lastFetchedAt).toLocaleString("de-CH", {
-          timeZone: "Europe/Zurich",
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : null;
-  const cached = last ? ` Letzter Stand: ${last} Uhr.` : "";
+/** Geplante Nachtpause Europe/Zurich: 23:30–06:00. */
+const PAUSE_START_MINUTES = 23 * 60 + 30;
+const PAUSE_END_MINUTES = 6 * 60;
+
+function zurichMinutesSinceMidnight(nowMs: number): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Zurich",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(nowMs));
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return hour * 60 + minute;
+}
+
+/** true in der geplanten Server-Nachtpause (23:30–06:00 Europe/Zurich). */
+export function isScheduledServerPause(nowMs: number = Date.now()): boolean {
+  const minutes = zurichMinutesSinceMidnight(nowMs);
+  return minutes >= PAUSE_START_MINUTES || minutes < PAUSE_END_MINUTES;
+}
+
+function formatLastStand(lastFetchedAt: number | null): string {
+  if (lastFetchedAt == null) return "";
+  const last = new Date(lastFetchedAt).toLocaleString("de-CH", {
+    timeZone: "Europe/Zurich",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return ` Letzter Stand: ${last} Uhr.`;
+}
+
+function formatUnreachableMessage(
+  lastFetchedAt: number | null,
+  nowMs: number,
+): string {
+  const cached = formatLastStand(lastFetchedAt);
+  if (isScheduledServerPause(nowMs)) {
+    return `Die Serververbindung wird zwischen 23.30 und 06.00 Uhr ausgesetzt. Die Daten werden aktualisiert, sobald der Server wieder läuft.${cached}`;
+  }
   return `Server nicht erreichbar — es werden gespeicherte Werte angezeigt. Die Daten werden aktualisiert, sobald der Server wieder läuft.${cached}`;
 }
 
@@ -28,17 +58,25 @@ export function ServerPauseBanner() {
     pvStore.getServerSnapshot,
   );
   const [dismissed, setDismissed] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   // Nach Wiedererreichbarkeit erneut anzeigen, falls der Server später wieder ausfällt.
   useEffect(() => {
     if (!serverUnreachable) setDismissed(false);
   }, [serverUnreachable]);
 
+  // Minuten-Takt, damit der Text an 23:30 / 06:00 umschaltet.
+  useEffect(() => {
+    if (!serverUnreachable) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [serverUnreachable]);
+
   // Erst nach dem ersten Live-Versuch anzeigen — sonst blitzt der Banner
   // bei jedem Refresh aus dem Offline-Cache auf, obwohl der Server erreichbar ist.
   if (!liveProbeDone || !serverUnreachable || dismissed) return null;
 
-  const message = formatUnreachableMessage(lastFetchedAt);
+  const message = formatUnreachableMessage(lastFetchedAt, nowMs);
 
   return (
     <div
