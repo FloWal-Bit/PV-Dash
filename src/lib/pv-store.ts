@@ -9,6 +9,7 @@ import {
 import {
   isScheduledServerPause,
   msUntilScheduledPauseEnd,
+  msUntilScheduledPauseStart,
 } from "@/lib/server-pause-window";
 
 export type PvStoreState = {
@@ -47,6 +48,8 @@ const HISTORY_RANGE_MIN_AGE_MS = 60_000;
  * wieder da ist — kein 15-s-Hämmern gegen 502.
  */
 const PAUSE_PROBE_INTERVAL_MS = 20 * 60 * 1000;
+/** Letzter frischer Abruf vor der Node-Pause — Offline-Cache für die Nacht. */
+const SLEEP_SNAPSHOT_LEAD_MS = 3 * 60_000;
 
 function nextLiveDelayMs(nowMs = Date.now()): number {
   if (!isScheduledServerPause(nowMs)) return LIVE_INTERVAL_MS;
@@ -133,6 +136,7 @@ class PvStore {
     typeof window === "undefined" ? INITIAL_STATE : hydrateFromOfflineCache();
   private liveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private historyTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private sleepSnapshotTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private visibilityBound = false;
   private liveInflight: Promise<void> | null = null;
   private historyInflight: Promise<void> | null = null;
@@ -297,6 +301,10 @@ class PvStore {
       clearTimeout(this.historyTimeoutId);
       this.historyTimeoutId = null;
     }
+    if (this.sleepSnapshotTimeoutId) {
+      clearTimeout(this.sleepSnapshotTimeoutId);
+      this.sleepSnapshotTimeoutId = null;
+    }
   }
 
   private armLiveTimer() {
@@ -330,6 +338,32 @@ class PvStore {
     }, HISTORY_INTERVAL_MS);
   }
 
+  /**
+   * Kurz vor 23:30 einmal Live + History holen und in den Offline-Cache schreiben,
+   * damit Card 1–3 über die Node-Pause frische Werte zeigen.
+   */
+  private async takeSleepSnapshot() {
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (isScheduledServerPause()) return;
+    await this.tickLive();
+    await this.tickHistory();
+  }
+
+  private armSleepSnapshotTimer() {
+    if (typeof document === "undefined" || document.hidden) return;
+    if (this.sleepSnapshotTimeoutId) {
+      clearTimeout(this.sleepSnapshotTimeoutId);
+      this.sleepSnapshotTimeoutId = null;
+    }
+    if (isScheduledServerPause()) return;
+    const untilStart = msUntilScheduledPauseStart();
+    const delay = Math.max(5_000, untilStart - SLEEP_SNAPSHOT_LEAD_MS);
+    this.sleepSnapshotTimeoutId = setTimeout(() => {
+      this.sleepSnapshotTimeoutId = null;
+      void this.takeSleepSnapshot();
+    }, delay);
+  }
+
   private startTimers() {
     if (typeof document === "undefined" || document.hidden) return;
     if (this.liveTimeoutId) return;
@@ -339,6 +373,7 @@ class PvStore {
     }
     this.armLiveTimer();
     this.armHistoryTimer();
+    this.armSleepSnapshotTimer();
   }
 
   private onVisibility = () => {

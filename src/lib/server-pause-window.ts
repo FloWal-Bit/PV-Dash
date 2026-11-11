@@ -35,3 +35,14 @@ export function msUntilScheduledPauseEnd(nowMs: number = Date.now()): number {
       : SERVER_PAUSE_END_MINUTES - minutes;
   return minutesToEnd * 60_000;
 }
+
+/**
+ * Millisekunden bis zum nächsten Pause-Beginn (23:30 Zurich).
+ * Innerhalb der Pause: 0.
+ */
+export function msUntilScheduledPauseStart(nowMs: number = Date.now()): number {
+  if (isScheduledServerPause(nowMs)) return 0;
+  const minutes = zurichMinutesSinceMidnight(nowMs);
+  // Ausserhalb der Pause sind wir zwischen 06:00 und 23:30.
+  return (SERVER_PAUSE_START_MINUTES - minutes) * 60_000;
+}

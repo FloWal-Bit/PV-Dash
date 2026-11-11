@@ -111,7 +111,8 @@ reservieren — der findet ausserhalb statt.
 Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 
 1. **Client:** in der Pause kein 15‑s-Poll mehr — nur ~**20‑Min-Probe** (bzw. kurz nach 06:00), History pausiert bis Live wieder ok.
-2. **Server:** beim ersten Request nach Prozessstart **ein** sequentieller Catch-up
+2. **Client Schlaf-Snapshot:** ca. **3 min vor 23:30** einmal Live + History → Offline-Cache (localStorage), damit die Nachtanzeige frisch ist.
+3. **Server:** beim ersten Request nach Prozessstart **ein** sequentieller Catch-up
    (FS Live → Heute → Ranges → Laufzeit → Open-Meteo → Wetter-Alarm Heute/Morgen),
    parallele Tabs warten auf denselben Warmup. Wetter-Alarm nicht erst auf die
    Client-Marke 06:00 warten.
@@ -130,6 +131,7 @@ Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 | Wetter-Alarm | Marken + Catch-up | **06 / 12 / 18 / 23** (+ Warmup ~06:00) | 4 Marken + Start | **Card 1** Wetter/Sonne |
 | Nachtpause Node | aus | **23:30–06:00** | — | Banner; keine FS-Aufrufe wenn Node aus |
 | Startup-Catch-up | 1× / Prozess | nach Hochfahren (~06:00) | 1 Sequenz (FS→OM→WA) | Caches Card 1–3 |
+| Schlaf-Snapshot (Client) | 1× / Abend | ~**23:27** (3 min vor Pause) | 1× Live+History | Offline-Cache für die Nacht |
 
 \*Bei dauerhaft laufendem Node + offenem Dashboard; Pause verkürzt die Nachtwerte.
 
