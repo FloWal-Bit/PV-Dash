@@ -12,9 +12,10 @@
  * Anlage für den Rest des Tages mit Fehlercode 407 sperren. Live-KPIs werden
  * höchstens alle 6 Minuten geholt. Die heutige Kurve kommt aus der
  * 5-Minuten-Reihe des Wechselrichters (eigenes Limit, 25 Aufrufe am Tag):
- * tagsüber alle 50 Minuten, von 23:00 bis 05:00 alle 3 Stunden. Woche, Monat,
- * Jahr und Laufzeit zweimal täglich. Ein Fehlversuch wartet genauso lange
- * wie der nächste planmässige Abruf.
+ * tagsüber alle 50 Minuten (06:00–23:00, ab Node-Start nach der Nachtpause),
+ * von 23:00 bis 06:00 alle 3 Stunden (meist irrelevant, Node oft aus).
+ * Woche, Monat, Jahr und Laufzeit zweimal täglich. Ein Fehlversuch wartet
+ * genauso lange wie der nächste planmässige Abruf.
  */
 
 import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
@@ -55,8 +56,8 @@ export type FusionSolarDashboardData = {
 };
 
 const LIVE_TTL_MS = 6 * 60 * 1000; // real-time station/device KPIs (~1 Slot / 5 Min laut Huawei)
-const TODAY_HISTORY_DAY_TTL_MS = 50 * 60 * 1000; // 05:00–23:00, etwa 22 Aufrufe
-const TODAY_HISTORY_NIGHT_TTL_MS = 3 * 60 * 60 * 1000; // 23:00–05:00, 2 Aufrufe
+const TODAY_HISTORY_DAY_TTL_MS = 50 * 60 * 1000; // 06:00–23:00, ~20 Aufrufe (+ Catch-up)
+const TODAY_HISTORY_NIGHT_TTL_MS = 3 * 60 * 60 * 1000; // 23:00–06:00; oft 0 wenn Node aus
 const SLOW_HISTORY_TTL_MS = 12 * 60 * 60 * 1000; // Woche/Monat/Jahr/Laufzeit, zweimal täglich
 const DEV_LIST_TTL_MS = 6 * 60 * 60 * 1000; // Gerätezuordnung ändert sich praktisch nie
 const STATION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -179,7 +180,11 @@ async function fetchLiveSnapshot(): Promise<PvSnapshot> {
   });
 }
 
-/** Tagsüber alle 50 Minuten, nachts alle 3 Stunden. Zusammen unter 25 Aufrufen. */
+/**
+ * Tagsüber (ab 06:00, wenn der Node nach der Pause wieder läuft) alle 50 Min,
+ * nachts alle 3 Std. Zusammen unter 25 Aufrufen. Grenze 06 statt 05 — passt zur
+ * Betriebs-Pause bis 06:00.
+ */
 export function todayHistoryTtlMs(now = Date.now()): number {
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {
@@ -188,7 +193,7 @@ export function todayHistoryTtlMs(now = Date.now()): number {
       hourCycle: "h23",
     }).format(new Date(now)),
   );
-  if (hour >= 23 || hour < 5) return TODAY_HISTORY_NIGHT_TTL_MS;
+  if (hour >= 23 || hour < 6) return TODAY_HISTORY_NIGHT_TTL_MS;
   return TODAY_HISTORY_DAY_TTL_MS;
 }
 
