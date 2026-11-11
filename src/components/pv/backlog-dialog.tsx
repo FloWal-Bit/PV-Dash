@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ChevronRight,
+  Clock3,
   EyeOff,
   Info,
   RefreshCcw,
   Smartphone,
 } from "lucide-react";
+import { FETCH_BUDGET_INTRO, FETCH_BUDGET_ROWS } from "@/lib/fetch-budget";
 import {
   Dialog,
   DialogContent,
@@ -70,6 +72,7 @@ export function BacklogDialog({
           <InfoBannerEditor />
           <PushNotificationSettings />
           <DeveloperPlantSettings />
+          <FetchBudgetSection />
           <HideSimulatedToggle />
           {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
         </div>
@@ -450,6 +453,36 @@ function InfoBannerEditor() {
         </Button>
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </SettingsSection>
+  );
+}
+
+/** Nachtpause- und API-Abrufbudget — gleiche Daten wie in DEPLOY.md. */
+function FetchBudgetSection() {
+  return (
+    <SettingsSection
+      icon={<Clock3 className="size-4" />}
+      iconClassName="bg-muted text-foreground/70"
+      title="Abruf-Budget"
+    >
+      <p className="text-xs leading-relaxed text-muted-foreground">{FETCH_BUDGET_INTRO}</p>
+      <ul className="flex flex-col divide-y divide-border/50 rounded-xl border border-border/60">
+        {FETCH_BUDGET_ROWS.map((row) => (
+          <li key={row.source} className="flex flex-col gap-0.5 px-3 py-2.5">
+            <p className="text-sm font-medium leading-snug">{row.source}</p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {row.interval}
+              {row.fixedTimes !== "—" && row.fixedTimes !== "nein"
+                ? ` · ${row.fixedTimes}`
+                : null}
+            </p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              ≈/Tag: {row.perDay}
+            </p>
+            <p className="text-[11px] leading-relaxed text-foreground/80">{row.display}</p>
+          </li>
+        ))}
+      </ul>
     </SettingsSection>
   );
 }
