@@ -106,11 +106,13 @@ export async function requestHideStatusBarFullscreen(): Promise<boolean> {
   if (document.fullscreenElement) return true;
 
   const root = document.documentElement as FullscreenElement;
+  const standard = root.requestFullscreen;
+  const webkit = root.webkitRequestFullscreen;
   const request =
-    typeof root.requestFullscreen === "function"
-      ? () => root.requestFullscreen({ navigationUI: "hide" })
-      : typeof root.webkitRequestFullscreen === "function"
-        ? () => root.webkitRequestFullscreen()
+    typeof standard === "function"
+      ? () => standard.call(root, { navigationUI: "hide" })
+      : typeof webkit === "function"
+        ? () => webkit.call(root)
         : null;
   if (!request) return false;
 
