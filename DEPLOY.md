@@ -121,16 +121,16 @@ Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 | --- | --- | --- | --- | --- |
 | Browser → `/api/pv` | 15 s; in Pause ~20 min Probe | Pause 23:30–06:00 | tagsüber hoch, nachts ~20 Probes | treibt Live (Card 1–3, KPIs, Header) |
 | Browser → `/api/pv/history` | 15 min; in Pause aus | — | ~68 (ohne Pause-Nacht) | **Card 3** alle Tabs |
-| FS Login | 25 min | nein | ~40 (ohne Pause) | nicht sichtbar |
-| FS Live RealKpi | 6 min Cache | nein | ~175 Zyklen (ohne Pause) | **Card 2**, Header, KPI Ertrag |
-| FS Heute `getDevFiveMinutes` | 45 min (06–23), 3 h (23–06) | Fenster 06/23 | ~23 + Catch-up; nachts oft 0 wenn Node aus (Limit 25) | **Card 3 → Heute** |
-| FS Zähler 5‑Min | 1×/Tag | erster Bedarf | 1 | **Card 3 → Heute** Verbrauchslücken |
-| FS Woche/Monat / Year | 12 h; Catch-up einmal nach Start | ~06:00 Warmup | ~2 + Catch-up | **Card 3** Woche–Laufzeit |
+| FusionSolar Login | 25 min | nein | ~40 (ohne Pause) | nicht sichtbar |
+| FusionSolar Live RealKpi | 6 min Cache | nein | ~175 Zyklen (ohne Pause) | **Card 2**, Header, KPI Ertrag |
+| FusionSolar Heute `getDevFiveMinutes` | 45 min (06–23), 3 h (23–06) | Fenster 06/23 | ~23 + Catch-up; nachts oft 0 wenn Node aus (Limit 25) | **Card 3 → Heute** |
+| FusionSolar Zähler 5‑Min | 1×/Tag | erster Bedarf | 1 | **Card 3 → Heute** Verbrauchslücken |
+| FusionSolar Woche/Monat / Year | 12 h; Catch-up einmal nach Start | ~06:00 Warmup | ~2 + Catch-up | **Card 3** Woche–Laufzeit |
 | whatwatt MQTT | Push | nein | 0 Polls | **Card 2**, KPIs Stromkonto/Verbrauch |
 | Open-Meteo | 45 min; Catch-up nach Start | — | ~32 | **Card 1** Prognose |
 | Wetter-Alarm | Marken + Catch-up | **06 / 12 / 18 / 23** (+ Warmup ~06:00) | 4 Marken + Start | **Card 1** Wetter/Sonne |
-| Nachtpause Node | aus | **23:30–06:00** | — | Banner; keine FS-Aufrufe wenn Node aus |
-| Startup-Catch-up | 1× / Prozess | nach Hochfahren (~06:00) | 1 Sequenz (FS→OM→WA) | Caches Card 1–3 |
+| Nachtpause Node | aus | **23:30–06:00** | — | Banner; keine FusionSolar-Aufrufe wenn Node aus |
+| Startup-Catch-up | 1× / Prozess | nach Hochfahren (~06:00) | 1 Sequenz (FusionSolar→OM→WA) | Caches Card 1–3 |
 | Schlaf-Snapshot (Client) | 1× / Abend | ~**23:27** (3 min vor Pause) | 1× Live+History | Offline-Cache für die Nacht |
 
 \*Bei dauerhaft laufendem Node + offenem Dashboard; Pause verkürzt die Nachtwerte.
