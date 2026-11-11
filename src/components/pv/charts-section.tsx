@@ -856,8 +856,14 @@ function YieldConsumptionChart({
 }) {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [pointerInChart, setPointerInChart] = useState(false);
+  // Monat: Widescreen alle Tage; sonst (Mobile Portrait/schmal) jeden zweiten Tag.
+  // Andere Ranges: ~10 Beschriftungen über die Breite.
   const tickInterval =
-    labelAllDays || data.length <= 14 ? 0 : Math.ceil(data.length / 10) - 1;
+    labelAllDays || data.length <= 14
+      ? 0
+      : expandMonthDayLabel
+        ? 1
+        : Math.ceil(data.length / 10) - 1;
   const axisLabels = useMemo(() => data.map((point) => point.label), [data]);
   const highlightedLabel = nearestLabeledBarLabel(axisLabels, selectedLabel, tickInterval);
   const chartData = useMemo(
