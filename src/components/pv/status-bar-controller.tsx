@@ -2,39 +2,70 @@
 
 import { useEffect } from "react";
 import {
-  mustNotAutoRequestFullscreen,
+  consumeIntentionalFullscreenExit,
   mustNotRequestDocumentFullscreen,
+  needsImmersiveDocumentFullscreen,
   readHideStatusBar,
   requestHideStatusBarFullscreen,
 } from "@/lib/status-bar";
 
+const ENSURE_RETRY_MS = [0, 250, 800, 2000, 5000] as const;
+
 /**
- * Hält Vollbild, wenn «Statusleiste ausblenden» aktiv ist.
- * Nach Sleep/App-Wechsel beendet Android oft den Fullscreen — dann erneut
- * anfordern: zuerst beim Sichtbarwerden, sonst beim nächsten Tipp (Geste).
- * iOS bleibt ausgenommen. Desktop ohne Geste erst nach pointerdown.
+ * Hält immersive Vollbild-Ansicht (Status- + Navigationsleiste aus), solange
+ * «Systemleisten ausblenden» aktiv ist.
+ *
+ * Document-Fullscreen mit navigationUI:"hide". Nach Sleep/App-Wechsel und
+ * wenn die Leisten wieder sichtbar wirken, erneut anfordern. Tipp als Fallback
+ * (Browser verlangen oft eine Geste). iOS: API nicht verfügbar.
  */
 export function StatusBarController() {
   useEffect(() => {
-    /** true nur wenn der Nutzer Vollbild bewusst verlassen hat (sichtbare Seite). */
+    /** true nur nach bewusstem Toggle «Leisten anzeigen». */
     let userLeft = false;
+    let ensureTimers: ReturnType<typeof setTimeout>[] = [];
 
-    const enter = (opts?: { userGesture?: boolean }) => {
-      if (userLeft || !readHideStatusBar() || document.fullscreenElement) return;
+    const clearEnsureTimers = () => {
+      for (const id of ensureTimers) clearTimeout(id);
+      ensureTimers = [];
+    };
+
+    const enter = () => {
+      if (userLeft || !readHideStatusBar()) return;
       if (mustNotRequestDocumentFullscreen()) return;
-      if (!opts?.userGesture && mustNotAutoRequestFullscreen()) return;
+      if (!needsImmersiveDocumentFullscreen()) return;
       void requestHideStatusBarFullscreen();
+    };
+
+    const scheduleEnsure = () => {
+      if (userLeft || !readHideStatusBar()) return;
+      clearEnsureTimers();
+      for (const delay of ENSURE_RETRY_MS) {
+        ensureTimers.push(
+          setTimeout(() => {
+            if (userLeft || !readHideStatusBar()) return;
+            enter();
+          }, delay),
+        );
+      }
     };
 
     const onFullscreenChange = () => {
       if (document.fullscreenElement) {
         userLeft = false;
+        clearEnsureTimers();
         return;
       }
-      // Beim Schlafen/Hintergrund beendet das OS Fullscreen — nicht als
-      // «Nutzer will Leiste» werten, sonst bleibt sie nach dem Aufwachen.
-      if (!document.hidden) {
+
+      if (consumeIntentionalFullscreenExit() || !readHideStatusBar()) {
         userLeft = true;
+        clearEnsureTimers();
+        return;
+      }
+
+      userLeft = false;
+      if (!document.hidden) {
+        scheduleEnsure();
       }
     };
 
@@ -42,13 +73,13 @@ export function StatusBarController() {
       if (document.hidden) return;
       if (!readHideStatusBar()) return;
       userLeft = false;
-      enter();
+      scheduleEnsure();
     };
 
     const onPageShow = () => {
       if (!readHideStatusBar()) return;
       userLeft = false;
-      enter();
+      scheduleEnsure();
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -56,20 +87,30 @@ export function StatusBarController() {
       if (target instanceof Element && target.closest("[data-status-bar-toggle]")) return;
       if (!readHideStatusBar()) return;
       userLeft = false;
-      enter({ userGesture: true });
+      enter();
+    };
+
+    const onResize = () => {
+      if (userLeft || !readHideStatusBar() || document.hidden) return;
+      if (needsImmersiveDocumentFullscreen()) {
+        scheduleEnsure();
+      }
     };
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("pointerdown", onPointerDown);
-    enter();
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("resize", onResize);
+    scheduleEnsure();
 
     return () => {
+      clearEnsureTimers();
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageShow);
-      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
