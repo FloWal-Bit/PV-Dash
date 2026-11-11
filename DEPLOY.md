@@ -117,6 +117,9 @@ Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
    parallele Tabs warten auf denselben Warmup. Wetter-Alarm nicht erst auf die
    Client-Marke 06:00 warten.
 
+Dieselbe Übersicht steht in den **Dev Settings** (App) und in
+`src/lib/fetch-budget.ts` (Quelle der Wahrheit für die UI).
+
 | Daten / Quelle | Intervall | Feste Uhrzeiten? | ≈/Tag* | Anzeige (Card / Tab) |
 | --- | --- | --- | --- | --- |
 | Browser → `/api/pv` | 15 s; in Pause ~20 min Probe | Pause 23:30–06:00 | tagsüber hoch, nachts ~20 Probes | treibt Live (Card 1–3, KPIs, Header) |

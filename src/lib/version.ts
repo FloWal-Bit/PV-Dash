@@ -1,5 +1,5 @@
 export const APP_NAME = "PV Dash";
-export const APP_VERSION = "1.5.8.9";
+export const APP_VERSION = "1.5.8.11";
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
 
 /**
