@@ -4,28 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { pvStore } from "@/lib/pv-store";
-
-/** Geplante Nachtpause Europe/Zurich: 23:30–06:00. */
-const PAUSE_START_MINUTES = 23 * 60 + 30;
-const PAUSE_END_MINUTES = 6 * 60;
-
-function zurichMinutesSinceMidnight(nowMs: number): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Zurich",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(nowMs));
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
-}
-
-/** true in der geplanten Server-Nachtpause (23:30–06:00 Europe/Zurich). */
-export function isScheduledServerPause(nowMs: number = Date.now()): boolean {
-  const minutes = zurichMinutesSinceMidnight(nowMs);
-  return minutes >= PAUSE_START_MINUTES || minutes < PAUSE_END_MINUTES;
-}
+import { isScheduledServerPause } from "@/lib/server-pause-window";
 
 function formatLastStand(lastFetchedAt: number | null): string {
   if (lastFetchedAt == null) return "";

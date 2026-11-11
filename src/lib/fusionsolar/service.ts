@@ -12,9 +12,10 @@
  * Anlage für den Rest des Tages mit Fehlercode 407 sperren. Live-KPIs werden
  * höchstens alle 6 Minuten geholt. Die heutige Kurve kommt aus der
  * 5-Minuten-Reihe des Wechselrichters (eigenes Limit, 25 Aufrufe am Tag):
- * tagsüber alle 50 Minuten, von 23:00 bis 05:00 alle 3 Stunden. Woche, Monat,
- * Jahr und Laufzeit zweimal täglich. Ein Fehlversuch wartet genauso lange
- * wie der nächste planmässige Abruf.
+ * tagsüber alle 45 Minuten (06:00–23:00, ab Node-Start nach der Nachtpause),
+ * von 23:00 bis 06:00 alle 3 Stunden (meist irrelevant, Node oft aus).
+ * Woche, Monat, Jahr und Laufzeit zweimal täglich. Ein Fehlversuch wartet
+ * genauso lange wie der nächste planmässige Abruf.
  */
 
 import type { DailyEnergyPoint, HistoryPoint, PvSnapshot } from "@/lib/pv-data";
@@ -55,8 +56,8 @@ export type FusionSolarDashboardData = {
 };
 
 const LIVE_TTL_MS = 6 * 60 * 1000; // real-time station/device KPIs (~1 Slot / 5 Min laut Huawei)
-const TODAY_HISTORY_DAY_TTL_MS = 50 * 60 * 1000; // 05:00–23:00, etwa 22 Aufrufe
-const TODAY_HISTORY_NIGHT_TTL_MS = 3 * 60 * 60 * 1000; // 23:00–05:00, 2 Aufrufe
+const TODAY_HISTORY_DAY_TTL_MS = 45 * 60 * 1000; // 06:00–23:00, ~23 Aufrufe (+ Catch-up), unter Limit 25
+const TODAY_HISTORY_NIGHT_TTL_MS = 3 * 60 * 60 * 1000; // 23:00–06:00; oft 0 wenn Node aus
 const SLOW_HISTORY_TTL_MS = 12 * 60 * 60 * 1000; // Woche/Monat/Jahr/Laufzeit, zweimal täglich
 const DEV_LIST_TTL_MS = 6 * 60 * 60 * 1000; // Gerätezuordnung ändert sich praktisch nie
 const STATION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -179,7 +180,11 @@ async function fetchLiveSnapshot(): Promise<PvSnapshot> {
   });
 }
 
-/** Tagsüber alle 50 Minuten, nachts alle 3 Stunden. Zusammen unter 25 Aufrufen. */
+/**
+ * Tagsüber (ab 06:00, wenn der Node nach der Pause wieder läuft) alle 45 Min,
+ * nachts alle 3 Std. Zusammen unter 25 Aufrufen. Grenze 06 — passt zur
+ * Betriebs-Pause bis 06:00.
+ */
 export function todayHistoryTtlMs(now = Date.now()): number {
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {
@@ -188,7 +193,7 @@ export function todayHistoryTtlMs(now = Date.now()): number {
       hourCycle: "h23",
     }).format(new Date(now)),
   );
-  if (hour >= 23 || hour < 5) return TODAY_HISTORY_NIGHT_TTL_MS;
+  if (hour >= 23 || hour < 6) return TODAY_HISTORY_NIGHT_TTL_MS;
   return TODAY_HISTORY_DAY_TTL_MS;
 }
 
@@ -265,7 +270,7 @@ let meterFiveMinFailedDay: string | null = null;
 
 /**
  * Einmal pro Kalendertag: 5-Minuten-Netzleistung des FusionSolar-Zählers.
- * Extra-Aufruf von getDevFiveMinutes — deshalb nicht im 50-Min-Rhythmus.
+ * Extra-Aufruf von getDevFiveMinutes — deshalb nicht im 45-Min-Rhythmus.
  */
 async function getMeterFiveMinutesGridCached(): Promise<Map<string, number>> {
   const dayKey = zurichDayKey();
@@ -584,4 +589,63 @@ export async function getFusionSolarDashboardData(): Promise<FusionSolarDashboar
     getFusionSolarLifetimeHistory(),
   ]);
   return { snapshot, ...history, lifetime };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Einmaliger sequentieller Warmup der FS-Caches (Live → Heute → Woche/Monat/Jahr → Laufzeit).
+ * Fehler in einem Schritt stoppen die folgenden nicht — teilweise warme Caches sind ok.
+ */
+export async function warmFusionSolarCachesSequential(options?: {
+  gapMs?: number;
+}): Promise<void> {
+  const gapMs = options?.gapMs ?? 750;
+
+  try {
+    const snapshot = await fetchLiveSnapshot();
+    liveCache = { value: snapshot, expiresAt: Date.now() + LIVE_TTL_MS };
+    liveFailure = null;
+  } catch (err) {
+    liveFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
+    console.error("[fusionsolar] Catch-up Live fehlgeschlagen:", asError(err).message);
+  }
+
+  await delay(gapMs);
+
+  try {
+    const today = await fetchTodayHistory();
+    todayHistoryCache = { value: today, expiresAt: Date.now() + todayHistoryTtlMs() };
+    todayHistoryFailure = null;
+  } catch (err) {
+    todayHistoryFailure = {
+      value: asError(err),
+      expiresAt: Date.now() + todayHistoryTtlMs(),
+    };
+    console.error("[fusionsolar] Catch-up Heute-Kurve fehlgeschlagen:", asError(err).message);
+  }
+
+  await delay(gapMs);
+
+  try {
+    const ranges = await fetchRangeHistory();
+    rangeHistoryCache = { value: ranges, expiresAt: Date.now() + SLOW_HISTORY_TTL_MS };
+    rangeHistoryFailure = null;
+  } catch (err) {
+    rangeHistoryFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
+    console.error("[fusionsolar] Catch-up Woche/Monat/Jahr fehlgeschlagen:", asError(err).message);
+  }
+
+  await delay(gapMs);
+
+  try {
+    const lifetime = await fetchLifetime();
+    lifetimeCache = { value: lifetime, expiresAt: Date.now() + LIFETIME_TTL_MS };
+    lifetimeFailure = null;
+  } catch (err) {
+    lifetimeFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
+    console.error("[fusionsolar] Catch-up Laufzeit fehlgeschlagen:", asError(err).message);
+  }
 }
