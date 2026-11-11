@@ -119,7 +119,7 @@ Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 | Browser → `/api/pv/history` | 15 min; in Pause aus | — | ~68 (ohne Pause-Nacht) | **Card 3** alle Tabs |
 | FS Login | 25 min | nein | ~40 (ohne Pause) | nicht sichtbar |
 | FS Live RealKpi | 6 min Cache | nein | ~175 Zyklen (ohne Pause) | **Card 2**, Header, KPI Ertrag |
-| FS Heute `getDevFiveMinutes` | 50 min (06–23), 3 h (23–06) | Fenster 06/23 | ~20 + Catch-up; nachts oft 0 wenn Node aus | **Card 3 → Heute** |
+| FS Heute `getDevFiveMinutes` | 45 min (06–23), 3 h (23–06) | Fenster 06/23 | ~23 + Catch-up; nachts oft 0 wenn Node aus (Limit 25) | **Card 3 → Heute** |
 | FS Zähler 5‑Min | 1×/Tag | erster Bedarf | 1 | **Card 3 → Heute** Verbrauchslücken |
 | FS Woche/Monat / Year | 12 h; Catch-up einmal nach Start | ~06:00 Warmup | ~2 + Catch-up | **Card 3** Woche–Laufzeit |
 | whatwatt MQTT | Push | nein | 0 Polls | **Card 2**, KPIs Stromkonto/Verbrauch |
