@@ -113,7 +113,7 @@ Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 1. **Client:** in der Pause kein 15‑s-Poll mehr — nur ~**20‑Min-Probe** (bzw. kurz nach 06:00), History pausiert bis Live wieder ok.
 2. **Client Schlaf-Snapshot:** ca. **3 min vor 23:30** einmal Live + History → Offline-Cache (localStorage), damit die Nachtanzeige frisch ist.
 3. **Server:** beim ersten Request nach Prozessstart **ein** sequentieller Catch-up
-   (FS Live → Heute → Ranges → Laufzeit → Open-Meteo → Wetter-Alarm Heute/Morgen),
+   (FusionSolar Live → Heute → Ranges → Laufzeit → Open-Meteo → Wetter-Alarm Heute/Morgen),
    parallele Tabs warten auf denselben Warmup. Wetter-Alarm nicht erst auf die
    Client-Marke 06:00 warten.
 
