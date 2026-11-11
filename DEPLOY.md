@@ -111,7 +111,10 @@ reservieren — der findet ausserhalb statt.
 Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 
 1. **Client:** in der Pause kein 15‑s-Poll mehr — nur ~**20‑Min-Probe** (bzw. kurz nach 06:00), History pausiert bis Live wieder ok.
-2. **Server:** beim ersten Request nach Prozessstart **ein** sequentieller Catch-up (Live → Heute-Kurve → Woche/Monat/Jahr → Laufzeit → Open-Meteo), parallele Tabs warten auf denselben Warmup.
+2. **Server:** beim ersten Request nach Prozessstart **ein** sequentieller Catch-up
+   (FS Live → Heute → Ranges → Laufzeit → Open-Meteo → Wetter-Alarm Heute/Morgen),
+   parallele Tabs warten auf denselben Warmup. Wetter-Alarm nicht erst auf die
+   Client-Marke 06:00 warten.
 
 | Daten / Quelle | Intervall | Feste Uhrzeiten? | ≈/Tag* | Anzeige (Card / Tab) |
 | --- | --- | --- | --- | --- |
@@ -124,9 +127,9 @@ Betrieb: Node typisch **23:30–06:00** aus (Infomaniak-Kosten). Ab v1.5.8.2:
 | FS Woche/Monat / Year | 12 h; Catch-up einmal nach Start | ~06:00 Warmup | ~2 + Catch-up | **Card 3** Woche–Laufzeit |
 | whatwatt MQTT | Push | nein | 0 Polls | **Card 2**, KPIs Stromkonto/Verbrauch |
 | Open-Meteo | 45 min; Catch-up nach Start | — | ~32 | **Card 1** Prognose |
-| Wetter-Alarm | Marken | **06 / 12 / 18 / 23** | 4 Marken | **Card 1** Wetter/Sonne |
+| Wetter-Alarm | Marken + Catch-up | **06 / 12 / 18 / 23** (+ Warmup ~06:00) | 4 Marken + Start | **Card 1** Wetter/Sonne |
 | Nachtpause Node | aus | **23:30–06:00** | — | Banner; keine FS-Aufrufe wenn Node aus |
-| Startup-Catch-up | 1× / Prozess | nach Hochfahren | 1 Sequenz | füllt Caches für alle Cards |
+| Startup-Catch-up | 1× / Prozess | nach Hochfahren (~06:00) | 1 Sequenz (FS→OM→WA) | Caches Card 1–3 |
 
 \*Bei dauerhaft laufendem Node + offenem Dashboard; Pause verkürzt die Nachtwerte.
 
