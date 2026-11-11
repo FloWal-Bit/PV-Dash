@@ -3,9 +3,10 @@ import { isAndroidBrowser, isInstalledApp, isIosBrowser } from "@/lib/install-pr
 const STORAGE_KEY = "pv-dash:hide-status-bar";
 
 /**
- * Ohne Nutzer-Geste kein requestFullscreen auf Android/iOS/PWA —
- * sonst Systemtoast bzw. wirkungsloser Aufruf.
- * Mit Geste (Tipp) darf Android/PWA wieder in den Vollbildmodus.
+ * Ohne Nutzer-Geste kein requestFullscreen auf Android/iOS/PWA beim
+ * ersten Öffnen — sonst Systemtoast bzw. wirkungsloser Aufruf.
+ * Nach Sleep/App-Wechsel (resume) und bei Tipp darf Android/PWA wieder
+ * in den Document-Fullscreen, sonst bleibt die Statusleiste sichtbar.
  */
 export function mustNotAutoRequestFullscreen(): boolean {
   return isAndroidBrowser() || isIosBrowser() || isInstalledApp();
@@ -19,6 +20,9 @@ export function mustNotRequestDocumentFullscreen(): boolean {
 type Listener = () => void;
 const listeners = new Set<Listener>();
 let snapshot = true;
+
+/** true, wenn exitFullscreen bewusst vom Toggle (Leiste anzeigen) kam. */
+let intentionalFullscreenExit = false;
 
 function refreshSnapshot() {
   snapshot = readHideStatusBar();
@@ -53,14 +57,39 @@ export const hideStatusBarStore = {
   },
 };
 
+/** Markiert den nächsten Fullscreen-Exit als bewusst (Toggle aus). */
+export function markIntentionalFullscreenExit(): void {
+  intentionalFullscreenExit = true;
+}
+
+/** Liest und löscht die Intentional-Exit-Marke. */
+export function consumeIntentionalFullscreenExit(): boolean {
+  const value = intentionalFullscreenExit;
+  intentionalFullscreenExit = false;
+  return value;
+}
+
+type FullscreenElement = Element & {
+  webkitRequestFullscreen?: (options?: FullscreenOptions) => Promise<void> | void;
+};
+
 export async function requestHideStatusBarFullscreen(): Promise<boolean> {
   if (typeof document === "undefined") return false;
   if (mustNotRequestDocumentFullscreen()) return false;
-  if (typeof document.documentElement.requestFullscreen !== "function") return false;
   if (document.fullscreenElement) return true;
+
+  const root = document.documentElement as FullscreenElement;
+  const request =
+    typeof root.requestFullscreen === "function"
+      ? () => root.requestFullscreen({ navigationUI: "hide" })
+      : typeof root.webkitRequestFullscreen === "function"
+        ? () => root.webkitRequestFullscreen()
+        : null;
+  if (!request) return false;
+
   try {
-    await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-    return true;
+    await Promise.resolve(request());
+    return document.fullscreenElement != null;
   } catch {
     return false;
   }
@@ -72,7 +101,12 @@ export async function setHideStatusBar(hide: boolean): Promise<boolean> {
   if (!hide) {
     writeHideStatusBar(false);
     if (document.fullscreenElement) {
-      await document.exitFullscreen();
+      markIntentionalFullscreenExit();
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // ignore
+      }
     }
     return true;
   }
