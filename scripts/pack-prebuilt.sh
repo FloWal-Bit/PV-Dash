@@ -56,16 +56,25 @@ export HOSTNAME=0.0.0.0
 export PORT="${PORT:-3000}"
 
 # Stromkonto & Co. ausserhalb ROOT (überlebt Git-Publish / git clean).
+# Darf den Start NIE abbrechen (EACCES auf ROOT/.data → sonst nodejs.service tot).
 ensure_persistent_data() {
   local persist="${HOME}/pv-dash-persist/.data"
-  mkdir -p "$persist"
+  mkdir -p "$persist" 2>/dev/null || true
   if [ -d .data ] && [ ! -L .data ]; then
-    rsync -a .data/ "$persist/"
-    rm -rf .data
+    rsync -a .data/ "$persist/" 2>/dev/null || true
+    # Nur ersetzen, wenn Persist befüllt aussieht bzw. Schreibrecht da ist.
+    if rm -rf .data 2>/dev/null; then
+      ln -sfn "$persist" .data 2>/dev/null || mkdir -p .data 2>/dev/null || true
+    else
+      echo "[start] WARN: ROOT/.data nicht löschbar (Rechte) — behalte Ordner, App startet trotzdem" >&2
+    fi
   elif [ -L .data ]; then
-    rm -f .data
+    ln -sfn "$persist" .data 2>/dev/null || true
+  else
+    ln -sfn "$persist" .data 2>/dev/null || mkdir -p .data 2>/dev/null || \
+      echo "[start] WARN: kein ROOT/.data anlegbar (EACCES) — whatwatt/Dev-Settings können fehlen" >&2
   fi
-  ln -sfn "$persist" .data
+  return 0
 }
 
 restore_prebuilt_if_needed() {
@@ -116,7 +125,7 @@ restore_prebuilt_if_needed() {
   fi
 }
 
-ensure_persistent_data
+ensure_persistent_data || true
 restore_prebuilt_if_needed
 echo "[start] prebuilt node server.js PORT=$PORT HOSTNAME=$HOSTNAME"
 exec node server.js
