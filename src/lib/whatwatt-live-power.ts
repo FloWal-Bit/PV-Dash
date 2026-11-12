@@ -13,7 +13,7 @@
  */
 
 /** Gleiche Schwelle wie die stillen Leitungen im Energiefluss. */
-export const LIVE_POWER_IDLE_KW = 0.05;
+export const LIVE_POWER_IDLE_KW = 0.03;
 
 /**
  * Letzter Verbrauch, der zur PV-Quelle gepasst hat.
