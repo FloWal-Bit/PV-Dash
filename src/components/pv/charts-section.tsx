@@ -1511,6 +1511,16 @@ export function ChartsSection({
                   if (scrubPointerId.current !== event.pointerId) return;
                   scrubPointerId.current = null;
                   setScrubbing(false);
+                  try {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  } catch {
+                    /* bereits freigegeben */
+                  }
+                }}
+                onLostPointerCapture={(event) => {
+                  if (scrubPointerId.current !== event.pointerId) return;
+                  scrubPointerId.current = null;
+                  setScrubbing(false);
                 }}
               >
                 {hidePv ? (

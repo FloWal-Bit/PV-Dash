@@ -379,12 +379,17 @@
     }
   }
 }
-/* Immersives Document-Fullscreen: volle Fläche, keine System-UI-Polster. */
+/*
+ * Immersives Document-Fullscreen: volle Fläche.
+ * Kein overflow:hidden auf html — sonst blockiert Vertikal-Scroll der Seite
+ * (Horizontal-Swipe in Cards läuft weiter, weil transform-basiert).
+ */
 html:fullscreen,
 html:-webkit-full-screen {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 html:fullscreen body,
