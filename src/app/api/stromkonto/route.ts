@@ -23,6 +23,7 @@ export async function GET() {
     aboEndForecast = getAboEndForecast({
       currentBalanceKwh,
       yearMonths: history.year,
+      monthDays: history.month,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
