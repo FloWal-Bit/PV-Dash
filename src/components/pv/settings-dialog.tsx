@@ -383,6 +383,8 @@ type AboEndForecastDto = {
   basisConsumptionKwh: number;
   basisDays: number;
   methodLabel: string;
+  yieldBias?: number;
+  consumptionBias?: number;
 };
 
 function formatForecastComputedAt(iso: string): string {
@@ -599,11 +601,14 @@ function StromkontoEditor() {
               {formatSignedKwh(aboEndForecast.balanceKwh, 1)}
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Rest laut Monatsprofil {formatSignedKwh(aboEndForecast.projectedNetKwh, 0)} (
+              Rest {formatSignedKwh(aboEndForecast.projectedNetKwh, 0)} (
               {formatYieldKwh(aboEndForecast.basisYieldKwh, 0)} Ertrag /{" "}
               {formatYieldKwh(aboEndForecast.basisConsumptionKwh, 0)} Verbrauch) · Mittel{" "}
               {formatSignedKwh(aboEndForecast.avgDailyNetKwh, 2)}/Tag · noch{" "}
               {aboEndForecast.remainingDays} Tage bis zur Nullung
+              {aboEndForecast.yieldBias != null && aboEndForecast.consumptionBias != null
+                ? ` · Bias E ${aboEndForecast.yieldBias.toFixed(2)} / V ${aboEndForecast.consumptionBias.toFixed(2)}`
+                : ""}
               {aboEndForecast.methodLabel ? ` · ${aboEndForecast.methodLabel}` : ""}. Wird ca.
               2× täglich neu berechnet
               {aboEndForecast.computedAt
