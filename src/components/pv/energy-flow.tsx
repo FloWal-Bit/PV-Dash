@@ -12,6 +12,7 @@ import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/d
 import { energyFlowDefaultTabStore } from "@/lib/energy-flow-default-tab";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw, kwFractionDigits } from "@/lib/format";
+import { LIVE_POWER_IDLE_KW } from "@/lib/whatwatt-live-power";
 
 /**
  * Tab 2 (Energiefluss): hat eine der Leistungszahlen zwei oder mehr Stellen
@@ -501,11 +502,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   const hideGrid = hideSimulated && gridSimulated;
   const gridKw = snapshot.gridKw;
   const hasGrid = gridKw != null;
-  const isProducing = snapshot.productionKw > 0.05;
-  const isConsuming = (snapshot.consumptionKw ?? 0) > 0.05;
+  const isProducing = snapshot.productionKw > LIVE_POWER_IDLE_KW;
+  const isConsuming = (snapshot.consumptionKw ?? 0) > LIVE_POWER_IDLE_KW;
   const gridMeasured = gridSource === "whatwatt" || source === "fusionsolar";
-  const isGridImport = gridMeasured && hasGrid && gridKw > 0.05;
-  const isGridExport = gridMeasured && hasGrid && gridKw < -0.05;
+  const isGridImport = gridMeasured && hasGrid && gridKw > LIVE_POWER_IDLE_KW;
+  const isGridExport = gridMeasured && hasGrid && gridKw < -LIVE_POWER_IDLE_KW;
   const stromkontoKw = gridMeasured && hasGrid ? Math.abs(gridKw) : null;
   const stromkontoShownKw = hideGrid || stromkontoKw == null ? null : stromkontoKw;
   const flowDigits = flowKwFractionDigits([
@@ -608,8 +609,8 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   const consumptionKw = snapshot.consumptionKw ?? 0;
   const directSolarKw = hidePv ? 0 : Math.min(snapshot.productionKw, consumptionKw);
   const pvSurplusKw = hidePv ? 0 : Math.max(0, snapshot.productionKw - consumptionKw);
-  const isPvToVerbrauch = directSolarKw > 0.05;
-  const isPvToStromkonto = pvSurplusKw > 0.05 || (!hidePv && isGridExport);
+  const isPvToVerbrauch = directSolarKw > LIVE_POWER_IDLE_KW;
+  const isPvToStromkonto = pvSurplusKw > LIVE_POWER_IDLE_KW || (!hidePv && isGridExport);
 
   let paths: FlowPaths | null = null;
 
