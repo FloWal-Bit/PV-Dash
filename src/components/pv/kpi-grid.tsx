@@ -36,7 +36,24 @@ export function KpiGrid({
   return (
     <div className={cn("grid h-full grid-cols-2 gap-3", className)}>
       <StatCard
-        label={<span data-kpi-label="kpi-top">Stromkonto heute</span>}
+        label={
+          <span data-kpi-label="kpi-top">
+            <span className="sm:hidden">
+              Ertrag
+              <br />
+              heute
+            </span>
+            <span className="hidden sm:inline">Ertrag heute</span>
+          </span>
+        }
+        value={hidePv ? "–" : formatSwissNumber(snapshot.todayYieldKwh, 1)}
+        unit={hidePv ? undefined : "kWh"}
+        icon={<Zap className="size-5" />}
+        accent="green"
+        simulated={!hidePv && pvSimulated}
+      />
+      <StatCard
+        label="Stromkonto heute"
         value={
           hideGrid || snapshot.stromkontoChangeTodayKwh == null
             ? "–"
@@ -46,35 +63,6 @@ export function KpiGrid({
         icon={<BatteryFull className="size-5 -rotate-90" />}
         accent={stromkontoChangeNegative ? "rose" : "green"}
         simulated={!hideGrid && gridSimulated}
-      />
-      <StatCard
-        label="Stromkonto Total"
-        value={
-          hideGrid || snapshot.stromkontoBalanceKwh == null
-            ? "–"
-            : formatSwissNumber(snapshot.stromkontoBalanceKwh, 1)
-        }
-        unit={hideGrid || snapshot.stromkontoBalanceKwh == null ? undefined : "kWh"}
-        icon={<BatteryFull className="size-5 -rotate-90" />}
-        accent={stromkontoNegative ? "rose" : "green"}
-        simulated={!hideGrid && gridSimulated}
-      />
-      <StatCard
-        label={
-          <>
-            <span className="sm:hidden">
-              Ertrag
-              <br />
-              heute
-            </span>
-            <span className="hidden sm:inline">Ertrag heute</span>
-          </>
-        }
-        value={hidePv ? "–" : formatSwissNumber(snapshot.todayYieldKwh, 1)}
-        unit={hidePv ? undefined : "kWh"}
-        icon={<Zap className="size-5" />}
-        accent="green"
-        simulated={!hidePv && pvSimulated}
       />
       <StatCard
         label={
@@ -97,6 +85,18 @@ export function KpiGrid({
         icon={<Home className="size-5" />}
         accent="rose"
         simulated={!hidePv && pvSimulated}
+      />
+      <StatCard
+        label="Stromkonto Total"
+        value={
+          hideGrid || snapshot.stromkontoBalanceKwh == null
+            ? "–"
+            : formatSwissNumber(snapshot.stromkontoBalanceKwh, 1)
+        }
+        unit={hideGrid || snapshot.stromkontoBalanceKwh == null ? undefined : "kWh"}
+        icon={<BatteryFull className="size-5 -rotate-90" />}
+        accent={stromkontoNegative ? "rose" : "green"}
+        simulated={!hideGrid && gridSimulated}
       />
     </div>
   );
