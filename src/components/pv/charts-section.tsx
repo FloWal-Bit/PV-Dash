@@ -57,6 +57,13 @@ const RANGE_LABELS = ["Heute", "Woche", "Monat", "Jahr", "Laufzeit"];
 /** Genug horizontale Breite, um alle Monatstage auf der X-Achse zu benennen. */
 const WIDE_MONTH_AXIS_QUERY = "(min-width: 1024px)";
 
+/**
+ * Widescreen oder Tablet-Querformat: Heute-Achse stündlich beschriften
+ * (sonst jede zweite Stunde; Smartphone-Hochformat jede vierte via CSS).
+ */
+const HOURLY_TODAY_AXIS_QUERY =
+  "(min-width: 1024px), (min-width: 768px) and (orientation: landscape)";
+
 function subscribeWideMonthAxis(onChange: () => void): () => void {
   const media = window.matchMedia(WIDE_MONTH_AXIS_QUERY);
   media.addEventListener("change", onChange);
@@ -68,6 +75,20 @@ function getWideMonthAxisSnapshot(): boolean {
 }
 
 function getWideMonthAxisServerSnapshot(): boolean {
+  return false;
+}
+
+function subscribeHourlyTodayAxis(onChange: () => void): () => void {
+  const media = window.matchMedia(HOURLY_TODAY_AXIS_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function getHourlyTodayAxisSnapshot(): boolean {
+  return window.matchMedia(HOURLY_TODAY_AXIS_QUERY).matches;
+}
+
+function getHourlyTodayAxisServerSnapshot(): boolean {
   return false;
 }
 
@@ -256,9 +277,9 @@ function YAxisUnit({
 
 /**
  * Volle Stunden für die Heute-X-Achse.
- * Beschriftet: jede zweite Stunde (00, 02, …). Strich nur in der Mitte dazwischen
- * (01, 03, …) — keine Halbstunden-Striche direkt vor/nach den Zahlen.
- * Smartphone-Hochformat: nur jede vierte Stunde beschriftet (CSS).
+ * Standard: jede zweite Stunde beschriftet, Strich dazwischen.
+ * Wide/Landscape: jede Stunde beschriftet.
+ * Smartphone-Hochformat: nur jede vierte Stunde (CSS).
  */
 function todayHourTicks(): string[] {
   const ticks: string[] = [];
@@ -268,12 +289,18 @@ function todayHourTicks(): string[] {
   return ticks;
 }
 
-/** Nächste beschriftete 2-Stunden-Marke zur Hover-Zeit (z. B. 07:30 → 06:00). */
-function todayAxisLabelForSelection(selectedTime: string | null): string | null {
+/** Nächste beschriftete Achsenmarke zur Hover-Zeit. */
+function todayAxisLabelForSelection(
+  selectedTime: string | null,
+  hourlyLabels: boolean,
+): string | null {
   if (!selectedTime) return null;
   const [hourText] = selectedTime.split(":");
   const hour = Number(hourText);
   if (!Number.isFinite(hour)) return null;
+  if (hourlyLabels) {
+    return `${String(hour).padStart(2, "0")}:00`;
+  }
   const evenHour = hour - (hour % 2);
   return `${String(evenHour).padStart(2, "0")}:00`;
 }
@@ -283,14 +310,15 @@ function TodayAxisTick({
   y,
   payload,
   selectedTime,
-}: XAxisTickContentProps & { selectedTime: string | null }) {
+  hourlyLabels,
+}: XAxisTickContentProps & { selectedTime: string | null; hourlyLabels: boolean }) {
   const value = String(payload?.value ?? "");
   const [hour = "00"] = value.split(":");
   const hourNumber = Number(hour);
-  const showLabel = hourNumber % 2 === 0;
-  const showTick = hourNumber % 2 === 1;
-  const hideOnPhonePortrait = showLabel && hourNumber % 4 !== 0;
-  const selectedLabel = todayAxisLabelForSelection(selectedTime);
+  const showLabel = hourlyLabels || hourNumber % 2 === 0;
+  const showTick = !hourlyLabels && hourNumber % 2 === 1;
+  const hideOnPhonePortrait = !hourlyLabels && showLabel && hourNumber % 4 !== 0;
+  const selectedLabel = todayAxisLabelForSelection(selectedTime, hourlyLabels);
   const selected = selectedLabel != null && value === selectedLabel;
   return (
     <g transform={`translate(${Number(x)},${Number(y)})`}>
@@ -337,6 +365,11 @@ function TodayPowerChart({
 }) {
   const [hoverLabel, setHoverLabel] = useState<string | null>(null);
   const [pointerInChart, setPointerInChart] = useState(false);
+  const hourlyLabels = useSyncExternalStore(
+    subscribeHourlyTodayAxis,
+    getHourlyTodayAxisSnapshot,
+    getHourlyTodayAxisServerSnapshot,
+  );
   const hourTicks = todayHourTicks().filter((tick) => data.some((point) => point.label === tick));
 
   useEffect(() => {
@@ -391,7 +424,9 @@ function TodayPowerChart({
           height={X_AXIS_HEIGHT}
           tickLine={false}
           axisLine={false}
-          tick={(props) => <TodayAxisTick {...props} selectedTime={hoverLabel} />}
+          tick={(props) => (
+            <TodayAxisTick {...props} selectedTime={hoverLabel} hourlyLabels={hourlyLabels} />
+          )}
           padding={{ left: 0, right: 0 }}
         />
         <YAxis
