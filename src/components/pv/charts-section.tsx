@@ -58,11 +58,11 @@ const RANGE_LABELS = ["Heute", "Woche", "Monat", "Jahr", "Laufzeit"];
 const WIDE_MONTH_AXIS_QUERY = "(min-width: 1024px)";
 
 /**
- * Widescreen oder Tablet-Querformat: Heute-Achse stündlich beschriften
- * (sonst jede zweite Stunde; Smartphone-Hochformat jede vierte via CSS).
+ * Ab Desktop/Tablet-Breite (≥1024px, inkl. iPad Querformat): stündlich.
+ * Smartphone-Querformat bleibt bei jeder zweiten Stunde — 24 Labels
+ * sind dort zu eng. Smartphone-Hochformat: jede vierte via CSS.
  */
-const HOURLY_TODAY_AXIS_QUERY =
-  "(min-width: 1024px), (min-width: 768px) and (orientation: landscape)";
+const HOURLY_TODAY_AXIS_QUERY = "(min-width: 1024px)";
 
 function subscribeWideMonthAxis(onChange: () => void): () => void {
   const media = window.matchMedia(WIDE_MONTH_AXIS_QUERY);
