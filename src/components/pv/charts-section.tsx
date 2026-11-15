@@ -1153,10 +1153,13 @@ function formatRangeTotal(
 ): string {
   if (range === "heute") {
     const hours = sampleIntervalHours(today);
-    const yieldKwh = todayChartData.reduce(
+    const chartYieldKwh = todayChartData.reduce(
       (sum, point) => sum + (point.productionKw ?? 0) * hours,
       0,
     );
+    // Live-Tagesertrag, wenn die Kurve noch leer/lückenhaft ist (z. B. 5‑Min-Ausfall).
+    const yieldKwh =
+      chartYieldKwh > 0 ? chartYieldKwh : (liveToday?.yieldKwh ?? chartYieldKwh);
     const measured = todayChartData.filter((point) => point.consumptionKw != null);
     const summedKwh = measured.reduce((sum, point) => sum + (point.consumptionKw ?? 0) * hours, 0);
     const consumptionKwh = liveToday?.consumptionKwh ?? (measured.length > 0 ? summedKwh : null);
