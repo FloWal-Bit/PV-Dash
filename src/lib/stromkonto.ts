@@ -5,6 +5,11 @@
  * Der Basiskontostand ist in den Einstellungen oder per STROMKONTO_BALANCE_KWH
  * setzbar (Standard 516 kWh). Zähler-Referenzwerte werden in
  * .data/stromkonto.json persistiert.
+ *
+ * Nachtpause (Node 23:30–06:00): Ohne Mitternachts-Messwert schätzen wir den
+ * Tagesbeginn aus dem letzten bekannten Zählerstand und dem ersten Morgenwert
+ * (lineare Interpolation auf Europe/Zurich-Mitternacht). Sonst würde
+ * dayBaseline erst ~06:00 gesetzt und „Stromkonto heute“ die Nacht verlieren.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
@@ -43,11 +48,34 @@ type DayMeterBaseline = {
   exportKwh: number;
 };
 
+type LastMeters = {
+  importKwh: number;
+  exportKwh: number;
+  /** ISO-Zeitpunkt der Messung. */
+  at: string;
+};
+
+type LastComputed = {
+  balanceKwh: number;
+  changeTodayKwh: number;
+  at: string;
+};
+
 type PersistedState = {
   configuredBalanceKwh: number;
   baseline: MeterBaseline | null;
   today: TodayEntry | null;
   dayBaseline: DayMeterBaseline | null;
+  /**
+   * Letzter gültiger whatwatt-Zählerstand — für Mitternachts-Schätzung nach
+   * der Node-Nachtpause und als Schutz vor kurzen MQTT-Ausreißern.
+   */
+  lastMeters: LastMeters | null;
+  /**
+   * Zuletzt aus whatwatt berechnetes Stromkonto. Fallback, solange MQTT nach
+   * dem Hochfahren noch fehlt (statt fälschlich Basis + FusionSolar-Heute).
+   */
+  lastComputed: LastComputed | null;
   /**
    * Kalenderjahr der letzten Nacht vom 3. auf den 4. August, in der der
    * Kontostand auf 0 gesetzt wurde. Fehlt der Wert, gilt das laufende
@@ -59,6 +87,9 @@ type PersistedState = {
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "stromkonto.json");
+
+/** Kleine Zähler-Jitter-Toleranz (kWh); darunter dayBaseline nachziehen. */
+const METER_JITTER_KWH = 0.05;
 
 function readEnvBalance(): number | null {
   const raw = process.env.STROMKONTO_BALANCE_KWH?.trim();
@@ -99,12 +130,34 @@ function isTodayEntry(value: unknown): value is TodayEntry {
   );
 }
 
+function isLastMeters(value: unknown): value is LastMeters {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Number.isFinite(Number(v.importKwh)) &&
+    Number.isFinite(Number(v.exportKwh)) &&
+    typeof v.at === "string"
+  );
+}
+
+function isLastComputed(value: unknown): value is LastComputed {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Number.isFinite(Number(v.balanceKwh)) &&
+    Number.isFinite(Number(v.changeTodayKwh)) &&
+    typeof v.at === "string"
+  );
+}
+
 function emptyState(): PersistedState {
   return {
     configuredBalanceKwh: defaultConfiguredBalance(),
     baseline: null,
     today: null,
     dayBaseline: null,
+    lastMeters: null,
+    lastComputed: null,
     lastAugustResetYear: latestAugustResetYear(new Date()),
   };
 }
@@ -127,6 +180,19 @@ export function appDayKey(date: Date): string {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
+}
+
+/** Mitternacht des genannten Schweizer Kalendertags, als Unix-ms. */
+export function zurichMidnightMs(dayKey: string): number {
+  const utcMidnight = Date.parse(`${dayKey}T00:00:00Z`);
+  const zurichHour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Zurich",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date(utcMidnight)),
+  );
+  return utcMidnight - zurichHour * 60 * 60 * 1000;
 }
 
 function isDayMeterBaseline(value: unknown): value is DayMeterBaseline {
@@ -178,6 +244,20 @@ function loadState(): PersistedState {
               exportKwh: Number(v.dayBaseline.exportKwh),
             }
           : null,
+        lastMeters: isLastMeters(v.lastMeters)
+          ? {
+              importKwh: Number(v.lastMeters.importKwh),
+              exportKwh: Number(v.lastMeters.exportKwh),
+              at: v.lastMeters.at,
+            }
+          : null,
+        lastComputed: isLastComputed(v.lastComputed)
+          ? {
+              balanceKwh: Number(v.lastComputed.balanceKwh),
+              changeTodayKwh: Number(v.lastComputed.changeTodayKwh),
+              at: v.lastComputed.at,
+            }
+          : null,
         lastAugustResetYear: resetYearFrom(v.lastAugustResetYear),
       });
     }
@@ -197,6 +277,8 @@ function loadState(): PersistedState {
         baseline: { importBaseline, exportBaseline, establishedAt },
         today: null,
         dayBaseline: null,
+        lastMeters: null,
+        lastComputed: null,
         lastAugustResetYear: null,
       });
     }
@@ -235,6 +317,42 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Schätzt Zählerstände zur Zurich-Mitternacht, wenn der Node über Mitternacht
+ * aus war: linear zwischen letztem Abend- und erstem Morgenwert.
+ */
+export function estimateMetersAtZurichMidnight(
+  last: LastMeters,
+  cumulativeImportKwh: number,
+  cumulativeExportKwh: number,
+  dayKey: string,
+  now: Date = new Date(),
+): { importKwh: number; exportKwh: number } | null {
+  const lastAt = Date.parse(last.at);
+  if (!Number.isFinite(lastAt)) return null;
+
+  const midnight = zurichMidnightMs(dayKey);
+  const nowMs = now.getTime();
+  if (lastAt >= midnight || nowMs <= midnight) return null;
+
+  // Zähler rückwärts → Ausreißer oder Zählerwechsel, keine Interpolation.
+  if (
+    cumulativeImportKwh + METER_JITTER_KWH < last.importKwh ||
+    cumulativeExportKwh + METER_JITTER_KWH < last.exportKwh
+  ) {
+    return null;
+  }
+
+  const span = nowMs - lastAt;
+  if (span <= 0) return null;
+  const t = Math.min(1, Math.max(0, (midnight - lastAt) / span));
+
+  return {
+    importKwh: last.importKwh + (cumulativeImportKwh - last.importKwh) * t,
+    exportKwh: last.exportKwh + (cumulativeExportKwh - last.exportKwh) * t,
+  };
+}
+
 export type StromkontoSnapshot = {
   /** Aktueller Kontostand in kWh (Basiskontostand ± laufende Netto-Veränderung). */
   balanceKwh: number;
@@ -248,26 +366,43 @@ export function getStromkontoBaseBalance(): number {
 }
 
 /**
- * Setzt den Basiskontostand. Optional werden aktuelle Zählerstände sofort
- * als neue Referenz gespeichert; sonst erfolgt die Anheftung beim nächsten
- * whatwatt-Messwert.
+ * Setzt den Basiskontostand. Mit Zählerständen: neue Anheftung.
+ * Ohne Zähler, aber mit bekannter Baseline + lastComputed: Baseline behalten
+ * und konfigurierten Stand so verschieben, dass der Live-Wert dem Eingabewert
+ * entspricht (verhindert versehentliches Nullen der Anheftung bei MQTT-Lücke).
+ * Sonst: Anheftung beim nächsten whatwatt-Messwert.
  */
 export function setStromkontoBaseBalance(
   balanceKwh: number,
   meterTotals?: { energyInKwh: number; energyOutKwh: number },
 ): PersistedState {
   const previous = loadState();
+  const wanted = round(balanceKwh);
+
+  let baseline: MeterBaseline | null;
+  let configuredBalanceKwh = wanted;
+
+  if (meterTotals) {
+    baseline = {
+      importBaseline: meterTotals.energyInKwh,
+      exportBaseline: meterTotals.energyOutKwh,
+      establishedAt: new Date().toISOString(),
+    };
+  } else if (previous.baseline && previous.lastComputed) {
+    const netDelta = previous.lastComputed.balanceKwh - previous.configuredBalanceKwh;
+    configuredBalanceKwh = round(wanted - netDelta);
+    baseline = previous.baseline;
+  } else {
+    baseline = null;
+  }
+
   const state: PersistedState = {
-    configuredBalanceKwh: round(balanceKwh),
-    baseline: meterTotals
-      ? {
-          importBaseline: meterTotals.energyInKwh,
-          exportBaseline: meterTotals.energyOutKwh,
-          establishedAt: new Date().toISOString(),
-        }
-      : null,
+    configuredBalanceKwh,
+    baseline,
     today: previous.today,
     dayBaseline: previous.dayBaseline,
+    lastMeters: previous.lastMeters,
+    lastComputed: previous.lastComputed,
     lastAugustResetYear: previous.lastAugustResetYear,
   };
   saveState(state);
@@ -307,6 +442,7 @@ export function setStromkontoTodayChange(
  * Bezug und Einspeisung seit Mitternacht Europe/Zurich.
  * Der Zählerstand zu Tagesbeginn bleibt in stromkonto.json, damit ein
  * Neustart des Servers den Tageswert nicht auf 0 setzt.
+ * Fehlt der Mitternachtswert (Nachtpause), wird er aus lastMeters geschätzt.
  */
 export function meterTotalsSinceZurichDayStart(
   cumulativeImportKwh: number,
@@ -318,15 +454,43 @@ export function meterTotalsSinceZurichDayStart(
   let day = state.dayBaseline;
 
   if (!day || day.day !== key) {
-    day = { day: key, importKwh: cumulativeImportKwh, exportKwh: cumulativeExportKwh };
-    saveState({ ...state, dayBaseline: day });
-  } else if (cumulativeImportKwh < day.importKwh || cumulativeExportKwh < day.exportKwh) {
+    const estimated =
+      state.lastMeters != null
+        ? estimateMetersAtZurichMidnight(
+            state.lastMeters,
+            cumulativeImportKwh,
+            cumulativeExportKwh,
+            key,
+            now,
+          )
+        : null;
     day = {
       day: key,
-      importKwh: Math.min(day.importKwh, cumulativeImportKwh),
-      exportKwh: Math.min(day.exportKwh, cumulativeExportKwh),
+      importKwh: estimated?.importKwh ?? cumulativeImportKwh,
+      exportKwh: estimated?.exportKwh ?? cumulativeExportKwh,
     };
     saveState({ ...state, dayBaseline: day });
+  } else if (
+    cumulativeImportKwh < day.importKwh - METER_JITTER_KWH ||
+    cumulativeExportKwh < day.exportKwh - METER_JITTER_KWH
+  ) {
+    const looksLikeMeterReset =
+      cumulativeImportKwh < 1 &&
+      cumulativeExportKwh < 1 &&
+      (day.importKwh > 10 || day.exportKwh > 10);
+    const smallJitter =
+      day.importKwh - cumulativeImportKwh <= METER_JITTER_KWH &&
+      day.exportKwh - cumulativeExportKwh <= METER_JITTER_KWH;
+
+    if (looksLikeMeterReset || smallJitter) {
+      day = {
+        day: key,
+        importKwh: Math.min(day.importKwh, cumulativeImportKwh),
+        exportKwh: Math.min(day.exportKwh, cumulativeExportKwh),
+      };
+      saveState({ ...state, dayBaseline: day });
+    }
+    // Sonst: kurzen MQTT-Ausreißer ignorieren, dayBaseline behalten.
   }
 
   return {
@@ -405,7 +569,6 @@ export function computeStromkonto(
       exportBaseline: cumulativeExportKwh,
       establishedAt: now.toISOString(),
     };
-    saveState({ ...state, baseline });
   }
 
   const netDeltaKwh =
@@ -421,9 +584,26 @@ export function computeStromkonto(
   );
   const changeTodayKwh =
     manualToday?.changeTodayKwh ?? round(gridFeedInTodayKwh - gridImportTodayKwh);
+  const balanceKwh = round(state.configuredBalanceKwh + netDeltaKwh);
+  const at = now.toISOString();
+
+  saveState({
+    ...(manualToday?.state ?? state),
+    baseline,
+    lastMeters: {
+      importKwh: cumulativeImportKwh,
+      exportKwh: cumulativeExportKwh,
+      at,
+    },
+    lastComputed: {
+      balanceKwh,
+      changeTodayKwh,
+      at,
+    },
+  });
 
   return {
-    balanceKwh: round(state.configuredBalanceKwh + netDeltaKwh),
+    balanceKwh,
     changeTodayKwh,
   };
 }
@@ -431,7 +611,8 @@ export function computeStromkonto(
 /**
  * Stromkonto nur aus gemessenen Netzdaten:
  * - whatwatt: Basis ± kumulierte Netzänderung seit Anheftung
- * - FusionSolar: Basis ± heutige Netzbilanz, falls die Anlage sie meldet
+ * - ohne whatwatt: zuletzt berechneter Stand (überlebt MQTT-Lücke nach Nachtpause);
+ *   nicht mehr „Basis + FusionSolar-Heute“ (verfälscht den Absolutstand über Tage)
  * - Simulation: gespeicherter Startstand, aber keine erfundene Tagesänderung.
  *   Ohne gespeicherten Startstand bleiben beide Werte leer.
  */
@@ -451,25 +632,26 @@ export function applyStromkontoToSnapshot(
     };
   }
 
-  const base = getStromkontoBaseBalance();
-  const manualToday = getStromkontoTodayChange();
-  const changeToday =
-    manualToday ??
-    (snapshot.gridFeedInTodayKwh != null
-      ? round(snapshot.gridFeedInTodayKwh - (snapshot.gridImportTodayKwh ?? 0))
-      : null);
-
-  if (changeToday != null) {
+  const state = loadState();
+  if (state.lastComputed) {
+    const computedDay = appDayKey(new Date(state.lastComputed.at));
+    const todayKey = appDayKey(new Date());
+    const manualToday = getStromkontoTodayChange();
     return {
       ...snapshot,
-      stromkontoBalanceKwh: round(base + changeToday),
-      stromkontoChangeTodayKwh: changeToday,
+      stromkontoBalanceKwh: state.lastComputed.balanceKwh,
+      stromkontoChangeTodayKwh:
+        manualToday ??
+        (computedDay === todayKey ? state.lastComputed.changeTodayKwh : null),
     };
   }
+
+  const base = getStromkontoBaseBalance();
+  const manualToday = getStromkontoTodayChange();
 
   return {
     ...snapshot,
     stromkontoBalanceKwh: base,
-    stromkontoChangeTodayKwh: null,
+    stromkontoChangeTodayKwh: manualToday,
   };
 }
