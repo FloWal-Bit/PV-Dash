@@ -58,6 +58,10 @@ export type FusionSolarDashboardData = {
 const LIVE_TTL_MS = 6 * 60 * 1000; // real-time station/device KPIs (~1 Slot / 5 Min laut Huawei)
 const TODAY_HISTORY_DAY_TTL_MS = 45 * 60 * 1000; // 06:00–23:00, ~23 Aufrufe (+ Catch-up), unter Limit 25
 const TODAY_HISTORY_NIGHT_TTL_MS = 3 * 60 * 60 * 1000; // 23:00–06:00; oft 0 wenn Node aus
+/** Leere 5‑Min-Antwort nicht 45 Min cachen — sonst bleibt Card 3 → Heute den ganzen Vormittag leer. */
+const TODAY_HISTORY_EMPTY_TTL_MS = 5 * 60 * 1000;
+/** Ab dieser Zurich-Stunde gilt eine leere 5‑Min-Reihe als Ausfall → Rest des Tages Stunden-KPI. */
+const FIVE_MIN_EMPTY_FALLBACK_HOUR = 7;
 const SLOW_HISTORY_TTL_MS = 12 * 60 * 60 * 1000; // Woche/Monat/Jahr/Laufzeit, zweimal täglich
 const DEV_LIST_TTL_MS = 6 * 60 * 60 * 1000; // Gerätezuordnung ändert sich praktisch nie
 const STATION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -88,6 +92,11 @@ let liveFailure: Cache<Error> | null = null;
 let todayHistoryFailure: Cache<Error> | null = null;
 let rangeHistoryFailure: Cache<Error> | null = null;
 let lifetimeFailure: Cache<Error> | null = null;
+
+/** Kalendertag, an dem getDevFiveMinutes tagsüber leer blieb — dann nur noch Stunden-KPI. */
+let fiveMinEmptyFallbackDay: string | null = null;
+/** Nächster erlaubter 5‑Min-Versuch (Quota: max ~25/Tag). */
+let fiveMinNextRetryAt = 0;
 
 let liveInFlight: Promise<PvSnapshot> | null = null;
 let todayHistoryInFlight: Promise<HistoryPoint[]> | null = null;
@@ -185,16 +194,25 @@ async function fetchLiveSnapshot(): Promise<PvSnapshot> {
  * nachts alle 3 Std. Zusammen unter 25 Aufrufen. Grenze 06 — passt zur
  * Betriebs-Pause bis 06:00.
  */
-export function todayHistoryTtlMs(now = Date.now()): number {
-  const hour = Number(
+function zurichHour(now = Date.now()): number {
+  return Number(
     new Intl.DateTimeFormat("en-GB", {
       timeZone: "Europe/Zurich",
       hour: "2-digit",
       hourCycle: "h23",
     }).format(new Date(now)),
   );
+}
+
+export function todayHistoryTtlMs(now = Date.now()): number {
+  const hour = zurichHour(now);
   if (hour >= 23 || hour < 6) return TODAY_HISTORY_NIGHT_TTL_MS;
   return TODAY_HISTORY_DAY_TTL_MS;
+}
+
+function todayHistoryCacheTtlMs(points: HistoryPoint[], now = Date.now()): number {
+  if (points.length === 0) return TODAY_HISTORY_EMPTY_TTL_MS;
+  return todayHistoryTtlMs(now);
 }
 
 function zurichDayKey(date = new Date()): string {
@@ -219,25 +237,62 @@ function shiftDayKey(dayKey: string, days: number): string {
   return zurichDayKey(shifted);
 }
 
+async function fetchTodayHistoryFromHourKpi(stationCode: string, collectTime: number): Promise<HistoryPoint[]> {
+  const dayKey = zurichDayKey();
+  const hourSeries = await api.getStationHourKpi([stationCode], collectTime);
+  hourKpiCache = {
+    dayKey,
+    value: hourSeries,
+    expiresAt: Date.now() + todayHistoryTtlMs(),
+  };
+  return mapHourSeriesToToday(hourSeries);
+}
+
+/**
+ * Heutige Leistungskurve: bevorzugt Wechselrichter-5‑Min (fein).
+ * Liefert Huawei tagsüber eine leere 5‑Min-Reihe (Limit/Lücke), Fallback auf
+ * getKpiStationHour — sonst bleibt Card 3 → Heute ohne Kurve, während Live-KPIs
+ * bereits Ertrag/Verbrauch zeigen.
+ */
 async function fetchTodayHistory(): Promise<HistoryPoint[]> {
+  const dayKey = zurichDayKey();
   const { stationCode } = await resolveStationInfo();
   const devices = await resolveDevices(stationCode);
-  const collectTime = zurichMidnight(zurichDayKey());
-  if (devices.inverterIds.length === 0) {
-    const hourSeries = await api.getStationHourKpi([stationCode], collectTime);
-    hourKpiCache = {
-      dayKey: zurichDayKey(),
-      value: hourSeries,
-      expiresAt: Date.now() + todayHistoryTtlMs(),
-    };
-    return mapHourSeriesToToday(hourSeries);
+  const collectTime = zurichMidnight(dayKey);
+
+  const tryFiveMin =
+    devices.inverterIds.length > 0 &&
+    fiveMinEmptyFallbackDay !== dayKey &&
+    Date.now() >= fiveMinNextRetryAt;
+
+  if (tryFiveMin) {
+    const series = await api.getDevFiveMinutes(
+      devices.inverterTypeId,
+      devices.inverterIds,
+      collectTime,
+    );
+    const points = mapFiveMinutesToToday(series);
+    if (points.length > 0) {
+      fiveMinNextRetryAt = 0;
+      fiveMinEmptyFallbackDay = null;
+      return points;
+    }
+
+    // Leere Antwort: Quota schonen — erst nach normalem Tages-TTL erneut 5‑Min.
+    fiveMinNextRetryAt = Date.now() + TODAY_HISTORY_DAY_TTL_MS;
+    if (zurichHour() >= FIVE_MIN_EMPTY_FALLBACK_HOUR) {
+      fiveMinEmptyFallbackDay = dayKey;
+      console.warn(
+        "[fusionsolar] getDevFiveMinutes leer — Rest des Tages Fallback auf Stunden-KPI.",
+      );
+    } else {
+      console.warn(
+        "[fusionsolar] getDevFiveMinutes noch leer (früher Morgen) — Fallback Stunden-KPI.",
+      );
+    }
   }
-  const series = await api.getDevFiveMinutes(
-    devices.inverterTypeId,
-    devices.inverterIds,
-    collectTime,
-  );
-  return mapFiveMinutesToToday(series);
+
+  return fetchTodayHistoryFromHourKpi(stationCode, collectTime);
 }
 
 type HourKpiCache = { dayKey: string; value: StationKpiTimeseriesItem[]; expiresAt: number };
@@ -435,7 +490,10 @@ export async function loadFusionSolarFresh(): Promise<{
   }
 
   if (todayResult.status === "fulfilled") {
-    todayHistoryCache = { value: todayResult.value, expiresAt: Date.now() + todayHistoryTtlMs() };
+    todayHistoryCache = {
+      value: todayResult.value,
+      expiresAt: Date.now() + todayHistoryCacheTtlMs(todayResult.value),
+    };
     todayHistoryFailure = null;
   } else {
     todayHistoryFailure = {
@@ -508,7 +566,10 @@ async function getTodayHistory(): Promise<HistoryPoint[]> {
   if (!todayHistoryInFlight) {
     todayHistoryInFlight = fetchTodayHistory()
       .then((today) => {
-        todayHistoryCache = { value: today, expiresAt: Date.now() + todayHistoryTtlMs() };
+        todayHistoryCache = {
+          value: today,
+          expiresAt: Date.now() + todayHistoryCacheTtlMs(today),
+        };
         todayHistoryFailure = null;
         return today;
       })
@@ -617,7 +678,10 @@ export async function warmFusionSolarCachesSequential(options?: {
 
   try {
     const today = await fetchTodayHistory();
-    todayHistoryCache = { value: today, expiresAt: Date.now() + todayHistoryTtlMs() };
+    todayHistoryCache = {
+      value: today,
+      expiresAt: Date.now() + todayHistoryCacheTtlMs(today),
+    };
     todayHistoryFailure = null;
   } catch (err) {
     todayHistoryFailure = {
