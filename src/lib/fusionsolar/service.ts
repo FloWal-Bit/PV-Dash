@@ -68,6 +68,8 @@ const STATION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const LIFETIME_TTL_MS = SLOW_HISTORY_TTL_MS;
 
 type Cache<T> = { value: T; expiresAt: number };
+/** Cache mit Kalendertag — ungültig, sobald Zurich-Mitternacht überschritten ist. */
+type DayCache<T> = Cache<T> & { dayKey: string };
 let stationInfoCache: Cache<{ stationCode: string; systemPeakKwp: number }> | null = null;
 let devicesCache: Cache<{
   inverterIds: number[];
@@ -77,8 +79,8 @@ let devicesCache: Cache<{
   meterTypeId: number;
 }> | null = null;
 let liveCache: Cache<PvSnapshot> | null = null;
-let todayHistoryCache: Cache<HistoryPoint[]> | null = null;
-let rangeHistoryCache: Cache<{
+let todayHistoryCache: DayCache<HistoryPoint[]> | null = null;
+let rangeHistoryCache: DayCache<{
   week: DailyEnergyPoint[];
   month: DailyEnergyPoint[];
   year: DailyEnergyPoint[];
@@ -89,8 +91,8 @@ let lifetimeCache: Cache<DailyEnergyPoint[]> | null = null;
 // browser tabs polling at the same moment) so we never double-spend our
 // rate-limit budget on a cache miss.
 let liveFailure: Cache<Error> | null = null;
-let todayHistoryFailure: Cache<Error> | null = null;
-let rangeHistoryFailure: Cache<Error> | null = null;
+let todayHistoryFailure: DayCache<Error> | null = null;
+let rangeHistoryFailure: DayCache<Error> | null = null;
 let lifetimeFailure: Cache<Error> | null = null;
 
 /** Kalendertag, an dem getDevFiveMinutes tagsüber leer blieb — dann nur noch Stunden-KPI. */
@@ -109,6 +111,10 @@ let lifetimeInFlight: Promise<DailyEnergyPoint[]> | null = null;
 
 function fresh<T>(cache: Cache<T> | null): cache is Cache<T> {
   return cache != null && cache.expiresAt > Date.now();
+}
+
+function freshForDay<T>(cache: DayCache<T> | null, dayKey: string): cache is DayCache<T> {
+  return cache != null && cache.dayKey === dayKey && cache.expiresAt > Date.now();
 }
 
 async function resolveStationInfo(): Promise<{ stationCode: string; systemPeakKwp: number }> {
@@ -489,24 +495,35 @@ export async function loadFusionSolarFresh(): Promise<{
     liveFailure = { value: asError(snapshotResult.reason), expiresAt: Date.now() + LIVE_TTL_MS };
   }
 
+  const dayKey = zurichDayKey();
   if (todayResult.status === "fulfilled") {
     todayHistoryCache = {
+      dayKey,
       value: todayResult.value,
       expiresAt: Date.now() + todayHistoryCacheTtlMs(todayResult.value),
     };
     todayHistoryFailure = null;
   } else {
     todayHistoryFailure = {
+      dayKey,
       value: asError(todayResult.reason),
       expiresAt: Date.now() + todayHistoryTtlMs(),
     };
   }
 
   if (rangesResult.status === "fulfilled") {
-    rangeHistoryCache = { value: rangesResult.value, expiresAt: Date.now() + SLOW_HISTORY_TTL_MS };
+    rangeHistoryCache = {
+      dayKey,
+      value: rangesResult.value,
+      expiresAt: Date.now() + SLOW_HISTORY_TTL_MS,
+    };
     rangeHistoryFailure = null;
   } else {
-    rangeHistoryFailure = { value: asError(rangesResult.reason), expiresAt: Date.now() + LIVE_TTL_MS };
+    rangeHistoryFailure = {
+      dayKey,
+      value: asError(rangesResult.reason),
+      expiresAt: Date.now() + LIVE_TTL_MS,
+    };
   }
 
   if (lifetimeResult.status === "fulfilled") {
@@ -561,12 +578,14 @@ export async function getFusionSolarLiveSnapshot(): Promise<PvSnapshot> {
 }
 
 async function getTodayHistory(): Promise<HistoryPoint[]> {
-  if (fresh(todayHistoryCache)) return todayHistoryCache.value;
-  if (fresh(todayHistoryFailure)) throw todayHistoryFailure.value;
+  const dayKey = zurichDayKey();
+  if (freshForDay(todayHistoryCache, dayKey)) return todayHistoryCache.value;
+  if (freshForDay(todayHistoryFailure, dayKey)) throw todayHistoryFailure.value;
   if (!todayHistoryInFlight) {
     todayHistoryInFlight = fetchTodayHistory()
       .then((today) => {
         todayHistoryCache = {
+          dayKey: zurichDayKey(),
           value: today,
           expiresAt: Date.now() + todayHistoryCacheTtlMs(today),
         };
@@ -575,7 +594,11 @@ async function getTodayHistory(): Promise<HistoryPoint[]> {
       })
       .catch((err: unknown) => {
         const error = asError(err);
-        todayHistoryFailure = { value: error, expiresAt: Date.now() + todayHistoryTtlMs() };
+        todayHistoryFailure = {
+          dayKey: zurichDayKey(),
+          value: error,
+          expiresAt: Date.now() + todayHistoryTtlMs(),
+        };
         throw error;
       })
       .finally(() => {
@@ -590,18 +613,27 @@ async function getRangeHistory(): Promise<{
   month: DailyEnergyPoint[];
   year: DailyEnergyPoint[];
 }> {
-  if (fresh(rangeHistoryCache)) return rangeHistoryCache.value;
-  if (fresh(rangeHistoryFailure)) throw rangeHistoryFailure.value;
+  const dayKey = zurichDayKey();
+  if (freshForDay(rangeHistoryCache, dayKey)) return rangeHistoryCache.value;
+  if (freshForDay(rangeHistoryFailure, dayKey)) throw rangeHistoryFailure.value;
   if (!rangeHistoryInFlight) {
     rangeHistoryInFlight = fetchRangeHistory()
       .then((ranges) => {
-        rangeHistoryCache = { value: ranges, expiresAt: Date.now() + SLOW_HISTORY_TTL_MS };
+        rangeHistoryCache = {
+          dayKey: zurichDayKey(),
+          value: ranges,
+          expiresAt: Date.now() + SLOW_HISTORY_TTL_MS,
+        };
         rangeHistoryFailure = null;
         return ranges;
       })
       .catch((err: unknown) => {
         const error = asError(err);
-        rangeHistoryFailure = { value: error, expiresAt: Date.now() + LIVE_TTL_MS };
+        rangeHistoryFailure = {
+          dayKey: zurichDayKey(),
+          value: error,
+          expiresAt: Date.now() + LIVE_TTL_MS,
+        };
         throw error;
       })
       .finally(() => {
@@ -679,12 +711,14 @@ export async function warmFusionSolarCachesSequential(options?: {
   try {
     const today = await fetchTodayHistory();
     todayHistoryCache = {
+      dayKey: zurichDayKey(),
       value: today,
       expiresAt: Date.now() + todayHistoryCacheTtlMs(today),
     };
     todayHistoryFailure = null;
   } catch (err) {
     todayHistoryFailure = {
+      dayKey: zurichDayKey(),
       value: asError(err),
       expiresAt: Date.now() + todayHistoryTtlMs(),
     };
@@ -695,10 +729,18 @@ export async function warmFusionSolarCachesSequential(options?: {
 
   try {
     const ranges = await fetchRangeHistory();
-    rangeHistoryCache = { value: ranges, expiresAt: Date.now() + SLOW_HISTORY_TTL_MS };
+    rangeHistoryCache = {
+      dayKey: zurichDayKey(),
+      value: ranges,
+      expiresAt: Date.now() + SLOW_HISTORY_TTL_MS,
+    };
     rangeHistoryFailure = null;
   } catch (err) {
-    rangeHistoryFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
+    rangeHistoryFailure = {
+      dayKey: zurichDayKey(),
+      value: asError(err),
+      expiresAt: Date.now() + LIVE_TTL_MS,
+    };
     console.error("[fusionsolar] Catch-up Woche/Monat/Jahr fehlgeschlagen:", asError(err).message);
   }
 

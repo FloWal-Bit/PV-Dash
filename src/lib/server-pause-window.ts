@@ -16,6 +16,21 @@ function zurichMinutesSinceMidnight(nowMs: number): number {
   return hour * 60 + minute;
 }
 
+/** Kalendertag Europe/Zurich als YYYY-MM-DD. */
+export function zurichDayKey(nowMs: number = Date.now()): string {
+  return new Date(nowMs).toLocaleDateString("en-CA", { timeZone: ZURICH });
+}
+
+/**
+ * Millisekunden bis zur nächsten Zurich-Mitternacht.
+ * Mindestens 1 s, damit ein gesetzter Timer nicht sofort erneut feuert.
+ */
+export function msUntilNextZurichMidnight(nowMs: number = Date.now()): number {
+  const minutes = zurichMinutesSinceMidnight(nowMs);
+  const minutesToMidnight = 24 * 60 - minutes;
+  return Math.max(1_000, minutesToMidnight * 60_000);
+}
+
 /** true in der geplanten Server-Nachtpause (23:30–06:00 Europe/Zurich). */
 export function isScheduledServerPause(nowMs: number = Date.now()): boolean {
   const minutes = zurichMinutesSinceMidnight(nowMs);
