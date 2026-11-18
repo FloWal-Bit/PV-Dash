@@ -12,7 +12,7 @@ import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/d
 import { energyFlowDefaultTabStore } from "@/lib/energy-flow-default-tab";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { formatKw, kwFractionDigits } from "@/lib/format";
-import { LIVE_POWER_IDLE_KW } from "@/lib/whatwatt-live-power";
+import { balanceEnergyFlowDisplay, LIVE_POWER_IDLE_KW } from "@/lib/whatwatt-live-power";
 
 /**
  * Tab 2 (Energiefluss): hat eine der Leistungszahlen zwei oder mehr Stellen
@@ -514,6 +514,16 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
     hideConsumption || snapshot.consumptionKw == null ? null : snapshot.consumptionKw,
     stromkontoShownKw,
   ]);
+  // Anzeige so runden, dass PV ± Stromkonto = Verbrauch (sonst 1.0+10.0≠10.9).
+  const balanced = balanceEnergyFlowDisplay({
+    productionKw: snapshot.productionKw,
+    consumptionKw: hideConsumption ? null : snapshot.consumptionKw,
+    gridKw: hideGrid || !hasGrid ? null : gridKw,
+    fractionDigits: flowDigits,
+  });
+  const displayProductionKw = hidePv ? null : balanced.productionKw;
+  const displayConsumptionKw = balanced.consumptionKw;
+  const displayStromkontoKw = balanced.gridAbsKw;
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoAccent: Accent = isGridExport
@@ -695,7 +705,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               pvCircleRef.current = el;
             }}
             icon={<Sun className="size-5" />}
-            value={hidePv ? "–" : formatKw(snapshot.productionKw, flowDigits)}
+            value={displayProductionKw == null ? "–" : formatKw(displayProductionKw, flowDigits)}
             label="PV"
             accent="green"
             muted={hidePv || !isProducing}
@@ -713,9 +723,9 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
             }}
             icon={<Home className="size-5" />}
             value={
-              hideConsumption || snapshot.consumptionKw == null
+              hideConsumption || displayConsumptionKw == null
                 ? "–"
-                : formatKw(snapshot.consumptionKw, flowDigits)
+                : formatKw(displayConsumptionKw, flowDigits)
             }
             label="Verbrauch"
             accent="rose"
@@ -730,7 +740,11 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
               stromkontoCircleRef.current = el;
             }}
             icon={<StromkontoBattery direction={stromkontoDirection} className="size-5" />}
-            value={hideGrid || stromkontoKw == null ? "–" : formatKw(stromkontoKw, flowDigits)}
+            value={
+              hideGrid || displayStromkontoKw == null
+                ? "–"
+                : formatKw(displayStromkontoKw, flowDigits)
+            }
             label="Stromkonto"
             accent={stromkontoAccent}
             muted={hideGrid || (!isGridImport && !isGridExport)}

@@ -66,35 +66,39 @@ export function reconcileWhatWattLivePower(
 
   const pvMissing = productionKw == null || !Number.isFinite(productionKw);
 
-  if (!(meterKw < 0)) {
+  // Netz ebenfalls auf 0.01 runden, damit Produktion + Netz = Verbrauch
+  // auf Speicherebene aufgeht (sonst driftet die Anzeige schon vor dem UI-Runden).
+  const grid = round(meterKw);
+
+  if (!(grid < 0)) {
     if (pvMissing) {
       return {
         productionKw: 0,
         consumptionKw: null,
-        gridKw: meterKw,
+        gridKw: grid,
         rememberConsumptionKw: null,
       };
     }
     const production = round(productionKw);
-    const consumption = round(Math.max(0, production + meterKw));
+    const consumption = round(Math.max(0, production + grid));
     return {
       productionKw: production,
       consumptionKw: consumption,
-      gridKw: meterKw,
+      gridKw: grid,
       rememberConsumptionKw: consumption,
     };
   }
 
-  const feedingInKw = exportKw(meterKw);
+  const feedingInKw = exportKw(grid);
   const pvKw = pvMissing ? null : round(productionKw);
   const pvCoversExport = pvKw != null && round(feedingInKw) <= pvKw;
 
   if (pvCoversExport && pvKw != null) {
-    const consumption = round(Math.max(0, pvKw + meterKw));
+    const consumption = round(Math.max(0, pvKw + grid));
     return {
       productionKw: pvKw,
       consumptionKw: consumption,
-      gridKw: meterKw,
+      gridKw: grid,
       rememberConsumptionKw: consumption,
     };
   }
@@ -103,8 +107,67 @@ export function reconcileWhatWattLivePower(
   return {
     productionKw: round(consumption + feedingInKw),
     consumptionKw: consumption,
-    gridKw: meterKw,
+    gridKw: grid,
     rememberConsumptionKw: null,
+  };
+}
+
+/** Rundet auf die Anzeige-Nachkommastellen (1 oder 2). */
+export function roundKwForDisplay(value: number, fractionDigits: number): number {
+  const factor = 10 ** fractionDigits;
+  return Math.round(value * factor) / factor;
+}
+
+/**
+ * PV / Verbrauch / |Stromkonto| so runden, dass auf der Anzeige gilt:
+ * Bezug: PV + Netz = Verbrauch; Einspeisung: PV = Verbrauch + Netz.
+ * Verhindert z. B. 1.0 + 10.0 ≠ 10.9 bei einer Nachkommastelle.
+ */
+export function balanceEnergyFlowDisplay(input: {
+  productionKw: number;
+  consumptionKw: number | null;
+  gridKw: number | null;
+  fractionDigits: number;
+}): {
+  productionKw: number;
+  consumptionKw: number | null;
+  gridAbsKw: number | null;
+} {
+  const digits = input.fractionDigits;
+  const productionKw = roundKwForDisplay(input.productionKw, digits);
+  if (input.gridKw == null) {
+    return {
+      productionKw,
+      consumptionKw:
+        input.consumptionKw == null ? null : roundKwForDisplay(input.consumptionKw, digits),
+      gridAbsKw: null,
+    };
+  }
+
+  const gridAbsKw = roundKwForDisplay(Math.abs(input.gridKw), digits);
+  if (input.consumptionKw == null) {
+    return { productionKw, consumptionKw: null, gridAbsKw };
+  }
+
+  if (input.gridKw > LIVE_POWER_IDLE_KW) {
+    return {
+      productionKw,
+      consumptionKw: roundKwForDisplay(productionKw + gridAbsKw, digits),
+      gridAbsKw,
+    };
+  }
+  if (input.gridKw < -LIVE_POWER_IDLE_KW) {
+    return {
+      productionKw,
+      consumptionKw: roundKwForDisplay(Math.max(0, productionKw - gridAbsKw), digits),
+      gridAbsKw,
+    };
+  }
+
+  return {
+    productionKw,
+    consumptionKw: roundKwForDisplay(input.consumptionKw, digits),
+    gridAbsKw,
   };
 }
 
