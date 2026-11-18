@@ -8,9 +8,12 @@ import {
 } from "@/lib/offline-dashboard-cache";
 import {
   isScheduledServerPause,
+  msUntilNextZurichMidnight,
   msUntilScheduledPauseEnd,
   msUntilScheduledPauseStart,
+  zurichDayKey,
 } from "@/lib/server-pause-window";
+import { isWhatWattFirstMessageWarmup } from "@/lib/whatwatt-warmup";
 
 export type PvStoreState = {
   snapshot: PvSnapshot | null;
@@ -47,9 +50,11 @@ const HISTORY_RANGE_MIN_AGE_MS = 60_000;
  * In der geplanten Nachtpause (23:30–06:00): nur selten prüfen, ob der Node
  * wieder da ist — kein 15-s-Hämmern gegen 502.
  */
-const PAUSE_PROBE_INTERVAL_MS = 20 * 60 * 1000;
+const PAUSE_PROBE_INTERVAL_MS = 20 * 60_000;
 /** Letzter frischer Abruf vor der Node-Pause — Offline-Cache für die Nacht. */
 const SLEEP_SNAPSHOT_LEAD_MS = 3 * 60_000;
+/** Nach whatwatt-Warmup (erste MQTT-Nachricht fehlt) einmal nachziehen. */
+const WHATWATT_WARMUP_RETRY_MS = 8_000;
 
 function nextLiveDelayMs(nowMs = Date.now()): number {
   if (!isScheduledServerPause(nowMs)) return LIVE_INTERVAL_MS;
@@ -94,6 +99,28 @@ type LiveResponse = {
 
 type HistoryResponse = PvHistory & { source: DataSource };
 
+/**
+ * true, wenn Live- oder History-Stand noch vom vorherigen Zurich-Kalendertag ist
+ * (typisch: Offline-Cache vom Schlaf-Snapshot ~23:27).
+ */
+export function isPreviousZurichDayData(
+  state: Pick<PvStoreState, "lastFetchedAt" | "snapshot" | "history">,
+  nowMs: number = Date.now(),
+): boolean {
+  const today = zurichDayKey(nowMs);
+  if (state.lastFetchedAt != null && zurichDayKey(state.lastFetchedAt) !== today) {
+    return true;
+  }
+  if (state.snapshot?.timestamp != null && zurichDayKey(state.snapshot.timestamp) !== today) {
+    return true;
+  }
+  const heute = state.history?.week?.find((point) => point.label === "Heute");
+  if (heute?.dayKey && heute.dayKey !== today) {
+    return true;
+  }
+  return false;
+}
+
 function hydrateFromOfflineCache(): PvStoreState {
   const cached = readOfflineDashboardCache();
   if (!cached) return INITIAL_STATE;
@@ -129,6 +156,8 @@ function hydrateFromOfflineCache(): PvStoreState {
  * Live-Zahlen alle 15 Sekunden (in der Nachtpause nur ~20‑Min-Probe),
  * Verläufe alle 15 Minuten — History in der Pause ausgesetzt, bis Live wieder
  * ok ist. Beides pausiert, solange der Tab im Hintergrund ist.
+ * Steht der Stand noch auf dem Vortag (Offline-Cache), wird ausserhalb der
+ * Pause sofort Live + History neu geladen.
  */
 class PvStore {
   private listeners = new Set<Listener>();
@@ -137,10 +166,14 @@ class PvStore {
   private liveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private historyTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private sleepSnapshotTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private dayRolloverTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private whatwattWarmupRetryId: ReturnType<typeof setTimeout> | null = null;
   private visibilityBound = false;
   private liveInflight: Promise<void> | null = null;
   private historyInflight: Promise<void> | null = null;
   private lastHistoryAt: number | null = null;
+  /** Zurich-Tag, für den zuletzt ein Vortags-Zwangsrefresh lief (Dedupe). */
+  private previousDayRefreshFor: string | null = null;
 
   private emit() {
     for (const listener of [...this.listeners]) listener();
@@ -148,6 +181,11 @@ class PvStore {
 
   private persistOffline() {
     if (!this.state.snapshot || this.state.source == null) return;
+    // Warmup-Warnung nicht cachen — sonst blitzt sie beim nächsten App-Start erneut auf.
+    const warning = isWhatWattFirstMessageWarmup(this.state.warning) ? null : this.state.warning;
+    const gridWarning = isWhatWattFirstMessageWarmup(this.state.gridWarning)
+      ? null
+      : this.state.gridWarning;
     writeOfflineDashboardCache({
       savedAt: this.state.lastFetchedAt ?? Date.now(),
       live: {
@@ -157,9 +195,9 @@ class PvStore {
         forecastedTodayYieldKwh: this.state.forecastedTodayYieldKwh,
         forecastedTomorrowYieldKwh: this.state.forecastedTomorrowYieldKwh,
         forecastSolarError: this.state.forecastSolarError,
-        warning: this.state.warning,
+        warning,
         sourceWarning: this.state.sourceWarning,
-        gridWarning: this.state.gridWarning,
+        gridWarning,
       },
       history:
         this.state.history && this.state.historySource
@@ -171,6 +209,7 @@ class PvStore {
   private tickLive = async () => {
     if (this.liveInflight) return this.liveInflight;
     const wasUnreachable = this.state.serverUnreachable;
+    const historyFromPreviousDay = isPreviousZurichDayData(this.state);
     this.liveInflight = (async () => {
       try {
         await ensureDevSettingsReady();
@@ -195,10 +234,14 @@ class PvStore {
           liveProbeDone: true,
         };
         this.persistOffline();
-        // Nach Offline/Pause: Verlauf sofort nachziehen.
-        if (wasUnreachable) {
+        // Nach Offline/Pause oder wenn History noch vom Vortag: Verlauf sofort.
+        if (wasUnreachable || historyFromPreviousDay) {
+          this.lastHistoryAt = null;
           void this.tickHistory();
         }
+        this.armWhatWattWarmupRetry(
+          payload.warning ?? payload.gridWarning ?? null,
+        );
       } catch {
         if (!this.state.snapshot) {
           const cached = hydrateFromOfflineCache();
@@ -292,6 +335,42 @@ class PvStore {
     void this.tickHistory();
   }
 
+  /**
+   * Offline-Cache / offener Tab vom Vortag: ausserhalb der Pause sofort
+   * Live + History neu laden (nicht auf 15‑Min-History-Intervall warten).
+   */
+  private refreshIfPreviousZurichDay() {
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (isScheduledServerPause()) return;
+    if (!isPreviousZurichDayData(this.state)) {
+      this.previousDayRefreshFor = null;
+      return;
+    }
+    const today = zurichDayKey();
+    if (this.previousDayRefreshFor === today) return;
+    this.previousDayRefreshFor = today;
+    this.lastHistoryAt = null;
+    void this.tickLive();
+    void this.tickHistory();
+  }
+
+  /** whatwatt noch ohne erste MQTT-Nachricht: still nachziehen statt Banner. */
+  private armWhatWattWarmupRetry(warning: string | null) {
+    if (!isWhatWattFirstMessageWarmup(warning)) {
+      if (this.whatwattWarmupRetryId) {
+        clearTimeout(this.whatwattWarmupRetryId);
+        this.whatwattWarmupRetryId = null;
+      }
+      return;
+    }
+    if (this.whatwattWarmupRetryId) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    this.whatwattWarmupRetryId = setTimeout(() => {
+      this.whatwattWarmupRetryId = null;
+      void this.tickLive();
+    }, WHATWATT_WARMUP_RETRY_MS);
+  }
+
   private stopTimers() {
     if (this.liveTimeoutId) {
       clearTimeout(this.liveTimeoutId);
@@ -305,6 +384,14 @@ class PvStore {
       clearTimeout(this.sleepSnapshotTimeoutId);
       this.sleepSnapshotTimeoutId = null;
     }
+    if (this.dayRolloverTimeoutId) {
+      clearTimeout(this.dayRolloverTimeoutId);
+      this.dayRolloverTimeoutId = null;
+    }
+    if (this.whatwattWarmupRetryId) {
+      clearTimeout(this.whatwattWarmupRetryId);
+      this.whatwattWarmupRetryId = null;
+    }
   }
 
   private armLiveTimer() {
@@ -313,7 +400,10 @@ class PvStore {
     const delay = nextLiveDelayMs();
     this.liveTimeoutId = setTimeout(() => {
       this.liveTimeoutId = null;
-      void this.tickLive().finally(() => this.armLiveTimer());
+      void this.tickLive().finally(() => {
+        this.refreshIfPreviousZurichDay();
+        this.armLiveTimer();
+      });
     }, delay);
   }
 
@@ -330,6 +420,12 @@ class PvStore {
         this.historyTimeoutId = null;
         this.armHistoryTimer();
       }, delay);
+      return;
+    }
+    // Direkt nach Pause-Ende: nicht erst 15 Min warten, wenn Stand noch vom Vortag.
+    if (isPreviousZurichDayData(this.state)) {
+      this.lastHistoryAt = null;
+      void this.tickHistory().finally(() => this.armHistoryTimer());
       return;
     }
     this.historyTimeoutId = setTimeout(() => {
@@ -364,16 +460,37 @@ class PvStore {
     }, delay);
   }
 
+  /** Bei Zurich-Mitternacht (offener Tab) Stand als Vortag erkennen und neu laden. */
+  private armDayRolloverTimer() {
+    if (typeof document === "undefined" || document.hidden) return;
+    if (this.dayRolloverTimeoutId) {
+      clearTimeout(this.dayRolloverTimeoutId);
+      this.dayRolloverTimeoutId = null;
+    }
+    const delay = msUntilNextZurichMidnight();
+    this.dayRolloverTimeoutId = setTimeout(() => {
+      this.dayRolloverTimeoutId = null;
+      this.previousDayRefreshFor = null;
+      this.refreshIfPreviousZurichDay();
+      this.armDayRolloverTimer();
+    }, delay);
+  }
+
   private startTimers() {
     if (typeof document === "undefined" || document.hidden) return;
     if (this.liveTimeoutId) return;
-    void this.tickLive();
-    if (!isScheduledServerPause()) {
-      this.refreshHistoryIfStale(HISTORY_INTERVAL_MS);
+    if (!isScheduledServerPause() && isPreviousZurichDayData(this.state)) {
+      this.refreshIfPreviousZurichDay();
+    } else {
+      void this.tickLive();
+      if (!isScheduledServerPause()) {
+        this.refreshHistoryIfStale(HISTORY_INTERVAL_MS);
+      }
     }
     this.armLiveTimer();
     this.armHistoryTimer();
     this.armSleepSnapshotTimer();
+    this.armDayRolloverTimer();
   }
 
   private onVisibility = () => {
@@ -417,7 +534,10 @@ class PvStore {
   refresh = () => {
     if (typeof document !== "undefined" && document.hidden) return;
     void this.tickLive();
-    if (this.state.history == null) void this.tickHistory();
+    if (this.state.history == null || isPreviousZurichDayData(this.state)) {
+      this.lastHistoryAt = null;
+      void this.tickHistory();
+    }
   };
 
   /** Live-Zahlen und Verläufe sofort neu vom eigenen Server lesen. */
@@ -429,6 +549,11 @@ class PvStore {
   /** Diagramm-Zeitraum gewechselt: Verlauf neu holen, wenn er älter als eine Minute ist. */
   refreshHistory = () => {
     if (typeof document !== "undefined" && document.hidden) return;
+    if (isPreviousZurichDayData(this.state)) {
+      this.lastHistoryAt = null;
+      void this.tickHistory();
+      return;
+    }
     this.refreshHistoryIfStale(HISTORY_RANGE_MIN_AGE_MS);
   };
 }
