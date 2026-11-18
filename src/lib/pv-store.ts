@@ -13,6 +13,7 @@ import {
   msUntilScheduledPauseStart,
   zurichDayKey,
 } from "@/lib/server-pause-window";
+import { isWhatWattFirstMessageWarmup } from "@/lib/whatwatt-warmup";
 
 export type PvStoreState = {
   snapshot: PvSnapshot | null;
@@ -52,6 +53,8 @@ const HISTORY_RANGE_MIN_AGE_MS = 60_000;
 const PAUSE_PROBE_INTERVAL_MS = 20 * 60_000;
 /** Letzter frischer Abruf vor der Node-Pause — Offline-Cache für die Nacht. */
 const SLEEP_SNAPSHOT_LEAD_MS = 3 * 60_000;
+/** Nach whatwatt-Warmup (erste MQTT-Nachricht fehlt) einmal nachziehen. */
+const WHATWATT_WARMUP_RETRY_MS = 8_000;
 
 function nextLiveDelayMs(nowMs = Date.now()): number {
   if (!isScheduledServerPause(nowMs)) return LIVE_INTERVAL_MS;
@@ -164,6 +167,7 @@ class PvStore {
   private historyTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private sleepSnapshotTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private dayRolloverTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private whatwattWarmupRetryId: ReturnType<typeof setTimeout> | null = null;
   private visibilityBound = false;
   private liveInflight: Promise<void> | null = null;
   private historyInflight: Promise<void> | null = null;
@@ -177,6 +181,11 @@ class PvStore {
 
   private persistOffline() {
     if (!this.state.snapshot || this.state.source == null) return;
+    // Warmup-Warnung nicht cachen — sonst blitzt sie beim nächsten App-Start erneut auf.
+    const warning = isWhatWattFirstMessageWarmup(this.state.warning) ? null : this.state.warning;
+    const gridWarning = isWhatWattFirstMessageWarmup(this.state.gridWarning)
+      ? null
+      : this.state.gridWarning;
     writeOfflineDashboardCache({
       savedAt: this.state.lastFetchedAt ?? Date.now(),
       live: {
@@ -186,9 +195,9 @@ class PvStore {
         forecastedTodayYieldKwh: this.state.forecastedTodayYieldKwh,
         forecastedTomorrowYieldKwh: this.state.forecastedTomorrowYieldKwh,
         forecastSolarError: this.state.forecastSolarError,
-        warning: this.state.warning,
+        warning,
         sourceWarning: this.state.sourceWarning,
-        gridWarning: this.state.gridWarning,
+        gridWarning,
       },
       history:
         this.state.history && this.state.historySource
@@ -230,6 +239,9 @@ class PvStore {
           this.lastHistoryAt = null;
           void this.tickHistory();
         }
+        this.armWhatWattWarmupRetry(
+          payload.warning ?? payload.gridWarning ?? null,
+        );
       } catch {
         if (!this.state.snapshot) {
           const cached = hydrateFromOfflineCache();
@@ -342,6 +354,23 @@ class PvStore {
     void this.tickHistory();
   }
 
+  /** whatwatt noch ohne erste MQTT-Nachricht: still nachziehen statt Banner. */
+  private armWhatWattWarmupRetry(warning: string | null) {
+    if (!isWhatWattFirstMessageWarmup(warning)) {
+      if (this.whatwattWarmupRetryId) {
+        clearTimeout(this.whatwattWarmupRetryId);
+        this.whatwattWarmupRetryId = null;
+      }
+      return;
+    }
+    if (this.whatwattWarmupRetryId) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    this.whatwattWarmupRetryId = setTimeout(() => {
+      this.whatwattWarmupRetryId = null;
+      void this.tickLive();
+    }, WHATWATT_WARMUP_RETRY_MS);
+  }
+
   private stopTimers() {
     if (this.liveTimeoutId) {
       clearTimeout(this.liveTimeoutId);
@@ -358,6 +387,10 @@ class PvStore {
     if (this.dayRolloverTimeoutId) {
       clearTimeout(this.dayRolloverTimeoutId);
       this.dayRolloverTimeoutId = null;
+    }
+    if (this.whatwattWarmupRetryId) {
+      clearTimeout(this.whatwattWarmupRetryId);
+      this.whatwattWarmupRetryId = null;
     }
   }
 

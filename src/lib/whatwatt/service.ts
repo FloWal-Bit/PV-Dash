@@ -26,6 +26,13 @@ import { parseWhatWattMqttPayload } from "./parse";
 // das ein Hinweis auf ein Verbindungs-/Geräteproblem statt nur eine normale
 // Sende-Pause – der Wert wird dann als veraltet statt als aktuell behandelt.
 const STALE_AFTER_MS = 5 * 60 * 1000;
+/**
+ * Nach Node-Start / Reconnect braucht MQTT kurz, bis die erste Nachricht da ist.
+ * Sofortiger Fehler würde den gelben Banner zeigen, obwohl Pull-to-Refresh
+ * Sekunden später wieder grün ist — deshalb kurz warten, bevor wir aufgeben.
+ */
+const FIRST_MESSAGE_GRACE_MS = 20_000;
+const FIRST_MESSAGE_POLL_MS = 400;
 
 type MeterTotals = {
   energyInKwh: number;
@@ -99,15 +106,31 @@ function ensureClient(): State {
   return newState;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Wartet kurz auf die erste MQTT-Nachricht nach Connect/Subscribe. */
+async function waitForFirstMessage(current: State, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (!current.latest && Date.now() < deadline) {
+    await delay(FIRST_MESSAGE_POLL_MS);
+  }
+  return current.latest != null;
+}
+
 export async function getWhatWattGridSnapshot(): Promise<WhatWattGridSnapshot> {
   const current = ensureClient();
 
   if (!current.latest) {
-    throw new Error(
-      current.lastError
-        ? `whatwatt Go: Noch keine gültige MQTT-Nachricht empfangen (${current.lastError.message}).`
-        : "whatwatt Go: Warte auf die erste MQTT-Nachricht vom Gerät.",
-    );
+    const gotMessage = await waitForFirstMessage(current, FIRST_MESSAGE_GRACE_MS);
+    if (!gotMessage || !current.latest) {
+      throw new Error(
+        current.lastError
+          ? `whatwatt Go: Noch keine gültige MQTT-Nachricht empfangen (${current.lastError.message}).`
+          : "whatwatt Go: Warte auf die erste MQTT-Nachricht vom Gerät.",
+      );
+    }
   }
 
   const age = Date.now() - current.latest.receivedAt;

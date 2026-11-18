@@ -7,6 +7,7 @@ import { BacklogDialog } from "@/components/pv/backlog-dialog";
 import { SettingsDialog } from "@/components/pv/settings-dialog";
 import { cn } from "@/lib/utils";
 import type { DataSource, GridSource } from "@/lib/pv-source";
+import { isWhatWattFirstMessageWarmup } from "@/lib/whatwatt-warmup";
 
 const BACKLOG_TAP_COUNT = 5;
 const BACKLOG_TAP_GAP_MS = 1500;
@@ -85,17 +86,20 @@ export function DashboardHeader({
       ? null
       : (sourceWarning ?? "FusionSolar liefert keine Livedaten. Angezeigt wird die Simulation.");
 
-  const showStromkonto = gridSource === "whatwatt" || Boolean(gridWarning);
+  // Warmup („warte auf erste MQTT-Nachricht“) ist kein echter Ausfall — Banner/Badge still.
+  const activeGridWarning =
+    gridWarning && !isWhatWattFirstMessageWarmup(gridWarning) ? gridWarning : null;
+  const showStromkonto = gridSource === "whatwatt" || Boolean(activeGridWarning);
   const stromkontoTone = serverUnreachable
     ? "muted"
-    : gridSource === "whatwatt" && !gridWarning
+    : gridSource === "whatwatt" && !activeGridWarning
       ? "green"
       : "amber";
   const stromkontoDetail = serverUnreachable
     ? OFFLINE_BADGE_DETAIL
-    : gridSource === "whatwatt" && !gridWarning
+    : gridSource === "whatwatt" && !activeGridWarning
       ? null
-      : gridWarning;
+      : activeGridWarning;
 
   function handleTitleTap() {
     const now = Date.now();
