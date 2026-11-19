@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { isInfoBannerActiveNow } from "@/lib/dev-settings-shared";
 import { infoBannerStore } from "@/lib/info-banner";
 
-/** Hinweis oberhalb der Wetterkarte. Die Höhe folgt dem Text, ohne feste Zeilenzahl. */
+/**
+ * Hinweis im Sticky-Chrome unter dem Header. Header + Banner stickern gemeinsam
+ * oben — der Scroll-Umbruch liegt unter dem Banner (nicht unter dem Header).
+ * Ausblenden nur über das Schliessenkreuz.
+ */
 export function InfoBanner() {
   const text = useSyncExternalStore(
     infoBannerStore.subscribe,
@@ -34,22 +38,25 @@ export function InfoBanner() {
   if (!isInfoBannerActiveNow(text, schedule, nowMs) || dismissed === text) return null;
 
   return (
-    <Card className="shadow-card rounded-2xl">
-      <CardContent className="flex items-start gap-2">
-        <p className="min-w-0 flex-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-card-foreground">
-          {text}
-        </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 text-muted-foreground"
-          aria-label="Hinweis schliessen"
-          onClick={() => infoBannerStore.dismiss()}
-        >
-          <X />
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="dashboard-container bg-background pt-2">
+      {/* Kein shadow-card: der 1px-Schatten wirkte wie eine Linie unter dem Sticky-Block. */}
+      <Card className="rounded-2xl shadow-none">
+        <CardContent className="flex items-start gap-2">
+          <p className="min-w-0 flex-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-card-foreground">
+            {text}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 text-muted-foreground"
+            aria-label="Hinweis schliessen"
+            onClick={() => infoBannerStore.dismiss()}
+          >
+            <X />
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
