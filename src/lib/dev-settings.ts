@@ -10,12 +10,18 @@ import {
   readInfoBanner,
   readInfoBannerInstant,
   readPerformanceRatio,
+  readPushDeviceIds,
+  readSurplusAlert,
   normalizeInfoBanner,
   normalizeInfoBannerInstant,
   normalizeInfoBannerSchedule,
   normalizePerformanceRatio,
+  normalizePushDeviceIds,
+  normalizeSurplusAlert,
+  copySurplusAlert,
   type DevSettingsUpdate,
   type SharedDevSettings,
+  type SurplusAlertSettings,
 } from "@/lib/dev-settings-shared";
 import { resolveOpenMeteoPerformanceRatio } from "@/lib/open-meteo-yield/config";
 
@@ -29,6 +35,8 @@ type PersistedDevSettings = {
   infoBannerVisibleUntil: string | null;
   /** null = noch nicht gesetzt → Env/Default. */
   performanceRatio: number | null;
+  pushDeviceIds: string[];
+  surplusAlert: SurplusAlertSettings;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -45,6 +53,8 @@ function readFile(): PersistedDevSettings | null {
     const infoBannerVisibleFrom = readInfoBannerInstant(v.infoBannerVisibleFrom);
     const infoBannerVisibleUntil = readInfoBannerInstant(v.infoBannerVisibleUntil);
     const performanceRatio = readPerformanceRatio(v.performanceRatio);
+    const pushDeviceIds = readPushDeviceIds(v.pushDeviceIds);
+    const surplusAlert = readSurplusAlert(v.surplusAlert);
     const hadLegacy =
       "siteLocation" in v ||
       "yieldForecast" in v ||
@@ -58,6 +68,8 @@ function readFile(): PersistedDevSettings | null {
       infoBannerVisibleFrom,
       infoBannerVisibleUntil,
       performanceRatio,
+      pushDeviceIds,
+      surplusAlert,
     };
     // Alte Standort-/Server-Pause-Felder beim nächsten Lesen aus der Datei streichen.
     if (hadLegacy) writeFile(file);
@@ -79,6 +91,8 @@ function resolve(file: PersistedDevSettings | null): SharedDevSettings {
     infoBannerVisibleFrom: file?.infoBannerVisibleFrom ?? null,
     infoBannerVisibleUntil: file?.infoBannerVisibleUntil ?? null,
     performanceRatio: resolvePerformanceRatio(file?.performanceRatio),
+    pushDeviceIds: file?.pushDeviceIds ?? [],
+    surplusAlert: copySurplusAlert(file?.surplusAlert),
     configured: file != null,
     updatedAt: file?.updatedAt ?? null,
   };
@@ -121,6 +135,14 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
       typeof update.performanceRatio === "number"
         ? normalizePerformanceRatio(update.performanceRatio)
         : (current?.performanceRatio ?? null),
+    pushDeviceIds:
+      "pushDeviceIds" in update
+        ? normalizePushDeviceIds(update.pushDeviceIds)
+        : (current?.pushDeviceIds ?? []),
+    surplusAlert:
+      update.surplusAlert != null
+        ? normalizeSurplusAlert(update.surplusAlert)
+        : copySurplusAlert(current?.surplusAlert),
   };
   writeFile(next);
   return resolve(next);
