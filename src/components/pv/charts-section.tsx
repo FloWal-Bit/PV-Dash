@@ -26,7 +26,6 @@ import {
   type XAxisTickContentProps,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollRoundedCorners } from "@/components/pv/scroll-rounded-corners";
 import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
@@ -1447,11 +1446,9 @@ export function ChartsSection({
   }, []);
 
   return (
-    <div className="relative">
-      <ScrollRoundedCorners />
-      <Card
-        ref={cardRef}
-        className="yield-chart-card shadow-card rounded-2xl"
+    <Card
+      ref={cardRef}
+      className="yield-chart-card shadow-card rounded-2xl"
       onPointerDown={(event) => {
         const card = event.currentTarget;
         // Nur Öffnen/Schliessen — kein Pointer-Capture auf der ganzen Karte,
@@ -1626,7 +1623,6 @@ export function ChartsSection({
           </CardContent>
         </div>
       </SwipePageSurface>
-      </Card>
-    </div>
+    </Card>
   );
 }

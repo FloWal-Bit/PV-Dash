@@ -6,7 +6,6 @@ import {
   Sun,
 } from "lucide-react";
 import { InfoPopover } from "@/components/pv/info-popover";
-import { ScrollRoundedCorners } from "@/components/pv/scroll-rounded-corners";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
@@ -760,9 +759,8 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   );
 
   return (
-    <div ref={frameRef} className={cn("relative flex min-w-0 flex-col", className)}>
-      <ScrollRoundedCorners />
-      <SwipeCarousel
+    <div ref={frameRef} className={cn("flex min-w-0 flex-col", className)}>
+    <SwipeCarousel
       labels={[...flowLabels]}
       page={flowPage}
       onPageChange={setFlowPage}
