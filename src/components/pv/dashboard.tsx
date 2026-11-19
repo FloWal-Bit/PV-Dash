@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { pvStore } from "@/lib/pv-store";
 import { siteLocationStore } from "@/lib/site-location";
 import { weatherStore } from "@/lib/weather-store";
-import { checkYieldNotification } from "@/lib/notifications";
+import { checkSurplusNotification, checkYieldNotification } from "@/lib/notifications";
 import { APP_VERSION_LABEL } from "@/lib/version";
 import { reportDeviceVisit } from "@/lib/device-visit";
 import { isWhatWattFirstMessageWarmup } from "@/lib/whatwatt-warmup";
@@ -74,6 +74,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
   useEffect(() => {
     if (!snapshot) return;
     checkYieldNotification(snapshot.todayYieldKwh, snapshot.timestamp);
+    checkSurplusNotification(snapshot.gridKw, snapshot.timestamp);
   }, [snapshot]);
 
   return (

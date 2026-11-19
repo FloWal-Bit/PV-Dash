@@ -1,4 +1,10 @@
-import { formatYieldKwh } from "@/lib/format";
+import {
+  evaluateSurplusAlert,
+  SURPLUS_ALERT_COOLDOWN_MS,
+  type SurplusAlertSettings,
+} from "@/lib/dev-settings-shared";
+import { formatKw, formatYieldKwh } from "@/lib/format";
+import { currentPushAlertState, thisDeviceReceivesPush } from "@/lib/push-alert-settings";
 import { APP_ICON_SRC } from "@/lib/version";
 
 /**
@@ -7,16 +13,21 @@ import { APP_ICON_SRC } from "@/lib/version";
  * Es gibt (bewusst) keinen eigenen Push-Server/Service-Worker-Abo-Flow –
  * dafür bräuchte es VAPID-Schlüssel und eine Backend-Anbindung. Stattdessen
  * nutzen wir die Browser-Notification-API direkt im Client: Sobald das
- * Dashboard offen ist (Tab im Vorder- oder Hintergrund) und die
- * Berechtigung erteilt wurde, löst eine Meldung aus, sobald der heutige
- * Ertrag die Schwelle überschreitet. Das deckt den vom Nutzer gewünschten
- * Anwendungsfall ab, ohne zusätzliche Server-Infrastruktur zu benötigen.
+ * Dashboard offen ist (Tab im Vorder- oder Hintergrund), die Berechtigung
+ * erteilt wurde und das Gerät in den Dev-Einstellungen als Empfänger
+ * eingetragen ist. Der Tagesertrag meldet sich einmal pro Tag ab 3 kWh.
+ * Der Stromüberschuss folgt der dort gespeicherten kW-Schwelle, den
+ * Wochentagen und der Uhrzeit.
  */
 
 export const YIELD_NOTIFICATION_THRESHOLD_KWH = 3;
 
 const ENABLED_KEY = "pv-dash:notifications-enabled";
 const LAST_FIRED_DATE_KEY = "pv-dash:notifications-last-fired-date";
+const SURPLUS_ACTIVE_KEY = "pv-dash:surplus-alert-active";
+const SURPLUS_FIRED_AT_KEY = "pv-dash:surplus-alert-fired-at";
+/** Ältere Messwerte (Offline-Cache) lösen keine Überschuss-Meldung aus. */
+const SURPLUS_MAX_SAMPLE_AGE_MS = 2 * 60 * 1000;
 
 export type NotificationPermissionState = "unsupported" | NotificationPermission;
 
@@ -115,19 +126,34 @@ function todayKey(timestamp: number): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-function showYieldNotification(todayYieldKwh: number): void {
+function showNotification(body: string, tag: string): void {
   if (!isSupported()) return;
   try {
     new Notification("PV Dash", {
-      body: `Deine Anlage hat heute bereits ${formatYieldKwh(todayYieldKwh, 1)} erzeugt.`,
+      body,
       icon: APP_ICON_SRC,
-      tag: "pv-yield-threshold",
+      tag,
     });
   } catch {
     // Manche Browser (z. B. iOS Safari im Nicht-PWA-Modus) unterstützen die
     // Notification-API technisch, werfen bei `new Notification(...)` aber
     // einen Fehler – in dem Fall lassen wir es still fehlschlagen.
   }
+}
+
+function showYieldNotification(todayYieldKwh: number): void {
+  showNotification(
+    `Deine Anlage hat heute bereits ${formatYieldKwh(todayYieldKwh, 1)} erzeugt.`,
+    "pv-yield-threshold",
+  );
+}
+
+function showSurplusNotification(exportKw: number): void {
+  showNotification(`Stromüberschuss: ${formatKw(exportKw)} Einspeisung.`, "pv-surplus");
+}
+
+function pushReadyOnThisDevice(): boolean {
+  return state.enabled && state.permission === "granted" && thisDeviceReceivesPush();
 }
 
 /**
@@ -137,7 +163,7 @@ function showYieldNotification(todayYieldKwh: number): void {
  */
 export function checkYieldNotification(todayYieldKwh: number, timestamp: number): void {
   if (typeof window === "undefined") return;
-  if (!state.enabled || state.permission !== "granted") return;
+  if (!pushReadyOnThisDevice()) return;
   if (todayYieldKwh <= YIELD_NOTIFICATION_THRESHOLD_KWH) return;
 
   const today = todayKey(timestamp);
@@ -147,7 +173,48 @@ export function checkYieldNotification(todayYieldKwh: number, timestamp: number)
   showYieldNotification(todayYieldKwh);
 }
 
-/** Löst sofort eine Test-Benachrichtigung aus (unabhängig vom Schwellenwert/Tageslimit). */
+function readSurplusActive(): boolean {
+  return window.localStorage.getItem(SURPLUS_ACTIVE_KEY) === "1";
+}
+
+function readSurplusFiredAt(): number | null {
+  const raw = window.localStorage.getItem(SURPLUS_FIRED_AT_KEY);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Mitteilung, wenn die Einspeisung die gespeicherte Schwelle im Tages- und
+ * Zeitfenster erreicht. Höchstens einmal pro Überschuss-Phase.
+ * `timestamp` ist der Messzeitpunkt; deutlich ältere Werte werden ignoriert.
+ */
+export function checkSurplusNotification(
+  gridKw: number | null,
+  timestamp: number,
+  nowMs: number = Date.now(),
+): void {
+  if (typeof window === "undefined") return;
+  if (!pushReadyOnThisDevice()) return;
+  if (!Number.isFinite(timestamp) || Math.abs(nowMs - timestamp) > SURPLUS_MAX_SAMPLE_AGE_MS) return;
+
+  const settings: SurplusAlertSettings = currentPushAlertState().surplus;
+  const decision = evaluateSurplusAlert({
+    now: new Date(nowMs),
+    gridKw,
+    settings,
+    wasActive: readSurplusActive(),
+    lastFiredAt: readSurplusFiredAt(),
+    cooldownMs: SURPLUS_ALERT_COOLDOWN_MS,
+  });
+  window.localStorage.setItem(SURPLUS_ACTIVE_KEY, decision.active ? "1" : "0");
+  if (!decision.fire || decision.exportKw == null) return;
+  window.localStorage.setItem(SURPLUS_FIRED_AT_KEY, String(nowMs));
+  showSurplusNotification(decision.exportKw);
+}
+
+/** Löst sofort eine Test-Benachrichtigung aus (unabhängig von Schwelle, Tag und Geräteliste). */
 export function sendTestNotification(): void {
-  showYieldNotification(YIELD_NOTIFICATION_THRESHOLD_KWH + 1.2);
+  const minKw = currentPushAlertState().surplus.minKw;
+  showSurplusNotification(minKw > 0 ? minKw : 1);
 }

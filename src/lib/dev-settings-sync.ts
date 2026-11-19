@@ -3,6 +3,7 @@
 import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
 import { hideSimulatedStore } from "@/lib/hide-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
+import { pushAlertStore } from "@/lib/push-alert-settings";
 import { yieldForecastStore } from "@/lib/yield-forecast-settings";
 
 let inflightSaves = 0;
@@ -18,9 +19,15 @@ export function applySharedDevSettings(data: SharedDevSettings): void {
     visibleUntil: data.infoBannerVisibleUntil,
   });
   yieldForecastStore.applyRemotePerformanceRatio(data.performanceRatio);
+  pushAlertStore.applyRemote({
+    deviceIds: data.pushDeviceIds,
+    surplus: data.surplusAlert,
+  });
 }
 
-export async function putDevSettings(update: DevSettingsUpdate): Promise<SharedDevSettings> {
+let saveChain: Promise<void> = Promise.resolve();
+
+async function putDevSettingsNow(update: DevSettingsUpdate): Promise<SharedDevSettings> {
   inflightSaves += 1;
   try {
     const response = await fetch("/api/dev-settings", {
@@ -37,6 +44,16 @@ export async function putDevSettings(update: DevSettingsUpdate): Promise<SharedD
   } finally {
     inflightSaves -= 1;
   }
+}
+
+/** Speichern nacheinander, damit zwei schnelle Änderungen sich nicht überschreiben. */
+export function putDevSettings(update: DevSettingsUpdate): Promise<SharedDevSettings> {
+  const run = saveChain.then(() => putDevSettingsNow(update));
+  saveChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 function readLocalSeed(): DevSettingsUpdate | null {

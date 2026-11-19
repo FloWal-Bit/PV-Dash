@@ -18,6 +18,16 @@ import {
   sendTestNotification,
   YIELD_NOTIFICATION_THRESHOLD_KWH,
 } from "@/lib/notifications";
+import { deviceIdStore } from "@/lib/device-visit";
+import {
+  formatSurplusKwInput,
+  normalizeSurplusAlert,
+  parseClockMinutes,
+  sameSurplusAlert,
+  SURPLUS_ALERT_MAX_KW,
+  SURPLUS_WEEKDAYS,
+} from "@/lib/dev-settings-shared";
+import { pushAlertStore } from "@/lib/push-alert-settings";
 import type { PlzLocality, PlzLookupResponse } from "@/lib/plz-types";
 import { siteLocationStore } from "@/lib/site-location";
 import {
@@ -810,7 +820,17 @@ export function PushNotificationSettings() {
     notificationSettingsStore.getSnapshot,
     notificationSettingsStore.getServerSnapshot,
   );
+  const { deviceIds } = useSyncExternalStore(
+    pushAlertStore.subscribe,
+    pushAlertStore.getSnapshot,
+    pushAlertStore.getServerSnapshot,
+  );
   const [pending, setPending] = useState(false);
+  const deviceId = useSyncExternalStore(
+    deviceIdStore.subscribe,
+    deviceIdStore.getSnapshot,
+    deviceIdStore.getServerSnapshot,
+  );
 
   async function handleToggle(checked: boolean) {
     if (!checked) {
@@ -824,6 +844,8 @@ export function PushNotificationSettings() {
 
   const isUnsupported = permission === "unsupported";
   const isDenied = permission === "denied";
+  const thisDeviceAllowed =
+    deviceId != null && deviceIds.some((id) => id === deviceId.toLowerCase());
 
   return (
     <SettingsSection
@@ -833,9 +855,11 @@ export function PushNotificationSettings() {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
-          <Label htmlFor="push-notifications">Push-Benachrichtigungen</Label>
+          <Label htmlFor="push-notifications">Push auf diesem Gerät</Label>
           <span className="text-xs leading-relaxed text-muted-foreground">
-            Meldung, sobald die Anlage heute mehr als{" "}
+            Erlaubt die Browser-Mitteilung hier. Welche Geräte sie erhalten, stellst du
+            in der Geräteliste ein. Ohne Auswahl geht keine Meldung raus. Zusätzlich:
+            einmal am Tag, sobald die Anlage mehr als{" "}
             {formatYieldKwh(YIELD_NOTIFICATION_THRESHOLD_KWH, 0)} erzeugt hat.
           </span>
         </div>
@@ -857,7 +881,14 @@ export function PushNotificationSettings() {
           Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den
           Browser-/Geräteeinstellungen, um sie hier zu aktivieren.
         </p>
+      ) : deviceId && !thisDeviceAllowed ? (
+        <p className="text-xs text-muted-foreground">
+          Dieses Gerät steht nicht auf der Empfängerliste. Die Testmeldung geht trotzdem
+          raus, Überschuss- und Ertragsmeldungen nur an ausgewählte Geräte.
+        </p>
       ) : null}
+
+      <SurplusAlertEditor />
 
       <Button
         type="button"
@@ -870,6 +901,188 @@ export function PushNotificationSettings() {
       </Button>
     </SettingsSection>
   );
+}
+
+function SurplusAlertEditor() {
+  const { surplus } = useSyncExternalStore(
+    pushAlertStore.subscribe,
+    pushAlertStore.getSnapshot,
+    pushAlertStore.getServerSnapshot,
+  );
+  const [draftMin, setDraftMin] = useState<string | null>(null);
+  const [draftDays, setDraftDays] = useState<number[] | null>(null);
+  const [draftFrom, setDraftFrom] = useState<string | null>(null);
+  const [draftUntil, setDraftUntil] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const minText = draftMin ?? formatSurplusKwInput(surplus.minKw);
+  const days = draftDays ?? surplus.days;
+  const from = draftFrom ?? surplus.from;
+  const until = draftUntil ?? surplus.until;
+  const dirty =
+    minText !== formatSurplusKwInput(surplus.minKw) ||
+    (draftDays != null && !sameDayList(draftDays, surplus.days)) ||
+    (draftFrom != null && draftFrom !== surplus.from) ||
+    (draftUntil != null && draftUntil !== surplus.until);
+  const fromMinutes = parseClockMinutes(from);
+  const untilMinutes = parseClockMinutes(until);
+  const timeOrderInvalid =
+    fromMinutes != null && untilMinutes != null && untilMinutes <= fromMinutes;
+
+  function toggleDay(day: number) {
+    const current = draftDays ?? surplus.days;
+    const next = current.includes(day)
+      ? current.filter((item) => item !== day)
+      : [...current, day].sort((a, b) => a - b);
+    setDraftDays(next);
+    if (error) setError(null);
+  }
+
+  async function save() {
+    const parsed = Number(minText.trim().replace(",", "."));
+    if (!Number.isFinite(parsed)) {
+      setError(`Bitte einen Ertrag in kW eingeben (0 bis ${SURPLUS_ALERT_MAX_KW}).`);
+      return;
+    }
+    let next;
+    try {
+      next = normalizeSurplusAlert({ minKw: parsed, days, from, until });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Überschuss-Regel konnte nicht gespeichert werden.");
+      return;
+    }
+    if (sameSurplusAlert(next, surplus)) {
+      setDraftMin(null);
+      setDraftDays(null);
+      setDraftFrom(null);
+      setDraftUntil(null);
+      setError(null);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await pushAlertStore.setSurplus(next);
+      setDraftMin(null);
+      setDraftDays(null);
+      setDraftFrom(null);
+      setDraftUntil(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Überschuss-Regel konnte nicht gespeichert werden.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border/70 pt-3">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-sm font-medium">Stromüberschuss</span>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Mitteilung, sobald die Netzeinspeisung diesen Ertrag in kW erreicht. Nur an den
+          gewählten Tagen und zwischen den Uhrzeiten (Europe/Zurich). 0 kW heisst: sobald
+          eingespeist wird. Höchstens eine Mitteilung pro Überschuss-Phase, danach frühestens
+          nach 30 Minuten.
+        </p>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="surplus-min-kw">Ertrag ab (kW)</Label>
+        <input
+          id="surplus-min-kw"
+          type="text"
+          inputMode="decimal"
+          className={inputClassName}
+          value={minText}
+          disabled={saving}
+          onChange={(event) => {
+            setDraftMin(event.target.value);
+            if (error) setError(null);
+          }}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium" id="surplus-days-label">
+          Tage
+        </span>
+        {days.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Kein Tag ausgewählt — dann kommt keine Überschuss-Mitteilung.
+          </p>
+        ) : null}
+        <div className="grid grid-cols-7 gap-1" role="group" aria-labelledby="surplus-days-label">
+          {SURPLUS_WEEKDAYS.map((weekday) => {
+            const selected = days.includes(weekday.day);
+            return (
+              <button
+                key={weekday.day}
+                type="button"
+                aria-pressed={selected}
+                aria-label={weekday.label}
+                disabled={saving}
+                onClick={() => toggleDay(weekday.day)}
+                className={
+                  selected
+                    ? "h-8 rounded-full bg-chart-3 text-xs font-medium text-white focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-chart-3/40 disabled:opacity-60"
+                    : "h-8 rounded-full bg-muted text-xs font-medium text-foreground/80 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-chart-3/40 disabled:opacity-60"
+                }
+              >
+                {weekday.short}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+          Von
+          <input
+            type="time"
+            className={inputClassName}
+            value={from}
+            step={60}
+            disabled={saving}
+            onChange={(event) => {
+              setDraftFrom(event.target.value.slice(0, 5));
+              if (error) setError(null);
+            }}
+            aria-label="Überschuss-Mitteilung von"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+          Bis
+          <input
+            type="time"
+            className={inputClassName}
+            value={until}
+            step={60}
+            disabled={saving}
+            onChange={(event) => {
+              setDraftUntil(event.target.value.slice(0, 5));
+              if (error) setError(null);
+            }}
+            aria-label="Überschuss-Mitteilung bis"
+          />
+        </label>
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        <Button type="button" variant="secondary" size="sm" disabled={saving || !dirty} onClick={() => void save()}>
+          {saving ? "…" : "Speichern"}
+        </Button>
+      </div>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {timeOrderInvalid && error == null ? (
+        <p className="text-xs text-destructive">«Bis» muss nach «Von» liegen.</p>
+      ) : null}
+    </div>
+  );
+}
+
+function sameDayList(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort((left, right) => left - right);
+  const sortedB = [...b].sort((left, right) => left - right);
+  return sortedA.every((day, index) => day === sortedB[index]);
 }
 
 /** Standort und Stromkonto, nur im versteckten Entwicklerbereich. */
