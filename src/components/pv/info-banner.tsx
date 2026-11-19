@@ -38,7 +38,7 @@ export function InfoBanner() {
   if (!isInfoBannerActiveNow(text, schedule, nowMs) || dismissed === text) return null;
 
   return (
-    <div className="dashboard-container border-b border-border/60 bg-background pb-3 pt-2">
+    <div className="dashboard-container bg-background pt-2">
       <Card className="rounded-2xl shadow-card">
         <CardContent className="flex items-start gap-2">
           <p className="min-w-0 flex-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-card-foreground">

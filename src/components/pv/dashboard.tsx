@@ -97,7 +97,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
         <InfoBanner />
       </div>
 
-      <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 py-4 sm:py-6">
+      <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 pt-4 pb-4 sm:pb-6">
         <ServerPauseBanner />
 
         {error ? (
