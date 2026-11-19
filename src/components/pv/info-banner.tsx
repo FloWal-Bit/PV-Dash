@@ -39,7 +39,8 @@ export function InfoBanner() {
 
   return (
     <div className="dashboard-container bg-background pt-2">
-      <Card className="rounded-2xl shadow-card">
+      {/* Kein shadow-card: der 1px-Schatten wirkte wie eine Linie unter dem Sticky-Block. */}
+      <Card className="rounded-2xl shadow-none">
         <CardContent className="flex items-start gap-2">
           <p className="min-w-0 flex-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-card-foreground">
             {text}
