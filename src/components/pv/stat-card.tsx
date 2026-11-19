@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ScrollRoundedCorners } from "@/components/pv/scroll-rounded-corners";
 import { SIMULATED_OPACITY_CLASS } from "@/lib/data-fidelity";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,9 @@ export function StatCard({
   className,
 }: StatCardProps) {
   return (
-    <Card className={cn("shadow-card h-full justify-center gap-3 rounded-2xl py-4", className)}>
+    <div className="relative h-full">
+      <ScrollRoundedCorners />
+      <Card className={cn("shadow-card h-full justify-center gap-3 rounded-2xl py-4", className)}>
       <CardContent className="flex flex-col gap-1 px-4">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 min-w-0 text-xs leading-tight font-medium text-muted-foreground">
@@ -73,6 +76,7 @@ export function StatCard({
           ) : null}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }

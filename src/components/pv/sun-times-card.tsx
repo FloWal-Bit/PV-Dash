@@ -13,6 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollRoundedCorners } from "@/components/pv/scroll-rounded-corners";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { cn } from "@/lib/utils";
 import { formatSwissNumber } from "@/lib/format";
@@ -219,19 +220,22 @@ export function SunTimesCard({
   }, [referenceDate]);
 
   return (
-    <Card data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
-      <SwipeCarousel labels={["Heute", "Morgen"]} className="min-w-0 gap-3 pb-1">
-        <SunTimesDayCard
-          date={referenceDate}
-          forecastedYieldKwh={forecastedTodayYieldKwh}
-          showLiveClock
-        />
-        <SunTimesDayCard
-          date={tomorrowDate}
-          forecastedYieldKwh={forecastedTomorrowYieldKwh}
-          showLiveClock={false}
-        />
-      </SwipeCarousel>
-    </Card>
+    <div className={cn("relative", className)}>
+      <ScrollRoundedCorners />
+      <Card data-sun-times-card className="shadow-card rounded-2xl">
+        <SwipeCarousel labels={["Heute", "Morgen"]} className="min-w-0 gap-3 pb-1">
+          <SunTimesDayCard
+            date={referenceDate}
+            forecastedYieldKwh={forecastedTodayYieldKwh}
+            showLiveClock
+          />
+          <SunTimesDayCard
+            date={tomorrowDate}
+            forecastedYieldKwh={forecastedTomorrowYieldKwh}
+            showLiveClock={false}
+          />
+        </SwipeCarousel>
+      </Card>
+    </div>
   );
 }
