@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Radio } from "lucide-react";
 import { ShareDashboardButton } from "@/components/pv/share-dashboard-button";
 import { BacklogDialog } from "@/components/pv/backlog-dialog";
@@ -128,8 +128,32 @@ export function DashboardHeader({
     setBacklogOpen(open);
   }
 
+  const headerRef = useRef<HTMLElement | null>(null);
+
+  // Sticky Info-Banner dockt unter der Header-Höhe an (--dashboard-header-height).
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const publishHeight = () => {
+      document.documentElement.style.setProperty(
+        "--dashboard-header-height",
+        `${Math.round(el.getBoundingClientRect().height)}px`,
+      );
+    };
+    publishHeight();
+    const observer = new ResizeObserver(publishHeight);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--dashboard-header-height");
+    };
+  }, []);
+
   return (
-    <header className="safe-top sticky top-0 z-30 border-b border-border/60 bg-background landscape:py-1.5">
+    <header
+      ref={headerRef}
+      className="safe-top sticky top-0 z-30 border-b border-border/60 bg-background landscape:py-1.5"
+    >
       <div className="dashboard-container flex items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-col pl-4">
           <button

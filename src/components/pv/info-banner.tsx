@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { isInfoBannerActiveNow } from "@/lib/dev-settings-shared";
 import { infoBannerStore } from "@/lib/info-banner";
 
-/** Hinweis oberhalb der Wetterkarte. Die Höhe folgt dem Text, ohne feste Zeilenzahl. */
+/**
+ * Hinweis oberhalb der Wetterkarte. Bleibt beim Scrollen unter dem Sticky-Header
+ * sichtbar; Ausblenden nur über das Schliessenkreuz (Dismiss).
+ */
 export function InfoBanner() {
   const text = useSyncExternalStore(
     infoBannerStore.subscribe,
@@ -34,7 +37,10 @@ export function InfoBanner() {
   if (!isInfoBannerActiveNow(text, schedule, nowMs) || dismissed === text) return null;
 
   return (
-    <Card className="shadow-card rounded-2xl">
+    <Card
+      className="sticky z-20 rounded-2xl border-border/60 bg-card/95 shadow-card backdrop-blur-sm supports-backdrop-filter:bg-card/90"
+      style={{ top: "calc(var(--dashboard-header-height, 3.75rem) + 0.5rem)" }}
+    >
       <CardContent className="flex items-start gap-2">
         <p className="min-w-0 flex-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-card-foreground">
           {text}
