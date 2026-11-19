@@ -8,6 +8,27 @@ const STORAGE_KEY = "pv-dash:device-id";
 
 let reportPromise: Promise<void> | null = null;
 
+type DeviceIdListener = () => void;
+const deviceIdListeners = new Set<DeviceIdListener>();
+
+function emitDeviceId(): void {
+  for (const listener of deviceIdListeners) listener();
+}
+
+/** Kennung dieses Browsers. Entsteht beim ersten Aufruf und bleibt in localStorage. */
+export const deviceIdStore = {
+  subscribe(listener: DeviceIdListener): () => void {
+    deviceIdListeners.add(listener);
+    return () => deviceIdListeners.delete(listener);
+  },
+  getSnapshot(): string | null {
+    return readDeviceId();
+  },
+  getServerSnapshot(): string | null {
+    return null;
+  },
+};
+
 type NavigatorUAData = {
   getHighEntropyValues: (hints: string[]) => Promise<{ model?: string }>;
 };
@@ -28,6 +49,7 @@ export function getOrCreateDeviceId(): string {
   if (existing) return existing;
   const id = crypto.randomUUID();
   window.localStorage.setItem(STORAGE_KEY, id);
+  emitDeviceId();
   return id;
 }
 

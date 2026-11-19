@@ -39,6 +39,7 @@ import {
   type DeviceLogSummary,
   type DeviceVisit,
 } from "@/lib/device-log-shared";
+import { pushAlertStore } from "@/lib/push-alert-settings";
 import { cn } from "@/lib/utils";
 
 export function BacklogDialog({
@@ -134,14 +135,43 @@ function groupDevicesByRecency(devices: DeviceVisit[], now = new Date()) {
   return { todayDevices, yesterdayDevices, olderDevices };
 }
 
+function DevicePushSwitch({
+  id,
+  label,
+  enabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  enabled: boolean;
+  onChange: (id: string, enabled: boolean) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span aria-hidden>Push</span>
+      <Switch
+        size="sm"
+        checked={enabled}
+        onCheckedChange={(checked) => onChange(id, checked)}
+        aria-label={`Push für ${label}`}
+        className="data-checked:bg-chart-3"
+      />
+    </div>
+  );
+}
+
 function DeviceRow({
   device,
   currentDeviceId,
   when,
+  pushEnabled,
+  onPushChange,
 }: {
   device: DeviceVisit;
   currentDeviceId: string | null;
   when: string;
+  pushEnabled: boolean;
+  onPushChange: (id: string, enabled: boolean) => void;
 }) {
   const isCurrent = device.id === currentDeviceId;
   return (
@@ -152,14 +182,22 @@ function DeviceRow({
         </p>
         <span className="shrink-0 pt-0.5 tabular-nums text-xs text-muted-foreground">{when}</span>
       </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-        {isCurrent ? (
-          <span className="font-medium text-chart-3">Dieses Gerät</span>
-        ) : null}
-        {device.version ? <span className="tabular-nums">v{device.version}</span> : null}
-        <span className="font-mono tabular-nums opacity-70" title={device.id}>
-          #{shortDeviceId(device.id)}
-        </span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+          {isCurrent ? (
+            <span className="font-medium text-chart-3">Dieses Gerät</span>
+          ) : null}
+          {device.version ? <span className="tabular-nums">v{device.version}</span> : null}
+          <span className="font-mono tabular-nums opacity-70" title={device.id}>
+            #{shortDeviceId(device.id)}
+          </span>
+        </div>
+        <DevicePushSwitch
+          id={device.id}
+          label={device.label}
+          enabled={pushEnabled}
+          onChange={onPushChange}
+        />
       </div>
     </li>
   );
@@ -170,11 +208,15 @@ function DeviceGroup({
   devices,
   currentDeviceId,
   formatWhen,
+  pushIds,
+  onPushChange,
 }: {
   title: string;
   devices: DeviceVisit[];
   currentDeviceId: string | null;
   formatWhen: (iso: string) => string;
+  pushIds: ReadonlySet<string>;
+  onPushChange: (id: string, enabled: boolean) => void;
 }) {
   if (devices.length === 0) return null;
   return (
@@ -189,6 +231,8 @@ function DeviceGroup({
             device={device}
             currentDeviceId={currentDeviceId}
             when={formatWhen(device.lastSeen)}
+            pushEnabled={pushIds.has(device.id.toLowerCase())}
+            onPushChange={onPushChange}
           />
         ))}
       </ul>
@@ -202,11 +246,15 @@ function CollapsibleDeviceGroup({
   devices,
   currentDeviceId,
   formatWhen,
+  pushIds,
+  onPushChange,
 }: {
   label: string;
   devices: DeviceVisit[];
   currentDeviceId: string | null;
   formatWhen: (iso: string) => string;
+  pushIds: ReadonlySet<string>;
+  onPushChange: (id: string, enabled: boolean) => void;
 }) {
   if (devices.length === 0) return null;
   return (
@@ -222,6 +270,8 @@ function CollapsibleDeviceGroup({
             device={device}
             currentDeviceId={currentDeviceId}
             when={formatWhen(device.lastSeen)}
+            pushEnabled={pushIds.has(device.id.toLowerCase())}
+            onPushChange={onPushChange}
           />
         ))}
       </ul>
@@ -233,6 +283,22 @@ function DeviceLogSection({ open }: { open: boolean }) {
   const [summary, setSummary] = useState<DeviceLogSummary | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const { deviceIds } = useSyncExternalStore(
+    pushAlertStore.subscribe,
+    pushAlertStore.getSnapshot,
+    pushAlertStore.getServerSnapshot,
+  );
+  const pushIds = new Set(deviceIds);
+
+  async function onPushChange(id: string, enabled: boolean) {
+    setPushError(null);
+    try {
+      await pushAlertStore.setDeviceEnabled(id, enabled);
+    } catch (err) {
+      setPushError(err instanceof Error ? err.message : "Push-Gerät konnte nicht gespeichert werden.");
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -262,6 +328,9 @@ function DeviceLogSection({ open }: { open: boolean }) {
 
   const groups = summary ? groupDevicesByRecency(summary.devices) : null;
   const count = summary?.count ?? 0;
+  const knownIds = new Set(summary?.devices.map((device) => device.id.toLowerCase()) ?? []);
+  const orphanIds = summary ? deviceIds.filter((id) => !knownIds.has(id)) : [];
+  const pushCount = deviceIds.length;
 
   return (
     <SettingsSection
@@ -269,7 +338,12 @@ function DeviceLogSection({ open }: { open: boolean }) {
       iconClassName="bg-chart-2/12 text-chart-2"
       title="Geräte"
     >
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Push schaltet, welche Geräte Mitteilungen erhalten dürfen. Die Regel dafür steht
+        unter Benachrichtigungen.
+      </p>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {pushError ? <p className="text-xs text-destructive">{pushError}</p> : null}
       {!summary && !error ? (
         <p className="text-xs text-muted-foreground">Geräte werden geladen…</p>
       ) : null}
@@ -287,6 +361,8 @@ function DeviceLogSection({ open }: { open: boolean }) {
             {groups.olderDevices.length > 0
               ? ` · ${groups.olderDevices.length} älter`
               : null}
+            {" · "}
+            {pushCount} mit Push
           </p>
 
           <DeviceGroup
@@ -294,19 +370,48 @@ function DeviceLogSection({ open }: { open: boolean }) {
             devices={groups.todayDevices}
             currentDeviceId={deviceId}
             formatWhen={formatSeenTime}
+            pushIds={pushIds}
+            onPushChange={(id, enabled) => void onPushChange(id, enabled)}
           />
           <CollapsibleDeviceGroup
             label="Gestern"
             devices={groups.yesterdayDevices}
             currentDeviceId={deviceId}
             formatWhen={formatSeenTime}
+            pushIds={pushIds}
+            onPushChange={(id, enabled) => void onPushChange(id, enabled)}
           />
           <CollapsibleDeviceGroup
             label="Älter"
             devices={groups.olderDevices}
             currentDeviceId={deviceId}
             formatWhen={formatSeenOlder}
+            pushIds={pushIds}
+            onPushChange={(id, enabled) => void onPushChange(id, enabled)}
           />
+        </div>
+      ) : null}
+      {orphanIds.length > 0 ? (
+        <div className="flex flex-col gap-0.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Nicht mehr in der Liste
+          </p>
+          <ul className="flex flex-col">
+            {orphanIds.map((id) => (
+              <li
+                key={id}
+                className="flex items-center justify-between gap-3 border-b border-border/40 py-2 last:border-b-0"
+              >
+                <span className="font-mono text-xs text-muted-foreground">#{shortDeviceId(id)}</span>
+                <DevicePushSwitch
+                  id={id}
+                  label={`Gerät ${shortDeviceId(id)}`}
+                  enabled
+                  onChange={(device, enabled) => void onPushChange(device, enabled)}
+                />
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </SettingsSection>
