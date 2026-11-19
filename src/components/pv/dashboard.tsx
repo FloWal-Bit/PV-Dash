@@ -83,7 +83,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] bg-[radial-gradient(60%_50%_at_50%_-10%,color-mix(in_oklch,var(--color-primary)_16%,transparent),transparent_70%)]"
       />
 
-      {/* Header + Info-Banner als Sticky-Block. pb-4 = Card-Gap, ohne Abschlusslinie. */}
+      {/* Header + Info-Banner als ein Sticky-Block. pb-4 = Card-Gap, ohne Abschlusslinie. */}
       <div className="sticky top-0 z-30 bg-background pb-4">
         <DashboardHeader
           lastUpdated={lastUpdated}
@@ -95,6 +95,15 @@ export function Dashboard({ plantName }: { plantName: string }) {
           serverUnreachable={serverUnreachable}
         />
         <InfoBanner />
+        {/* Fest am Sticky-Block verankerte runde Ecken (gleicher Compositor-Layer → kein Wackeln beim Scrollen). */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-[calc(100%-1px)] h-[calc(var(--radius-2xl)+1px)] overflow-hidden pt-px"
+        >
+          <div className="dashboard-container h-full">
+            <div className="h-[calc(var(--radius-2xl)*2)] rounded-t-2xl shadow-[0_0_0_9999px_var(--background)]" />
+          </div>
+        </div>
       </div>
 
       <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 pb-4 sm:pb-6">
