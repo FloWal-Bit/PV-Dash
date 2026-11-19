@@ -83,15 +83,19 @@ export function Dashboard({ plantName }: { plantName: string }) {
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] bg-[radial-gradient(60%_50%_at_50%_-10%,color-mix(in_oklch,var(--color-primary)_16%,transparent),transparent_70%)]"
       />
 
-      <DashboardHeader
-        lastUpdated={lastUpdated}
-        plantName={plantName}
-        source={source}
-        gridSource={gridSource}
-        sourceWarning={sourceWarning}
-        gridWarning={gridWarning}
-        serverUnreachable={serverUnreachable}
-      />
+      {/* Header + Info-Banner als ein Sticky-Block: Scroll-Umbruch unter dem Banner. */}
+      <div className="sticky top-0 z-30 bg-background">
+        <DashboardHeader
+          lastUpdated={lastUpdated}
+          plantName={plantName}
+          source={source}
+          gridSource={gridSource}
+          sourceWarning={sourceWarning}
+          gridWarning={gridWarning}
+          serverUnreachable={serverUnreachable}
+        />
+        <InfoBanner />
+      </div>
 
       <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 py-4 sm:py-6">
         <ServerPauseBanner />
@@ -134,7 +138,6 @@ export function Dashboard({ plantName }: { plantName: string }) {
           <DashboardSkeleton />
         ) : (
           <>
-            <InfoBanner />
             <SunTimesCard
               className="min-w-0"
               referenceDate={new Date(snapshot.timestamp)}
