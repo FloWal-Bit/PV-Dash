@@ -3,10 +3,11 @@
  * (ausgehend) zu einem Cloud-MQTT-Broker und veröffentlicht dort laufend
  * seine Messwerte (siehe README.md, Abschnitt "whatwatt Go-Anbindung", für
  * Broker-Einrichtung und Geräte-Konfiguration). Diese App hält dazu eine
- * einzige, dauerhafte Abo-Verbindung zum selben Broker offen und
- * aktualisiert einen In-Memory-Zwischenspeicher, sobald eine neue Nachricht
- * eintrifft – ein API-Aufruf liest daraus nur den zuletzt bekannten Stand,
- * ohne selbst eine Netzwerk-Anfrage auszulösen.
+ * einzige Abo-Verbindung offen und aktualisiert einen In-Memory-Zwischenspeicher,
+ * sobald eine neue Nachricht eintrifft – ein API-Aufruf liest daraus nur den
+ * zuletzt bekannten Stand, ohne selbst eine Netzwerk-Anfrage auszulösen.
+ * Ändern sich URL, Zugangsdaten oder Topic (auch nach einem Env-Reload im
+ * Dev-Server), wird die alte Verbindung geschlossen und neu aufgebaut.
  *
  * Wichtig: Das setzt voraus, dass der Node-Prozess durchgehend läuft (z. B.
  * als Web-Service auf Render/Railway, nicht als serverlose Funktion) –
@@ -16,7 +17,7 @@
 
 import mqtt, { type MqttClient } from "mqtt";
 import { randomUUID } from "crypto";
-import { getWhatWattConfig } from "./config";
+import { getWhatWattConfig, whatWattConfigKey } from "./config";
 import { noteWhatWattHourSample } from "./hour-samples";
 import { mapMqttMessageToGridSnapshot, type WhatWattGridSnapshot } from "./mapper";
 import { parseWhatWattMqttPayload } from "./parse";
@@ -41,6 +42,7 @@ type MeterTotals = {
 
 type State = {
   client: MqttClient;
+  configKey: string;
   latest: { snapshot: WhatWattGridSnapshot; receivedAt: number } | null;
   latestMeters: MeterTotals | null;
   lastError: Error | null;
@@ -48,12 +50,33 @@ type State = {
 
 let state: State | null = null;
 
-function ensureClient(): State {
-  if (state) return state;
+function closeClient(current: State): void {
+  current.client.removeAllListeners();
+  // end() kann noch einen error emittieren. Ohne Listener beendet Node den Prozess.
+  current.client.on("error", () => {});
+  current.client.end(true);
+}
 
+/** Schliesst die Abo-Verbindung, falls sie offen ist. */
+export function closeWhatWattClient(): void {
+  if (!state) return;
+  closeClient(state);
+  state = null;
+}
+
+function ensureClient(): State {
   const config = getWhatWattConfig();
   if (!config) {
+    closeWhatWattClient();
     throw new Error("whatwatt Go ist nicht konfiguriert (WHATWATT_MQTT_URL/-TOPIC fehlen).");
+  }
+
+  const configKey = whatWattConfigKey(config);
+  if (state?.configKey === configKey) return state;
+  if (state) {
+    console.info("[whatwatt] MQTT-Konfiguration geändert, verbinde neu.");
+    closeClient(state);
+    state = null;
   }
 
   const client = mqtt.connect(config.url, {
@@ -65,7 +88,13 @@ function ensureClient(): State {
     clean: true,
   });
 
-  const newState: State = { client, latest: null, latestMeters: null, lastError: null };
+  const newState: State = {
+    client,
+    configKey,
+    latest: null,
+    latestMeters: null,
+    lastError: null,
+  };
   state = newState;
 
   client.on("connect", () => {

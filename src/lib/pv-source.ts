@@ -46,7 +46,11 @@ import {
   type OpenMeteoYieldMeta,
 } from "@/lib/open-meteo-yield/service";
 import { applyWhatWattHourConsumption } from "@/lib/whatwatt/hour-samples";
-import { getLatestWhatWattMeterTotals, getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
+import {
+  closeWhatWattClient,
+  getLatestWhatWattMeterTotals,
+  getWhatWattGridSnapshot,
+} from "@/lib/whatwatt/service";
 import { applyWhatWattLivePower, livePowerRates } from "@/lib/whatwatt-live-power";
 import { ensureStartupCatchup } from "@/lib/startup-catchup";
 
@@ -124,6 +128,7 @@ async function overlayWhatWattGrid(
   snapshot: PvSnapshot,
 ): Promise<{ snapshot: PvSnapshot; gridSource: GridSource; warning: string | null }> {
   if (!isWhatWattConfigured()) {
+    closeWhatWattClient();
     return { snapshot, gridSource: null, warning: null };
   }
 
