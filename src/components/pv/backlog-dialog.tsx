@@ -339,7 +339,7 @@ function DeviceLogSection({ open }: { open: boolean }) {
       title="Geräte"
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Push schaltet, welche Geräte Mitteilungen erhalten dürfen. Die Regel dafür steht
+        Standard aus. Nur angehakte Geräte erhalten Mitteilungen. Die Regel dafür steht
         unter Benachrichtigungen.
       </p>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
