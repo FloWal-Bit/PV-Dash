@@ -32,6 +32,11 @@ export function getWhatWattConfig(): WhatWattMqttConfig | null {
   return { url, username: username ?? "", password: password ?? "", topic };
 }
 
+/** Identifiziert URL, Zugangsdaten und Topic. Passwort bleibt Teil des Schlüssels, wird aber nicht geloggt. */
+export function whatWattConfigKey(config: WhatWattMqttConfig): string {
+  return [config.url, config.username, config.password, config.topic].join("\0");
+}
+
 export function isWhatWattConfigured(): boolean {
   return getWhatWattConfig() !== null;
 }
