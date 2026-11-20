@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
-  Clock,
   CloudDrizzle,
   Cloudy,
   Sun,
@@ -150,15 +149,14 @@ function SunTimesDayCard({
       <CardHeader>
         <CardTitle className="text-sm font-medium text-card-foreground capitalize">
           {formatDayHeading(date)}
+          {showLiveClock ? (
+            <span className="normal-case tabular-nums">
+              {` · ${formatTimeWithSeconds(currentTime)}`}
+            </span>
+          ) : null}
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-6 sm:gap-x-2">
-        <SunStat
-          icon={<Clock className="size-4" />}
-          label="Uhrzeit"
-          value={showLiveClock ? formatTimeWithSeconds(currentTime) : "–"}
-          accent="slate"
-        />
+      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
         <SunStat
           icon={weatherIcon[weatherCategory]}
           label="Wetter"
