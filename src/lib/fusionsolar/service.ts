@@ -690,68 +690,44 @@ function delay(ms: number): Promise<void> {
 
 /**
  * Einmaliger sequentieller Warmup der FS-Caches (Live → Heute → Woche/Monat/Jahr → Laufzeit).
+ * Nutzt dieselben In-Flight-Abrufe wie die Dashboard-Routen, damit der erste
+ * Client nicht parallel noch einmal dieselben Huawei-Calls startet.
  * Fehler in einem Schritt stoppen die folgenden nicht — teilweise warme Caches sind ok.
  */
 export async function warmFusionSolarCachesSequential(options?: {
   gapMs?: number;
+  onHistoryReady?: () => void;
 }): Promise<void> {
   const gapMs = options?.gapMs ?? 750;
 
   try {
-    const snapshot = await fetchLiveSnapshot();
-    liveCache = { value: snapshot, expiresAt: Date.now() + LIVE_TTL_MS };
-    liveFailure = null;
+    await getFusionSolarLiveSnapshot();
   } catch (err) {
-    liveFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
     console.error("[fusionsolar] Catch-up Live fehlgeschlagen:", asError(err).message);
   }
 
   await delay(gapMs);
 
   try {
-    const today = await fetchTodayHistory();
-    todayHistoryCache = {
-      dayKey: zurichDayKey(),
-      value: today,
-      expiresAt: Date.now() + todayHistoryCacheTtlMs(today),
-    };
-    todayHistoryFailure = null;
+    await getTodayHistory();
   } catch (err) {
-    todayHistoryFailure = {
-      dayKey: zurichDayKey(),
-      value: asError(err),
-      expiresAt: Date.now() + todayHistoryTtlMs(),
-    };
     console.error("[fusionsolar] Catch-up Heute-Kurve fehlgeschlagen:", asError(err).message);
   }
 
   await delay(gapMs);
 
   try {
-    const ranges = await fetchRangeHistory();
-    rangeHistoryCache = {
-      dayKey: zurichDayKey(),
-      value: ranges,
-      expiresAt: Date.now() + SLOW_HISTORY_TTL_MS,
-    };
-    rangeHistoryFailure = null;
+    await getRangeHistory();
   } catch (err) {
-    rangeHistoryFailure = {
-      dayKey: zurichDayKey(),
-      value: asError(err),
-      expiresAt: Date.now() + LIVE_TTL_MS,
-    };
     console.error("[fusionsolar] Catch-up Woche/Monat/Jahr fehlgeschlagen:", asError(err).message);
   }
 
   await delay(gapMs);
 
   try {
-    const lifetime = await fetchLifetime();
-    lifetimeCache = { value: lifetime, expiresAt: Date.now() + LIFETIME_TTL_MS };
-    lifetimeFailure = null;
+    await getFusionSolarLifetimeHistory();
   } catch (err) {
-    lifetimeFailure = { value: asError(err), expiresAt: Date.now() + LIVE_TTL_MS };
     console.error("[fusionsolar] Catch-up Laufzeit fehlgeschlagen:", asError(err).message);
   }
+  options?.onHistoryReady?.();
 }
