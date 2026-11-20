@@ -462,13 +462,13 @@ function StromkontoFocus({
         >
           <div
             className={cn(
-              "stromkonto-focus-circle flex size-48 flex-col items-center justify-center gap-2 rounded-full border-[3px] bg-gradient-to-br shadow-inner",
+              "stromkonto-focus-circle flex size-[13.2rem] flex-col items-center justify-center gap-2 rounded-full border-[3px] bg-gradient-to-br shadow-inner",
               muted
                 ? "border-border text-muted-foreground/60"
                 : cn(ACCENT_RING[accent], ACCENT_BG[accent]),
             )}
           >
-            <StromkontoBattery direction={direction} className="size-10" />
+            <StromkontoBattery direction={direction} className="size-11" />
             <span className="flex items-baseline gap-x-1 whitespace-nowrap">
               <span
                 className={cn(

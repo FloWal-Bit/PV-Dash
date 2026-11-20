@@ -295,8 +295,8 @@
       min-height: 0;
     }
     .stromkonto-focus-circle {
-      width: 9rem;
-      height: 9rem;
+      width: 9.9rem;
+      height: 9.9rem;
     }
     /* Heute-Kurven halb so dick, damit sie auf dem schmalen Display lesbar bleiben. */
     .today-ertrag .recharts-area-curve,
