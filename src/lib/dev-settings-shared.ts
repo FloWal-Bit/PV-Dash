@@ -58,7 +58,8 @@ export type InfoBannerSchedule = {
 };
 
 export type SharedDevSettings = {
-  hideSimulated: boolean;
+  /** true = Ersatzkurve zeigen, wenn FusionSolar fehlt. Standard aus. */
+  showSimulated: boolean;
   /** Hinweis oberhalb der Wetterkarte. Leer blendet das Banner aus. */
   infoBanner: string;
   infoBannerVisibleFrom: string | null;
@@ -77,7 +78,7 @@ export type SharedDevSettings = {
 };
 
 export type DevSettingsUpdate = {
-  hideSimulated?: boolean;
+  showSimulated?: boolean;
   infoBanner?: string;
   infoBannerVisibleFrom?: string | null;
   infoBannerVisibleUntil?: string | null;

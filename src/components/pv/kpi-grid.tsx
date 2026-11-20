@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { BatteryFull, Home, Zap } from "lucide-react";
 import { StatCard } from "@/components/pv/stat-card";
 import { isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
-import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { showSimulatedStore } from "@/lib/show-simulated";
 import { formatSignedSwissNumber, formatSwissNumber } from "@/lib/format";
 import type { PvSnapshot } from "@/lib/pv-data";
 import type { DataSource, GridSource } from "@/lib/pv-source";
@@ -21,13 +21,13 @@ export function KpiGrid({
 }) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
-  const hideSimulated = useSyncExternalStore(
-    hideSimulatedStore.subscribe,
-    hideSimulatedStore.getSnapshot,
-    hideSimulatedStore.getServerSnapshot,
+  const showSimulated = useSyncExternalStore(
+    showSimulatedStore.subscribe,
+    showSimulatedStore.getSnapshot,
+    showSimulatedStore.getServerSnapshot,
   );
-  const hidePv = hideSimulated && pvSimulated;
-  const hideGrid = hideSimulated && gridSimulated;
+  const hidePv = pvSimulated && !showSimulated;
+  const hideGrid = gridSimulated && !showSimulated;
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoChangeNegative =

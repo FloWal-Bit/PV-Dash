@@ -1,7 +1,7 @@
 "use client";
 
 import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
-import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { showSimulatedStore } from "@/lib/show-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
 import { pushAlertStore } from "@/lib/push-alert-settings";
 import { yieldForecastStore } from "@/lib/yield-forecast-settings";
@@ -12,7 +12,7 @@ let ready = false;
 
 export function applySharedDevSettings(data: SharedDevSettings): void {
   lastUpdatedAt = data.updatedAt;
-  hideSimulatedStore.applyRemote(data.hideSimulated);
+  showSimulatedStore.applyRemote(data.showSimulated);
   infoBannerStore.applyRemote({
     text: data.infoBanner,
     visibleFrom: data.infoBannerVisibleFrom,
@@ -58,9 +58,11 @@ export function putDevSettings(update: DevSettingsUpdate): Promise<SharedDevSett
 
 function readLocalSeed(): DevSettingsUpdate | null {
   if (typeof window === "undefined") return null;
+  const showRaw = window.localStorage.getItem("pv-dash:show-simulated");
+  if (showRaw === "0" || showRaw === "1") return { showSimulated: showRaw === "1" };
   const hideRaw = window.localStorage.getItem("pv-dash:hide-simulated");
-  if (hideRaw !== "0" && hideRaw !== "1") return null;
-  return { hideSimulated: hideRaw === "1" };
+  if (hideRaw === "0" || hideRaw === "1") return { showSimulated: hideRaw === "0" };
+  return null;
 }
 
 export async function pullDevSettings(): Promise<void> {

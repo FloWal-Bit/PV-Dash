@@ -29,7 +29,8 @@ export type { DevSettingsUpdate, SharedDevSettings };
 
 type PersistedDevSettings = {
   updatedAt: string;
-  hideSimulated: boolean | null;
+  /** null = noch nicht gesetzt → aus. */
+  showSimulated: boolean | null;
   infoBanner: string;
   infoBannerVisibleFrom: string | null;
   infoBannerVisibleUntil: string | null;
@@ -48,7 +49,12 @@ function readFile(): PersistedDevSettings | null {
     const parsed: unknown = JSON.parse(readFileSync(DATA_FILE, "utf8"));
     if (typeof parsed !== "object" || parsed === null) return null;
     const v = parsed as Record<string, unknown>;
-    const hideSimulated = typeof v.hideSimulated === "boolean" ? v.hideSimulated : null;
+    const showSimulated =
+      typeof v.showSimulated === "boolean"
+        ? v.showSimulated
+        : typeof v.hideSimulated === "boolean"
+          ? !v.hideSimulated
+          : null;
     const infoBanner = readInfoBanner(v.infoBanner);
     const infoBannerVisibleFrom = readInfoBannerInstant(v.infoBannerVisibleFrom);
     const infoBannerVisibleUntil = readInfoBannerInstant(v.infoBannerVisibleUntil);
@@ -60,10 +66,11 @@ function readFile(): PersistedDevSettings | null {
       "yieldForecast" in v ||
       "serverPauseEnabled" in v ||
       "serverPauseStopAt" in v ||
-      "serverPauseResumeAt" in v;
+      "serverPauseResumeAt" in v ||
+      "hideSimulated" in v;
     const file: PersistedDevSettings = {
       updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : new Date(0).toISOString(),
-      hideSimulated,
+      showSimulated,
       infoBanner,
       infoBannerVisibleFrom,
       infoBannerVisibleUntil,
@@ -71,7 +78,7 @@ function readFile(): PersistedDevSettings | null {
       pushDeviceIds,
       surplusAlert,
     };
-    // Alte Standort-/Server-Pause-Felder beim nächsten Lesen aus der Datei streichen.
+    // Alte Standort-, Server-Pause- und hideSimulated-Felder beim nächsten Lesen streichen.
     if (hadLegacy) writeFile(file);
     return file;
   } catch {
@@ -86,7 +93,7 @@ function resolvePerformanceRatio(stored: number | null | undefined): number {
 
 function resolve(file: PersistedDevSettings | null): SharedDevSettings {
   return {
-    hideSimulated: file?.hideSimulated ?? true,
+    showSimulated: file?.showSimulated ?? false,
     infoBanner: file?.infoBanner ?? "",
     infoBannerVisibleFrom: file?.infoBannerVisibleFrom ?? null,
     infoBannerVisibleUntil: file?.infoBannerVisibleUntil ?? null,
@@ -121,10 +128,10 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
 
   const next: PersistedDevSettings = {
     updatedAt: new Date().toISOString(),
-    hideSimulated:
-      typeof update.hideSimulated === "boolean"
-        ? update.hideSimulated
-        : (current?.hideSimulated ?? null),
+    showSimulated:
+      typeof update.showSimulated === "boolean"
+        ? update.showSimulated
+        : (current?.showSimulated ?? null),
     infoBanner:
       typeof update.infoBanner === "string"
         ? normalizeInfoBanner(update.infoBanner)
