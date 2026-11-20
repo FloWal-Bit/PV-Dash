@@ -826,6 +826,7 @@ export function PushNotificationSettings() {
     pushAlertStore.getServerSnapshot,
   );
   const [pending, setPending] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
   const deviceId = useSyncExternalStore(
     deviceIdStore.subscribe,
     deviceIdStore.getSnapshot,
@@ -895,10 +896,21 @@ export function PushNotificationSettings() {
         variant="outline"
         size="sm"
         disabled={!enabled}
-        onClick={() => sendTestNotification()}
+        onClick={() => {
+          setTestError(null);
+          void sendTestNotification().then((result) => {
+            if (result === "shown") return;
+            setTestError(
+              result === "denied"
+                ? "Benachrichtigungen sind für diese Seite blockiert."
+                : "Die Testbenachrichtigung konnte nicht angezeigt werden.",
+            );
+          });
+        }}
       >
         Testbenachrichtigung senden
       </Button>
+      {testError ? <p className="text-xs text-destructive">{testError}</p> : null}
     </SettingsSection>
   );
 }

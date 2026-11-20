@@ -126,30 +126,81 @@ function todayKey(timestamp: number): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-function showNotification(body: string, tag: string): void {
-  if (!isSupported()) return;
+export type TestNotificationResult = "shown" | "unsupported" | "denied" | "failed";
+
+/**
+ * Android Chrome (auch als installierte App) ignoriert `new Notification()`,
+ * solange die Seite offen ist, und wirft oft «Illegal constructor».
+ * Die Anzeige läuft deshalb über den Service Worker. Der Konstruktor bleibt
+ * der Fallback für Desktop-Browser ohne aktiven Worker.
+ */
+async function showNotification(
+  body: string,
+  tag: string,
+  renotify = false,
+): Promise<TestNotificationResult> {
+  if (typeof window === "undefined" || !isSupported()) return "unsupported";
+  if (Notification.permission !== "granted") return "denied";
+
+  const options: NotificationOptions = {
+    body,
+    tag,
+    renotify,
+    icon: APP_ICON_SRC,
+  };
+
   try {
-    new Notification("PV Dash", {
-      body,
-      icon: APP_ICON_SRC,
-      tag,
-    });
+    if (await showThroughServiceWorker(options)) return "shown";
   } catch {
-    // Manche Browser (z. B. iOS Safari im Nicht-PWA-Modus) unterstützen die
-    // Notification-API technisch, werfen bei `new Notification(...)` aber
-    // einen Fehler – in dem Fall lassen wir es still fehlschlagen.
+    // Worker da, Anzeige trotzdem fehlgeschlagen — Konstruktor versuchen.
+  }
+  return showThroughConstructor(options) ? "shown" : "failed";
+}
+
+async function showThroughServiceWorker(options: NotificationOptions): Promise<boolean> {
+  if (!("serviceWorker" in navigator)) return false;
+  const registration = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => {
+      window.setTimeout(() => resolve(null), 2500);
+    }),
+  ]);
+  if (!registration) return false;
+  try {
+    await registration.showNotification("PV Dash", options);
+  } catch {
+    await registration.showNotification("PV Dash", {
+      body: options.body,
+      tag: options.tag,
+      renotify: options.renotify,
+    });
+  }
+  return true;
+}
+
+function showThroughConstructor(options: NotificationOptions): boolean {
+  try {
+    new Notification("PV Dash", options);
+    return true;
+  } catch {
+    try {
+      new Notification("PV Dash", { body: options.body, tag: options.tag });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
 function showYieldNotification(todayYieldKwh: number): void {
-  showNotification(
+  void showNotification(
     `Deine Anlage hat heute bereits ${formatYieldKwh(todayYieldKwh, 1)} erzeugt.`,
     "pv-yield-threshold",
   );
 }
 
 function showSurplusNotification(exportKw: number): void {
-  showNotification(`Stromüberschuss: ${formatKw(exportKw)} Einspeisung.`, "pv-surplus");
+  void showNotification(`Stromüberschuss: ${formatKw(exportKw)} Einspeisung.`, "pv-surplus");
 }
 
 function pushReadyOnThisDevice(): boolean {
@@ -213,8 +264,16 @@ export function checkSurplusNotification(
   showSurplusNotification(decision.exportKw);
 }
 
-/** Löst sofort eine Test-Benachrichtigung aus (unabhängig von Schwelle, Tag und Geräteliste). */
-export function sendTestNotification(): void {
+/**
+ * Löst sofort eine Test-Benachrichtigung aus (unabhängig von Schwelle, Tag und Geräteliste).
+ * Eigenes Tag mit `renotify`, damit ein erneuter Tipp wieder einen Hinweis auslöst
+ * und keine echte Überschuss-Meldung ersetzt.
+ */
+export function sendTestNotification(): Promise<TestNotificationResult> {
   const minKw = currentPushAlertState().surplus.minKw;
-  showSurplusNotification(minKw > 0 ? minKw : 1);
+  return showNotification(
+    `Stromüberschuss: ${formatKw(minKw > 0 ? minKw : 1)} Einspeisung.`,
+    "pv-dash-test",
+    true,
+  );
 }
