@@ -10,7 +10,7 @@ import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SIMULATED_OPACITY_CLASS, isGridSimulated, isPvSimulated } from "@/lib/data-fidelity";
 import { energyFlowDefaultTabStore } from "@/lib/energy-flow-default-tab";
-import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { showSimulatedStore } from "@/lib/show-simulated";
 import { formatKw, kwFractionDigits } from "@/lib/format";
 import { balanceEnergyFlowDisplay, LIVE_POWER_IDLE_KW } from "@/lib/whatwatt-live-power";
 
@@ -492,14 +492,14 @@ function StromkontoFocus({
 export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFlowProps) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
-  const hideSimulated = useSyncExternalStore(
-    hideSimulatedStore.subscribe,
-    hideSimulatedStore.getSnapshot,
-    hideSimulatedStore.getServerSnapshot,
+  const showSimulated = useSyncExternalStore(
+    showSimulatedStore.subscribe,
+    showSimulatedStore.getSnapshot,
+    showSimulatedStore.getServerSnapshot,
   );
-  const hidePv = hideSimulated && pvSimulated;
-  const hideConsumption = hideSimulated && (pvSimulated || gridSimulated);
-  const hideGrid = hideSimulated && gridSimulated;
+  const hidePv = pvSimulated && !showSimulated;
+  const hideConsumption = (pvSimulated || gridSimulated) && !showSimulated;
+  const hideGrid = gridSimulated && !showSimulated;
   const gridKw = snapshot.gridKw;
   const hasGrid = gridKw != null;
   const isProducing = snapshot.productionKw > LIVE_POWER_IDLE_KW;

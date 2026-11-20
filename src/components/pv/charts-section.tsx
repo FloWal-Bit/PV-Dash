@@ -28,7 +28,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SwipePageSurface } from "@/components/pv/swipe-carousel";
 import { SIMULATED_OPACITY_CLASS, isPvSimulated } from "@/lib/data-fidelity";
-import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { showSimulatedStore } from "@/lib/show-simulated";
 import { pvStore } from "@/lib/pv-store";
 import { withLiveDayTotals } from "@/lib/fusionsolar/mapper";
 import type { DailyEnergyPoint, HistoryPoint } from "@/lib/pv-data";
@@ -1294,17 +1294,17 @@ export function ChartsSection({
   const tooltipOpen = !tooltipDismissed;
   const range = RANGE_ORDER[page] ?? "heute";
   const pvSimulated = isPvSimulated(source);
-  const hideSimulated = useSyncExternalStore(
-    hideSimulatedStore.subscribe,
-    hideSimulatedStore.getSnapshot,
-    hideSimulatedStore.getServerSnapshot,
+  const showSimulated = useSyncExternalStore(
+    showSimulatedStore.subscribe,
+    showSimulatedStore.getSnapshot,
+    showSimulatedStore.getServerSnapshot,
   );
   const wideMonthAxis = useSyncExternalStore(
     subscribeWideMonthAxis,
     getWideMonthAxisSnapshot,
     getWideMonthAxisServerSnapshot,
   );
-  const hidePv = hideSimulated && pvSimulated;
+  const hidePv = pvSimulated && !showSimulated;
 
   const todayChartData = useMemo((): TodayChartPoint[] => {
     const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();

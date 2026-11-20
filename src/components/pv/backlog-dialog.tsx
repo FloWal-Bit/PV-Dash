@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ChevronRight,
   Clock3,
-  EyeOff,
+  Eye,
   Info,
   RefreshCcw,
   Smartphone,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { hideSimulatedStore } from "@/lib/hide-simulated";
+import { showSimulatedStore } from "@/lib/show-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
 import {
   MAX_INFO_BANNER_LENGTH,
@@ -74,7 +74,7 @@ export function BacklogDialog({
           <PushNotificationSettings />
           <DeveloperPlantSettings />
           <FetchBudgetSection />
-          <HideSimulatedToggle />
+          <ShowSimulatedToggle />
           {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
         </div>
       </DialogContent>
@@ -592,29 +592,29 @@ function FetchBudgetSection() {
   );
 }
 
-function HideSimulatedToggle() {
-  const hideSimulated = useSyncExternalStore(
-    hideSimulatedStore.subscribe,
-    hideSimulatedStore.getSnapshot,
-    hideSimulatedStore.getServerSnapshot,
+function ShowSimulatedToggle() {
+  const showSimulated = useSyncExternalStore(
+    showSimulatedStore.subscribe,
+    showSimulatedStore.getSnapshot,
+    showSimulatedStore.getServerSnapshot,
   );
 
   return (
     <SettingsSection
-      icon={<EyeOff className="size-4" />}
+      icon={<Eye className="size-4" />}
       iconClassName="bg-muted text-foreground/70"
-      title="Simulierte Werte ausblenden"
+      title="Simulierte Werte einblenden"
     >
       <div className="flex items-start justify-between gap-3">
         <span className="text-xs leading-relaxed text-muted-foreground">
-          Ertrag, Verbrauch und Verläufe ohne FusionSolar bleiben leer. Gemessene Netzwerte
+          Zeigt Ertrag, Verbrauch und Verläufe, wenn FusionSolar fehlt. Gemessene Netzwerte
           von whatwatt Go bleiben sichtbar.
         </span>
         <Switch
-          id="hide-simulated"
-          aria-label="Simulierte Werte ausblenden"
-          checked={hideSimulated}
-          onCheckedChange={(checked) => hideSimulatedStore.set(checked)}
+          id="show-simulated"
+          aria-label="Simulierte Werte einblenden"
+          checked={showSimulated}
+          onCheckedChange={(checked) => showSimulatedStore.set(checked)}
           className="data-checked:bg-chart-3"
         />
       </div>
