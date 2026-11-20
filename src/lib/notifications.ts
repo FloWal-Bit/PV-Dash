@@ -239,34 +239,9 @@ function readSurplusFiredAt(): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-type SurplusBannerListener = () => void;
-const surplusBannerListeners = new Set<SurplusBannerListener>();
-let surplusBannerKw: number | null = null;
-
-function setSurplusBanner(exportKw: number | null) {
-  if (surplusBannerKw === exportKw) return;
-  surplusBannerKw = exportKw;
-  for (const listener of surplusBannerListeners) listener();
-}
-
-/** Einspeisung in kW, solange die Überschuss-Regel auf dem Dashboard gilt. */
-export const surplusBannerStore = {
-  subscribe(listener: SurplusBannerListener): () => void {
-    surplusBannerListeners.add(listener);
-    return () => surplusBannerListeners.delete(listener);
-  },
-  getSnapshot(): number | null {
-    return surplusBannerKw;
-  },
-  getServerSnapshot(): number | null {
-    return null;
-  },
-};
-
 /**
  * Mitteilung, wenn die Einspeisung die gespeicherte Schwelle im Tages- und
- * Zeitfenster erreicht. Höchstens einmal pro Überschuss-Phase als Push.
- * Das Dashboard zeigt den Zustand, solange er anhält, auch ohne Push-Freigabe.
+ * Zeitfenster erreicht. Höchstens einmal pro Überschuss-Phase.
  * `timestamp` ist der Messzeitpunkt; deutlich ältere Werte werden ignoriert.
  */
 export function checkSurplusNotification(
@@ -275,10 +250,8 @@ export function checkSurplusNotification(
   nowMs: number = Date.now(),
 ): void {
   if (typeof window === "undefined") return;
-  if (!Number.isFinite(timestamp) || Math.abs(nowMs - timestamp) > SURPLUS_MAX_SAMPLE_AGE_MS) {
-    setSurplusBanner(null);
-    return;
-  }
+  if (!pushReadyOnThisDevice()) return;
+  if (!Number.isFinite(timestamp) || Math.abs(nowMs - timestamp) > SURPLUS_MAX_SAMPLE_AGE_MS) return;
 
   const settings: SurplusAlertSettings = currentPushAlertState().surplus;
   const decision = evaluateSurplusAlert({
@@ -290,10 +263,7 @@ export function checkSurplusNotification(
     cooldownMs: SURPLUS_ALERT_COOLDOWN_MS,
   });
   window.localStorage.setItem(SURPLUS_ACTIVE_KEY, decision.active ? "1" : "0");
-  const visible =
-    decision.active && decision.exportKw != null && decision.exportKw > 0 ? decision.exportKw : null;
-  setSurplusBanner(visible);
-  if (!decision.fire || decision.exportKw == null || !pushReadyOnThisDevice()) return;
+  if (!decision.fire || decision.exportKw == null) return;
   window.localStorage.setItem(SURPLUS_FIRED_AT_KEY, String(nowMs));
   showSurplusNotification(decision.exportKw);
 }
