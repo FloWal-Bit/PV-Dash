@@ -7,6 +7,7 @@ import { KpiGrid } from "@/components/pv/kpi-grid";
 import { EnergyFlow } from "@/components/pv/energy-flow";
 import { SunTimesCard } from "@/components/pv/sun-times-card";
 import { InfoBanner } from "@/components/pv/info-banner";
+import { SurplusBanner } from "@/components/pv/surplus-banner";
 import { ServerPauseBanner } from "@/components/pv/server-pause-banner";
 import { ChartsSection } from "@/components/pv/charts-section";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,6 +97,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
           serverUnreachable={serverUnreachable}
         />
         <InfoBanner />
+        <SurplusBanner />
         {/* Fest am Sticky-Block verankerte runde Ecken (gleicher Compositor-Layer → kein Wackeln beim Scrollen). */}
         <div
           aria-hidden
