@@ -46,9 +46,13 @@ import {
   type OpenMeteoYieldMeta,
 } from "@/lib/open-meteo-yield/service";
 import { applyWhatWattHourConsumption } from "@/lib/whatwatt/hour-samples";
-import { getLatestWhatWattMeterTotals, getWhatWattGridSnapshot } from "@/lib/whatwatt/service";
+import {
+  getLatestWhatWattMeterTotals,
+  getWhatWattGridSnapshot,
+  warmWhatWattConnection,
+} from "@/lib/whatwatt/service";
 import { applyWhatWattLivePower, livePowerRates } from "@/lib/whatwatt-live-power";
-import { ensureStartupCatchup } from "@/lib/startup-catchup";
+import { ensureStartupCatchup, whenStartupHistoryReady } from "@/lib/startup-catchup";
 
 export type PvHistory = {
   today: HistoryPoint[];
@@ -175,7 +179,11 @@ async function rememberDevRateLimit(err: unknown): Promise<void> {
  * Verbrauch und Stromkonto auf die whatwatt-Messung aus.
  */
 export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
-  await ensureStartupCatchup();
+  // Warmup im Hintergrund. Live hängt sich an den laufenden FusionSolar-Abruf
+  // und kehrt zurück, sobald der Snapshot da ist — nicht erst nach Woche,
+  // Laufzeit und Wetter.
+  warmWhatWattConnection();
+  void ensureStartupCatchup();
   const base = await (async (): Promise<{ source: DataSource; snapshot: PvSnapshot; warning: string | null }> => {
     if (!isFusionSolarConfigured()) {
       return { source: "simulation", snapshot: getSnapshot(new Date()), warning: null };
@@ -304,7 +312,7 @@ async function withTodayConsumption(today: HistoryPoint[]): Promise<HistoryPoint
 
 /** Verlaufsreihen für die Diagramme. */
 export async function getHistoryPayload(): Promise<HistoryPayload> {
-  await ensureStartupCatchup();
+  await whenStartupHistoryReady();
   if (!isFusionSolarConfigured()) {
     return { source: "simulation", ...simulateHistory() };
   }

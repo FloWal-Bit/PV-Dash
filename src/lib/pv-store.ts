@@ -55,6 +55,20 @@ const PAUSE_PROBE_INTERVAL_MS = 20 * 60_000;
 const SLEEP_SNAPSHOT_LEAD_MS = 3 * 60_000;
 /** Nach whatwatt-Warmup (erste MQTT-Nachricht fehlt) einmal nachziehen. */
 const WHATWATT_WARMUP_RETRY_MS = 8_000;
+/**
+ * Hängender Abruf (z. B. Warmup) darf den nächsten Versuch nicht minutenlang
+ * blockieren. Danach bleibt der Vortags-Cache sichtbar und wird neu versucht.
+ */
+const DASHBOARD_FETCH_TIMEOUT_MS = 45_000;
+/** Solange noch der Vortag auf dem Schirm ist: schneller nachziehen als alle 15 s. */
+const PREVIOUS_DAY_LIVE_INTERVAL_MS = 5_000;
+
+function dashboardFetch(path: string): Promise<Response> {
+  return fetch(path, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(DASHBOARD_FETCH_TIMEOUT_MS),
+  });
+}
 
 function nextLiveDelayMs(nowMs = Date.now()): number {
   if (!isScheduledServerPause(nowMs)) return LIVE_INTERVAL_MS;
@@ -119,6 +133,16 @@ export function isPreviousZurichDayData(
     return true;
   }
   return false;
+}
+
+/** Nur die Verlaufsreihe, nicht der Live-Snapshot. Verhindert eine Nachlade-Schleife, während Live noch auf MQTT wartet. */
+function isPreviousZurichDayHistory(
+  history: PvStoreState["history"],
+  nowMs: number = Date.now(),
+): boolean {
+  const today = zurichDayKey(nowMs);
+  const heute = history?.week?.find((point) => point.label === "Heute");
+  return heute?.dayKey != null && heute.dayKey !== today;
 }
 
 function hydrateFromOfflineCache(): PvStoreState {
@@ -213,7 +237,7 @@ class PvStore {
     this.liveInflight = (async () => {
       try {
         await ensureDevSettingsReady();
-        const res = await fetch("/api/pv", { cache: "no-store" });
+        const res = await dashboardFetch("/api/pv");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const payload = (await res.json()) as LiveResponse;
         applyLiveDevSettings(payload.devSettings);
@@ -281,7 +305,7 @@ class PvStore {
     if (this.historyInflight) return this.historyInflight;
     this.historyInflight = (async () => {
       try {
-        const res = await fetch("/api/pv/history", { cache: "no-store" });
+        const res = await dashboardFetch("/api/pv/history");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const payload = (await res.json()) as HistoryResponse;
         this.lastHistoryAt = Date.now();
@@ -397,7 +421,10 @@ class PvStore {
   private armLiveTimer() {
     if (typeof document === "undefined" || document.hidden) return;
     if (this.liveTimeoutId) clearTimeout(this.liveTimeoutId);
-    const delay = nextLiveDelayMs();
+    const delay =
+      !isScheduledServerPause() && isPreviousZurichDayData(this.state)
+        ? PREVIOUS_DAY_LIVE_INTERVAL_MS
+        : nextLiveDelayMs();
     this.liveTimeoutId = setTimeout(() => {
       this.liveTimeoutId = null;
       void this.tickLive().finally(() => {
@@ -422,10 +449,14 @@ class PvStore {
       }, delay);
       return;
     }
-    // Direkt nach Pause-Ende: nicht erst 15 Min warten, wenn Stand noch vom Vortag.
-    if (isPreviousZurichDayData(this.state)) {
+    // Verlauf selbst noch vom Vortag: kurz warten und neu holen, nicht alle 15 Min
+    // und nicht in einer Schleife, solange nur der Live-Snapshot hinterherhinkt.
+    if (isPreviousZurichDayHistory(this.state.history)) {
       this.lastHistoryAt = null;
-      void this.tickHistory().finally(() => this.armHistoryTimer());
+      this.historyTimeoutId = setTimeout(() => {
+        this.historyTimeoutId = null;
+        void this.tickHistory().finally(() => this.armHistoryTimer());
+      }, PREVIOUS_DAY_LIVE_INTERVAL_MS);
       return;
     }
     this.historyTimeoutId = setTimeout(() => {

@@ -48,6 +48,17 @@ type State = {
 
 let state: State | null = null;
 
+/** MQTT-Abo starten, ohne auf die erste Nachricht zu warten. */
+export function warmWhatWattConnection(): void {
+  if (!getWhatWattConfig()) return;
+  try {
+    ensureClient();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+    console.error("[whatwatt] MQTT-Start fehlgeschlagen:", message);
+  }
+}
+
 function ensureClient(): State {
   if (state) return state;
 

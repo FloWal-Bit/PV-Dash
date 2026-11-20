@@ -43,6 +43,19 @@ type CacheEntry = {
 
 let cache: CacheEntry | null = null;
 let cacheKey = "";
+let forecastInFlight: { key: string; promise: Promise<HourlyGti | null> } | null = null;
+
+function loadForecastHourlyShared(
+  plant: YieldForecastPlant,
+  key: string,
+): Promise<HourlyGti | null> {
+  if (forecastInFlight?.key === key) return forecastInFlight.promise;
+  const promise = loadForecastHourly(plant).finally(() => {
+    if (forecastInFlight?.promise === promise) forecastInFlight = null;
+  });
+  forecastInFlight = { key, promise };
+  return promise;
+}
 
 export function dateKeyInZurich(date: Date): string {
   return date.toLocaleDateString("en-CA", { timeZone: OPEN_METEO_TIMEZONE });
@@ -186,7 +199,7 @@ export async function getOpenMeteoTodayAndTomorrowYieldKwh(
     hourly = cache.hourly;
   } else {
     try {
-      hourly = await loadForecastHourly(plant);
+      hourly = await loadForecastHourlyShared(plant, key);
       if (!hourly) {
         return {
           ...empty,
