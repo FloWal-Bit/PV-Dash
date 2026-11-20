@@ -128,6 +128,9 @@ function todayKey(timestamp: number): string {
 
 export type TestNotificationResult = "shown" | "unsupported" | "denied" | "failed";
 
+/** `renotify` ist gültiges Notification-Feld, fehlt aber in den DOM-Typen von TypeScript 5. */
+type DashNotificationOptions = NotificationOptions & { renotify?: boolean };
+
 /**
  * Android Chrome (auch als installierte App) ignoriert `new Notification()`,
  * solange die Seite offen ist, und wirft oft «Illegal constructor».
@@ -142,7 +145,7 @@ async function showNotification(
   if (typeof window === "undefined" || !isSupported()) return "unsupported";
   if (Notification.permission !== "granted") return "denied";
 
-  const options: NotificationOptions = {
+  const options: DashNotificationOptions = {
     body,
     tag,
     renotify,
@@ -157,7 +160,7 @@ async function showNotification(
   return showThroughConstructor(options) ? "shown" : "failed";
 }
 
-async function showThroughServiceWorker(options: NotificationOptions): Promise<boolean> {
+async function showThroughServiceWorker(options: DashNotificationOptions): Promise<boolean> {
   if (!("serviceWorker" in navigator)) return false;
   const registration = await Promise.race([
     navigator.serviceWorker.ready,
@@ -169,16 +172,17 @@ async function showThroughServiceWorker(options: NotificationOptions): Promise<b
   try {
     await registration.showNotification("PV Dash", options);
   } catch {
-    await registration.showNotification("PV Dash", {
+    const withoutIcon: DashNotificationOptions = {
       body: options.body,
       tag: options.tag,
       renotify: options.renotify,
-    });
+    };
+    await registration.showNotification("PV Dash", withoutIcon);
   }
   return true;
 }
 
-function showThroughConstructor(options: NotificationOptions): boolean {
+function showThroughConstructor(options: DashNotificationOptions): boolean {
   try {
     new Notification("PV Dash", options);
     return true;
