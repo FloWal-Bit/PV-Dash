@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   CloudDrizzle,
   Cloudy,
@@ -334,9 +334,35 @@ export function SunTimesCard({
     forecastedTomorrowYieldKwh,
     forecastedDayAfterTomorrowYieldKwh,
   );
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Alle Inhalte um 5 % der Kartenhöhe nach unten.
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+
+    const apply = () => {
+      const extra = Number(card.dataset.shiftPx ?? "0");
+      const height = card.getBoundingClientRect().height;
+      const next = (height - extra) * 0.05;
+      if (Math.abs(next - extra) < 0.5) return;
+      const pad = parseFloat(getComputedStyle(card).paddingTop);
+      card.style.paddingTop = `${pad - extra + next}px`;
+      card.dataset.shiftPx = String(next);
+    };
+
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(card);
+    return () => {
+      observer.disconnect();
+      card.style.paddingTop = "";
+      delete card.dataset.shiftPx;
+    };
+  }, []);
 
   return (
-    <Card data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
+    <Card ref={cardRef} data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
       <SwipeCarousel labels={["Heute", "Morgen", "Übermorgen"]} className="min-w-0 gap-3 pb-1">
         <SunTimesDayCard date={todayDate} forecastedYieldKwh={yields.today} />
         <SunTimesDayCard date={tomorrowDate} forecastedYieldKwh={yields.tomorrow} />
