@@ -1,11 +1,11 @@
 "use client";
 
 import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
-import { extraCardsStore } from "@/lib/extra-cards-store";
 import { showSimulatedStore } from "@/lib/show-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
 import { pushAlertStore } from "@/lib/push-alert-settings";
 import { yieldForecastStore } from "@/lib/yield-forecast-settings";
+import { cardDeviceStore, extraCardsStore } from "@/lib/extra-cards-store";
 
 let inflightSaves = 0;
 let lastUpdatedAt: string | null = null;
@@ -33,6 +33,7 @@ export function applySharedDevSettings(data: SharedDevSettings): void {
     spotifyEnabled: data.spotifyEnabled,
     spotifyUrl: data.spotifyUrl,
   });
+  cardDeviceStore.applyRemote(data.cardDeviceIds);
 }
 
 let saveChain: Promise<void> = Promise.resolve();

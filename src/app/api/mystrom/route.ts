@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
-import { getMystromTarget } from "@/lib/dev-settings";
+import { getMystromTarget, requestMayUseCards } from "@/lib/dev-settings";
 import { readMystromState, setMystromState } from "@/lib/mystrom";
 
 export const dynamic = "force-dynamic";
+
+function locked() {
+  return NextResponse.json(
+    { error: "Dieses Gerät ist für die Lampe nicht freigegeben." },
+    { status: 401 },
+  );
+}
 
 function disabled() {
   return NextResponse.json(
@@ -16,7 +23,8 @@ function failure(error: unknown) {
   return NextResponse.json({ error: message }, { status: 502 });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!requestMayUseCards(request)) return locked();
   try {
     if (!getMystromTarget()) return disabled();
     return NextResponse.json(await readMystromState());
@@ -26,6 +34,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!requestMayUseCards(request)) return locked();
   try {
     if (!getMystromTarget()) return disabled();
   } catch (error) {

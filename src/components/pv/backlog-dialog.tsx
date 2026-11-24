@@ -35,6 +35,7 @@ import {
 } from "@/components/pv/settings-dialog";
 import { pvStore } from "@/lib/pv-store";
 import { readDeviceId, reportDeviceVisit } from "@/lib/device-visit";
+import { cardDeviceStore } from "@/lib/extra-cards-store";
 import {
   shortDeviceId,
   type DeviceLogSummary,
@@ -137,12 +138,14 @@ function groupDevicesByRecency(devices: DeviceVisit[], now = new Date()) {
   return { todayDevices, yesterdayDevices, olderDevices };
 }
 
-function DevicePushSwitch({
+function DeviceFlagSwitch({
+  caption,
   id,
   label,
   enabled,
   onChange,
 }: {
+  caption: string;
   id: string;
   label: string;
   enabled: boolean;
@@ -150,12 +153,12 @@ function DevicePushSwitch({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-      <span aria-hidden>Push</span>
+      <span aria-hidden>{caption}</span>
       <Switch
         size="sm"
         checked={enabled}
         onCheckedChange={(checked) => onChange(id, checked)}
-        aria-label={`Push für ${label}`}
+        aria-label={`${caption} für ${label}`}
         className="data-checked:bg-chart-3"
       />
     </div>
@@ -167,13 +170,17 @@ function DeviceRow({
   currentDeviceId,
   when,
   pushEnabled,
+  cardEnabled,
   onPushChange,
+  onCardChange,
 }: {
   device: DeviceVisit;
   currentDeviceId: string | null;
   when: string;
   pushEnabled: boolean;
+  cardEnabled: boolean;
   onPushChange: (id: string, enabled: boolean) => void;
+  onCardChange: (id: string, enabled: boolean) => void;
 }) {
   const isCurrent = device.id === currentDeviceId;
   return (
@@ -194,12 +201,22 @@ function DeviceRow({
             #{shortDeviceId(device.id)}
           </span>
         </div>
-        <DevicePushSwitch
-          id={device.id}
-          label={device.label}
-          enabled={pushEnabled}
-          onChange={onPushChange}
-        />
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+          <DeviceFlagSwitch
+            caption="Push"
+            id={device.id}
+            label={device.label}
+            enabled={pushEnabled}
+            onChange={onPushChange}
+          />
+          <DeviceFlagSwitch
+            caption="Karten"
+            id={device.id}
+            label={device.label}
+            enabled={cardEnabled}
+            onChange={onCardChange}
+          />
+        </div>
       </div>
     </li>
   );
@@ -211,14 +228,18 @@ function DeviceGroup({
   currentDeviceId,
   formatWhen,
   pushIds,
+  cardIds,
   onPushChange,
+  onCardChange,
 }: {
   title: string;
   devices: DeviceVisit[];
   currentDeviceId: string | null;
   formatWhen: (iso: string) => string;
   pushIds: ReadonlySet<string>;
+  cardIds: ReadonlySet<string>;
   onPushChange: (id: string, enabled: boolean) => void;
+  onCardChange: (id: string, enabled: boolean) => void;
 }) {
   if (devices.length === 0) return null;
   return (
@@ -234,7 +255,9 @@ function DeviceGroup({
             currentDeviceId={currentDeviceId}
             when={formatWhen(device.lastSeen)}
             pushEnabled={pushIds.has(device.id.toLowerCase())}
+            cardEnabled={cardIds.has(device.id.toLowerCase())}
             onPushChange={onPushChange}
+            onCardChange={onCardChange}
           />
         ))}
       </ul>
@@ -249,14 +272,18 @@ function CollapsibleDeviceGroup({
   currentDeviceId,
   formatWhen,
   pushIds,
+  cardIds,
   onPushChange,
+  onCardChange,
 }: {
   label: string;
   devices: DeviceVisit[];
   currentDeviceId: string | null;
   formatWhen: (iso: string) => string;
   pushIds: ReadonlySet<string>;
+  cardIds: ReadonlySet<string>;
   onPushChange: (id: string, enabled: boolean) => void;
+  onCardChange: (id: string, enabled: boolean) => void;
 }) {
   if (devices.length === 0) return null;
   return (
@@ -273,7 +300,9 @@ function CollapsibleDeviceGroup({
             currentDeviceId={currentDeviceId}
             when={formatWhen(device.lastSeen)}
             pushEnabled={pushIds.has(device.id.toLowerCase())}
+            cardEnabled={cardIds.has(device.id.toLowerCase())}
             onPushChange={onPushChange}
+            onCardChange={onCardChange}
           />
         ))}
       </ul>
@@ -291,7 +320,13 @@ function DeviceLogSection({ open }: { open: boolean }) {
     pushAlertStore.getSnapshot,
     pushAlertStore.getServerSnapshot,
   );
+  const cardDeviceIds = useSyncExternalStore(
+    cardDeviceStore.subscribe,
+    cardDeviceStore.getSnapshot,
+    cardDeviceStore.getServerSnapshot,
+  );
   const pushIds = new Set(deviceIds);
+  const cardIds = new Set(cardDeviceIds);
 
   async function onPushChange(id: string, enabled: boolean) {
     setPushError(null);
@@ -299,6 +334,15 @@ function DeviceLogSection({ open }: { open: boolean }) {
       await pushAlertStore.setDeviceEnabled(id, enabled);
     } catch (err) {
       setPushError(err instanceof Error ? err.message : "Push-Gerät konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function onCardChange(id: string, enabled: boolean) {
+    setPushError(null);
+    try {
+      await cardDeviceStore.setEnabled(id, enabled);
+    } catch (err) {
+      setPushError(err instanceof Error ? err.message : "Karten-Gerät konnte nicht gespeichert werden.");
     }
   }
 
@@ -331,8 +375,11 @@ function DeviceLogSection({ open }: { open: boolean }) {
   const groups = summary ? groupDevicesByRecency(summary.devices) : null;
   const count = summary?.count ?? 0;
   const knownIds = new Set(summary?.devices.map((device) => device.id.toLowerCase()) ?? []);
-  const orphanIds = summary ? deviceIds.filter((id) => !knownIds.has(id)) : [];
+  const orphanIds = summary
+    ? [...new Set([...deviceIds, ...cardDeviceIds])].filter((id) => !knownIds.has(id))
+    : [];
   const pushCount = deviceIds.length;
+  const cardCount = cardDeviceIds.length;
 
   return (
     <SettingsSection
@@ -341,8 +388,8 @@ function DeviceLogSection({ open }: { open: boolean }) {
       title="Geräte"
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Standard aus. Nur angehakte Geräte erhalten Mitteilungen. Die Regel dafür steht
-        unter Benachrichtigungen.
+        Standard aus. Nur angehakte Geräte erhalten Mitteilungen oder sehen Lampe und Spotify.
+        Die Mitteilungen stehen unter Benachrichtigungen, die Karten unter «Karten unter dem Verlauf».
       </p>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       {pushError ? <p className="text-xs text-destructive">{pushError}</p> : null}
@@ -365,6 +412,8 @@ function DeviceLogSection({ open }: { open: boolean }) {
               : null}
             {" · "}
             {pushCount} mit Push
+            {" · "}
+            {cardCount} mit Karten
           </p>
 
           <DeviceGroup
@@ -373,7 +422,9 @@ function DeviceLogSection({ open }: { open: boolean }) {
             currentDeviceId={deviceId}
             formatWhen={formatSeenTime}
             pushIds={pushIds}
+            cardIds={cardIds}
             onPushChange={(id, enabled) => void onPushChange(id, enabled)}
+            onCardChange={(id, enabled) => void onCardChange(id, enabled)}
           />
           <CollapsibleDeviceGroup
             label="Gestern"
@@ -381,7 +432,9 @@ function DeviceLogSection({ open }: { open: boolean }) {
             currentDeviceId={deviceId}
             formatWhen={formatSeenTime}
             pushIds={pushIds}
+            cardIds={cardIds}
             onPushChange={(id, enabled) => void onPushChange(id, enabled)}
+            onCardChange={(id, enabled) => void onCardChange(id, enabled)}
           />
           <CollapsibleDeviceGroup
             label="Älter"
@@ -389,7 +442,9 @@ function DeviceLogSection({ open }: { open: boolean }) {
             currentDeviceId={deviceId}
             formatWhen={formatSeenOlder}
             pushIds={pushIds}
+            cardIds={cardIds}
             onPushChange={(id, enabled) => void onPushChange(id, enabled)}
+            onCardChange={(id, enabled) => void onCardChange(id, enabled)}
           />
         </div>
       ) : null}
@@ -405,12 +460,22 @@ function DeviceLogSection({ open }: { open: boolean }) {
                 className="flex items-center justify-between gap-3 border-b border-border/40 py-2 last:border-b-0"
               >
                 <span className="font-mono text-xs text-muted-foreground">#{shortDeviceId(id)}</span>
-                <DevicePushSwitch
-                  id={id}
-                  label={`Gerät ${shortDeviceId(id)}`}
-                  enabled
-                  onChange={(device, enabled) => void onPushChange(device, enabled)}
-                />
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                  <DeviceFlagSwitch
+                    caption="Push"
+                    id={id}
+                    label={`Gerät ${shortDeviceId(id)}`}
+                    enabled={pushIds.has(id.toLowerCase())}
+                    onChange={(device, enabled) => void onPushChange(device, enabled)}
+                  />
+                  <DeviceFlagSwitch
+                    caption="Karten"
+                    id={id}
+                    label={`Gerät ${shortDeviceId(id)}`}
+                    enabled={cardIds.has(id.toLowerCase())}
+                    onChange={(device, enabled) => void onCardChange(device, enabled)}
+                  />
+                </div>
               </li>
             ))}
           </ul>

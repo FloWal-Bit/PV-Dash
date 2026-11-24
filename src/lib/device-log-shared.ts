@@ -8,6 +8,9 @@ export const MAX_DEVICE_LABEL_LENGTH = 96;
 export const MAX_DEVICE_VERSION_LENGTH = 32;
 export const MAX_TRACKED_DEVICES = 100;
 
+/** Header, mit dem der Browser seine Gerätekennung mitschickt. */
+export const DEVICE_ID_HEADER = "x-pv-device";
+
 /** UUID, wie sie `crypto.randomUUID()` erzeugt. */
 export const DEVICE_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

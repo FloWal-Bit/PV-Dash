@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 const inputClassName =
   "flex h-10 w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60";
 
-/** Schalter für Lampe und Spotify. An heisst: die Karte ist auf dem Dashboard, auch ohne Adresse oder Link. */
+/** Schalter für Lampe und Spotify. Sichtbar nur auf Geräten, die in der Geräteliste angehakt sind. */
 export function ExtraCardsSettings() {
   const saved = useSyncExternalStore(
     extraCardsStore.subscribe,
@@ -102,6 +102,10 @@ function ExtraCardsForm({
       iconClassName="bg-muted text-foreground/70"
       title="Karten unter dem Verlauf"
     >
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Welche Geräte die Karten sehen, stellst du in der Geräteliste bei Karten ein. Ohne Auswahl
+        bleibt die Karte aus.
+      </p>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-sm font-medium">myStrom-Lampe</span>

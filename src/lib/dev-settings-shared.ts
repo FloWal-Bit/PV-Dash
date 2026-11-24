@@ -72,6 +72,8 @@ export type SharedDevSettings = ExtraCardsSettings & {
   performanceRatio: number;
   /** Gerätekennungen, die Push-Mitteilungen erhalten dürfen. */
   pushDeviceIds: string[];
+  /** Gerätekennungen, die Lampe und Spotify sehen dürfen. Standard leer. */
+  cardDeviceIds: string[];
   /** Wann bei Stromüberschuss eine Mitteilung kommt. */
   surplusAlert: SurplusAlertSettings;
   configured: boolean;
@@ -85,6 +87,7 @@ export type DevSettingsUpdate = {
   infoBannerVisibleUntil?: string | null;
   performanceRatio?: number;
   pushDeviceIds?: string[];
+  cardDeviceIds?: string[];
   surplusAlert?: SurplusAlertSettings;
   mystromEnabled?: boolean;
   mystromBaseUrl?: string;
