@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 const inputClassName =
   "flex h-10 w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60";
 
-/** Schalter für Lampe und Spotify. Die Karten bleiben aus, bis hier gespeichert wird. */
+/** Schalter für Lampe und Spotify. An heisst: die Karte ist auf dem Dashboard, auch ohne Adresse oder Link. */
 export function ExtraCardsSettings() {
   const saved = useSyncExternalStore(
     extraCardsStore.subscribe,
@@ -21,12 +21,10 @@ export function ExtraCardsSettings() {
     extraCardsStore.getServerSnapshot,
   );
   const signature = [
-    saved.mystromEnabled,
     saved.mystromBaseUrl,
     saved.mystromKind,
     saved.mystromMac,
     saved.mystromTokenSet,
-    saved.spotifyEnabled,
     saved.spotifyUrl,
   ].join("|");
   return <ExtraCardsForm key={signature} saved={saved} />;
@@ -47,6 +45,34 @@ function ExtraCardsForm({
   const [spotifyUrl, setSpotifyUrl] = useState(saved.spotifyUrl);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function setLampEnabled(enabled: boolean) {
+    setMystromEnabled(enabled);
+    setSaving(true);
+    setError(null);
+    try {
+      await putDevSettings({ mystromEnabled: enabled });
+    } catch (err) {
+      setMystromEnabled(!enabled);
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function setSpotifyEnabledFlag(enabled: boolean) {
+    setSpotifyEnabled(enabled);
+    setSaving(true);
+    setError(null);
+    try {
+      await putDevSettings({ spotifyEnabled: enabled });
+    } catch (err) {
+      setSpotifyEnabled(!enabled);
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -80,13 +106,13 @@ function ExtraCardsForm({
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-sm font-medium">myStrom-Lampe</span>
           <span className="text-xs leading-relaxed text-muted-foreground">
-            Button zum Ein- und Ausschalten. Der Server ruft die Lampe im lokalen Netz auf.
+            Erscheint auf dem Dashboard, sobald der Schalter an ist. Adresse, MAC und Token können danach folgen.
           </span>
         </div>
         <Switch
           aria-label="myStrom-Lampe anzeigen"
           checked={mystromEnabled}
-          onCheckedChange={setMystromEnabled}
+          onCheckedChange={(checked) => void setLampEnabled(checked)}
           className="data-checked:bg-chart-3"
         />
       </div>
@@ -166,13 +192,13 @@ function ExtraCardsForm({
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-sm font-medium">Spotify</span>
           <span className="text-xs leading-relaxed text-muted-foreground">
-            Player für einen Titel, ein Album oder eine Playlist.
+            Erscheint auf dem Dashboard, sobald der Schalter an ist. Der Link kann danach folgen.
           </span>
         </div>
         <Switch
           aria-label="Spotify-Player anzeigen"
           checked={spotifyEnabled}
-          onCheckedChange={setSpotifyEnabled}
+          onCheckedChange={(checked) => void setSpotifyEnabledFlag(checked)}
           className="data-checked:bg-chart-3"
         />
       </div>

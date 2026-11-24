@@ -4,18 +4,32 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Lightbulb, LightbulbOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { extraCardsStore } from "@/lib/extra-cards-store";
-import { spotifyEmbedSrc } from "@/lib/extra-cards-shared";
+import { spotifyEmbedSrc, type MystromKind } from "@/lib/extra-cards-shared";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 type LampPhase = "loading" | "ready" | "saving";
 
-function MystromLampCard() {
+function MystromLampCard({
+  baseUrl,
+  kind,
+  mac,
+}: {
+  baseUrl: string;
+  kind: MystromKind;
+  mac: string;
+}) {
+  const setupHint = !baseUrl
+    ? "Adresse in den Dev-Einstellungen setzen."
+    : kind === "bulb" && !mac
+      ? "MAC der Lampe in den Dev-Einstellungen setzen."
+      : null;
   const [on, setOn] = useState<boolean | null>(null);
-  const [phase, setPhase] = useState<LampPhase>("loading");
+  const [phase, setPhase] = useState<LampPhase>(setupHint ? "ready" : "loading");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (setupHint) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -39,10 +53,10 @@ function MystromLampCard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setupHint]);
 
   async function toggle() {
-    if (phase === "loading" || phase === "saving") return;
+    if (setupHint || phase === "loading" || phase === "saving") return;
     const next = on !== true;
     setPhase("saving");
     setError(null);
@@ -81,7 +95,7 @@ function MystromLampCard() {
           type="button"
           aria-pressed={lit}
           aria-label="myStrom-Lampe ein- oder ausschalten"
-          disabled={phase === "loading" || phase === "saving"}
+          disabled={setupHint != null || phase === "loading" || phase === "saving"}
           onClick={() => void toggle()}
           className="flex flex-col items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-70"
         >
@@ -98,7 +112,9 @@ function MystromLampCard() {
           </span>
         </button>
         <span className={cn("text-center text-xs", error ? "text-destructive" : "text-muted-foreground")}>
-          {error ?? (lit ? "Eingeschaltet" : on === false ? "Ausgeschaltet" : "Tippen zum Schalten")}
+          {setupHint ??
+            error ??
+            (lit ? "Eingeschaltet" : on === false ? "Ausgeschaltet" : "Tippen zum Schalten")}
         </span>
       </CardContent>
     </Card>
@@ -145,6 +161,9 @@ export function ExtraCards() {
       {settings.mystromEnabled ? (
         <MystromLampCard
           key={`${settings.mystromBaseUrl}\0${settings.mystromKind}\0${settings.mystromMac}\0${String(settings.mystromTokenSet)}`}
+          baseUrl={settings.mystromBaseUrl}
+          kind={settings.mystromKind}
+          mac={settings.mystromMac}
         />
       ) : null}
       {settings.spotifyEnabled ? <SpotifyPlayerCard url={settings.spotifyUrl} /> : null}
