@@ -150,17 +150,22 @@ export function Dashboard({ plantName }: { plantName: string }) {
           <DashboardSkeleton />
         ) : (
           <>
-            <div data-clock-card className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <ClockCard />
-            </div>
+            <div className="flex flex-col gap-4 md:portrait:grid md:portrait:grid-cols-4 md:portrait:items-stretch">
+              <div
+                data-clock-card
+                className="grid grid-cols-2 gap-3 md:grid-cols-4 md:portrait:col-span-1 md:portrait:h-full md:portrait:grid-cols-1"
+              >
+                <ClockCard />
+              </div>
 
-            <SunTimesCard
-              className="min-w-0"
-              snapshotTimestamp={snapshot.timestamp}
-              forecastedTodayYieldKwh={forecastedTodayYieldKwh}
-              forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
-              forecastedDayAfterTomorrowYieldKwh={forecastedDayAfterTomorrowYieldKwh}
-            />
+              <SunTimesCard
+                className="min-w-0 md:portrait:col-span-3"
+                snapshotTimestamp={snapshot.timestamp}
+                forecastedTodayYieldKwh={forecastedTodayYieldKwh}
+                forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
+                forecastedDayAfterTomorrowYieldKwh={forecastedDayAfterTomorrowYieldKwh}
+              />
+            </div>
 
             <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
               <EnergyFlow
@@ -236,10 +241,12 @@ function ChartHistoryPlaceholder({ error }: { error: string | null }) {
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Skeleton className="h-[96px] rounded-2xl" />
+      <div className="flex flex-col gap-4 md:portrait:grid md:portrait:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:portrait:col-span-1 md:portrait:grid-cols-1">
+          <Skeleton className="h-[96px] rounded-2xl" />
+        </div>
+        <Skeleton className="h-[120px] rounded-2xl md:portrait:col-span-3" />
       </div>
-      <Skeleton className="h-[120px] rounded-2xl" />
       <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
         <Skeleton className="h-52 rounded-2xl md:h-full md:min-h-64" />
         <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-2">
