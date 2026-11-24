@@ -23,6 +23,17 @@ import {
   type SharedDevSettings,
   type SurplusAlertSettings,
 } from "@/lib/dev-settings-shared";
+import {
+  assertExtraCardsReady,
+  normalizeMystromBaseUrl,
+  normalizeMystromKind,
+  normalizeMystromMac,
+  normalizeMystromToken,
+  normalizeSpotifyUrl,
+  readMystromKind,
+  type ExtraCardsSettings,
+  type MystromKind,
+} from "@/lib/extra-cards-shared";
 import { resolveOpenMeteoPerformanceRatio } from "@/lib/open-meteo-yield/config";
 
 export type { DevSettingsUpdate, SharedDevSettings };
@@ -38,6 +49,13 @@ type PersistedDevSettings = {
   performanceRatio: number | null;
   pushDeviceIds: string[];
   surplusAlert: SurplusAlertSettings;
+  mystromEnabled: boolean;
+  mystromBaseUrl: string;
+  mystromKind: MystromKind;
+  mystromMac: string;
+  mystromToken: string;
+  spotifyEnabled: boolean;
+  spotifyUrl: string;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -61,6 +79,13 @@ function readFile(): PersistedDevSettings | null {
     const performanceRatio = readPerformanceRatio(v.performanceRatio);
     const pushDeviceIds = readPushDeviceIds(v.pushDeviceIds);
     const surplusAlert = readSurplusAlert(v.surplusAlert);
+    const mystromEnabled = v.mystromEnabled === true;
+    const mystromBaseUrl = typeof v.mystromBaseUrl === "string" ? v.mystromBaseUrl : "";
+    const mystromKind = readMystromKind(v.mystromKind);
+    const mystromMac = typeof v.mystromMac === "string" ? v.mystromMac : "";
+    const mystromToken = typeof v.mystromToken === "string" ? v.mystromToken : "";
+    const spotifyEnabled = v.spotifyEnabled === true;
+    const spotifyUrl = typeof v.spotifyUrl === "string" ? v.spotifyUrl : "";
     const hadLegacy =
       "siteLocation" in v ||
       "yieldForecast" in v ||
@@ -77,6 +102,13 @@ function readFile(): PersistedDevSettings | null {
       performanceRatio,
       pushDeviceIds,
       surplusAlert,
+      mystromEnabled,
+      mystromBaseUrl,
+      mystromKind,
+      mystromMac,
+      mystromToken,
+      spotifyEnabled,
+      spotifyUrl,
     };
     // Alte Standort-, Server-Pause- und hideSimulated-Felder beim nächsten Lesen streichen.
     if (hadLegacy) writeFile(file);
@@ -91,8 +123,21 @@ function resolvePerformanceRatio(stored: number | null | undefined): number {
   return resolveOpenMeteoPerformanceRatio();
 }
 
+function extraFromFile(file: PersistedDevSettings | null): ExtraCardsSettings {
+  return {
+    mystromEnabled: file?.mystromEnabled ?? false,
+    mystromBaseUrl: file?.mystromBaseUrl ?? "",
+    mystromKind: file?.mystromKind ?? "bulb",
+    mystromMac: file?.mystromMac ?? "",
+    mystromTokenSet: Boolean(file?.mystromToken),
+    spotifyEnabled: file?.spotifyEnabled ?? false,
+    spotifyUrl: file?.spotifyUrl ?? "",
+  };
+}
+
 function resolve(file: PersistedDevSettings | null): SharedDevSettings {
   return {
+    ...extraFromFile(file),
     showSimulated: file?.showSimulated ?? false,
     infoBanner: file?.infoBanner ?? "",
     infoBannerVisibleFrom: file?.infoBannerVisibleFrom ?? null,
@@ -102,6 +147,23 @@ function resolve(file: PersistedDevSettings | null): SharedDevSettings {
     surplusAlert: copySurplusAlert(file?.surplusAlert),
     configured: file != null,
     updatedAt: file?.updatedAt ?? null,
+  };
+}
+
+/** Ziel für den Server-Abruf. Token bleibt in der Datei. */
+export function getMystromTarget(): {
+  baseUrl: string;
+  kind: MystromKind;
+  mac: string;
+  token: string;
+} | null {
+  const file = readFile();
+  if (!file?.mystromEnabled) return null;
+  return {
+    baseUrl: normalizeMystromBaseUrl(file.mystromBaseUrl),
+    kind: file.mystromKind,
+    mac: file.mystromMac ? normalizeMystromMac(file.mystromMac) : "",
+    token: file.mystromToken,
   };
 }
 
@@ -125,6 +187,47 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
       ? normalizeInfoBannerInstant(update.infoBannerVisibleUntil)
       : (current?.infoBannerVisibleUntil ?? null);
   normalizeInfoBannerSchedule(infoBannerVisibleFrom, infoBannerVisibleUntil);
+
+  const mystromEnabled =
+    typeof update.mystromEnabled === "boolean"
+      ? update.mystromEnabled
+      : (current?.mystromEnabled ?? false);
+  const mystromBaseUrl =
+    typeof update.mystromBaseUrl === "string"
+      ? normalizeMystromBaseUrl(update.mystromBaseUrl)
+      : (current?.mystromBaseUrl ?? "");
+  const mystromKind =
+    update.mystromKind != null
+      ? normalizeMystromKind(update.mystromKind)
+      : (current?.mystromKind ?? "bulb");
+  const mystromMac =
+    typeof update.mystromMac === "string"
+      ? normalizeMystromMac(update.mystromMac)
+      : (current?.mystromMac ?? "");
+  // Leer oder weggelassen behält den Token. Nur null löscht ihn.
+  let mystromToken = current?.mystromToken ?? "";
+  if (update.mystromToken === null) {
+    mystromToken = "";
+  } else if (typeof update.mystromToken === "string" && update.mystromToken.trim()) {
+    mystromToken = normalizeMystromToken(update.mystromToken);
+  }
+  const spotifyEnabled =
+    typeof update.spotifyEnabled === "boolean"
+      ? update.spotifyEnabled
+      : (current?.spotifyEnabled ?? false);
+  const spotifyUrl =
+    typeof update.spotifyUrl === "string"
+      ? normalizeSpotifyUrl(update.spotifyUrl)
+      : (current?.spotifyUrl ?? "");
+  assertExtraCardsReady({
+    mystromEnabled,
+    mystromBaseUrl,
+    mystromKind,
+    mystromMac,
+    mystromTokenSet: Boolean(mystromToken),
+    spotifyEnabled,
+    spotifyUrl,
+  });
 
   const next: PersistedDevSettings = {
     updatedAt: new Date().toISOString(),
@@ -150,6 +253,13 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
       update.surplusAlert != null
         ? normalizeSurplusAlert(update.surplusAlert)
         : copySurplusAlert(current?.surplusAlert),
+    mystromEnabled,
+    mystromBaseUrl,
+    mystromKind,
+    mystromMac,
+    mystromToken,
+    spotifyEnabled,
+    spotifyUrl,
   };
   writeFile(next);
   return resolve(next);

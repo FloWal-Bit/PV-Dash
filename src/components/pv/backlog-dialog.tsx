@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { ExtraCardsSettings } from "@/components/pv/extra-cards-settings";
 import { showSimulatedStore } from "@/lib/show-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
 import {
@@ -75,6 +76,7 @@ export function BacklogDialog({
           <DeveloperPlantSettings />
           <FetchBudgetSection />
           <ShowSimulatedToggle />
+          <ExtraCardsSettings />
           {process.env.NODE_ENV === "development" ? <DevFusionRefresh /> : null}
         </div>
       </DialogContent>
