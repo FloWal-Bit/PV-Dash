@@ -241,12 +241,10 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<Timer className="size-4" />}
-          label="Sonnenstunden"
-          value={
-            waLoading ? "…" : sunHoursDisplay != null ? formatSwissNumber(sunHoursDisplay, 1) : "–"
-          }
-          unit={!waLoading && sunHoursDisplay != null ? "h" : undefined}
+          icon={<Thermometer className="size-4" />}
+          label="Temperatur"
+          value={waLoading && !dayWeather ? "…" : temperatureDisplay}
+          valueClassName="whitespace-nowrap"
           accent="slate"
         />
         <SunStat
@@ -259,10 +257,12 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<Thermometer className="size-4" />}
-          label="Temperatur"
-          value={waLoading && !dayWeather ? "…" : temperatureDisplay}
-          valueClassName="whitespace-nowrap"
+          icon={<Timer className="size-4" />}
+          label="Sonnenstunden"
+          value={
+            waLoading ? "…" : sunHoursDisplay != null ? formatSwissNumber(sunHoursDisplay, 1) : "–"
+          }
+          unit={!waLoading && sunHoursDisplay != null ? "h" : undefined}
           accent="slate"
         />
         <SunStat
