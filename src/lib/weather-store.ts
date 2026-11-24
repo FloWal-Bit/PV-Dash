@@ -2,6 +2,7 @@
 
 import type { PvSnapshot } from "@/lib/pv-data";
 import { APP_TIME_ZONE, lastDailyCheckpointMs, msUntilNextDailyCheckpoint } from "@/lib/daily-checkpoint";
+import { addZurichDaysKey, isScheduledServerPause } from "@/lib/server-pause-window";
 import { DEFAULT_SITE_LOCATION, type SiteLocation } from "@/lib/site-location";
 import { WETTER_ALARM_UNAVAILABLE } from "@/lib/service-unavailable-messages";
 
@@ -49,6 +50,8 @@ const listeners = new Set<Listener>();
 let state: WeatherState = SERVER_STATE;
 let inflight: Promise<void> | null = null;
 let dailyTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+let dayWatchTimer: ReturnType<typeof globalThis.setInterval> | null = null;
+let visibilityBound = false;
 let hydrated = false;
 let activeLocation: Pick<SiteLocation, "name" | "latitude" | "longitude"> = DEFAULT_SITE_LOCATION;
 
@@ -66,9 +69,7 @@ export function weatherDateKey(date: Date = new Date()): string {
 }
 
 function tomorrowDateKey(from = new Date()): string {
-  const next = new Date(from);
-  next.setDate(next.getDate() + 1);
-  return weatherDateKey(next);
+  return addZurichDaysKey(weatherDateKey(from), 1);
 }
 
 function readPersistedCache(): PersistedWeatherCache | null {
@@ -119,9 +120,12 @@ function needsNetworkFetch(locationKey: string, force: boolean): boolean {
 
   const todayKey = weatherDateKey();
   const tomorrowKey = tomorrowDateKey();
-  if (!state.byDate[todayKey] || !state.byDate[tomorrowKey]) {
-    return true;
-  }
+  const hasToday = state.byDate[todayKey] != null;
+  const hasTomorrow = state.byDate[tomorrowKey] != null;
+  if (!hasToday) return true;
+  // Nachts ist der Node aus. Heute liegt meist schon als gestrige „Morgen“-Prognose im Cache.
+  // Der Folgetag kann bis zur 06:00-Marke warten, sonst scheitert der Abruf und setzt einen Fehler.
+  if (!hasTomorrow && !isScheduledServerPause()) return true;
 
   if (state.lastFetchAt == null) return true;
   return state.lastFetchAt < lastDailyCheckpointMs();
@@ -183,6 +187,14 @@ async function fetchTodayAndTomorrow(
   }
 }
 
+function realignTodayPointer() {
+  const todayKey = weatherDateKey();
+  const today = state.byDate[todayKey] ?? null;
+  if (state.data === today) return;
+  state = { ...state, data: today };
+  emit();
+}
+
 function scheduleDailyRefresh() {
   if (typeof window === "undefined") return;
   if (dailyTimer != null) globalThis.clearTimeout(dailyTimer);
@@ -192,9 +204,35 @@ function scheduleDailyRefresh() {
   }, msUntilNextDailyCheckpoint());
 }
 
+function onAppVisible() {
+  if (typeof document !== "undefined" && document.hidden) return;
+  realignTodayPointer();
+  void weatherStore.refresh(activeLocation);
+}
+
 function ensureScheduler() {
   hydrateFromPersistence();
+  realignTodayPointer();
   scheduleDailyRefresh();
+  if (typeof window === "undefined") return;
+  if (!visibilityBound) {
+    document.addEventListener("visibilitychange", onAppVisible);
+    window.addEventListener("pageshow", onAppVisible);
+    visibilityBound = true;
+  }
+  if (dayWatchTimer == null) {
+    dayWatchTimer = globalThis.setInterval(() => {
+      const todayKey = weatherDateKey();
+      const today = state.byDate[todayKey] ?? null;
+      if (state.data !== today) realignTodayPointer();
+      const tomorrowMissing = state.byDate[tomorrowDateKey()] == null;
+      const checkpointDue =
+        state.lastFetchAt == null || state.lastFetchAt < lastDailyCheckpointMs();
+      if (!today || checkpointDue || (tomorrowMissing && !isScheduledServerPause())) {
+        void weatherStore.refresh(activeLocation);
+      }
+    }, 30_000);
+  }
 }
 
 export const weatherStore = {
