@@ -27,6 +27,7 @@ const SunCourse = createLucideIcon("sun-course", [
   ["path", { d: "M16 18a4 4 0 0 0-8 0" }],
 ]);
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/pv/stat-card";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { cn } from "@/lib/utils";
 import { formatSwissNumber } from "@/lib/format";
@@ -196,11 +197,9 @@ function SunStat({
 function SunTimesDayCard({
   date,
   forecastedYieldKwh,
-  clockNow,
 }: {
   date: Date;
   forecastedYieldKwh: number | null;
-  clockNow: Date | null;
 }) {
   const weatherState = useSyncExternalStore(
     weatherStore.subscribe,
@@ -232,13 +231,7 @@ function SunTimesDayCard({
           {formatDayHeading(date)}
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-6 sm:gap-x-2">
-        <SunStat
-          icon={<Clock className="size-4" />}
-          label="Uhrzeit"
-          value={clockNow ? formatTimeWithSeconds(clockNow) : "–"}
-          accent="slate"
-        />
+      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
         <SunStat
           icon={weatherIcon[weatherCategory]}
           label="Wetter"
@@ -285,6 +278,21 @@ function SunTimesDayCard({
   );
 }
 
+/** Aktuelle Uhrzeit, gleiche Kachel wie «Ertrag heute». */
+export function ClockCard({ className }: { className?: string }) {
+  const now = useCurrentTime();
+  return (
+    <StatCard
+      className={className}
+      label="Uhrzeit"
+      value={formatTimeWithSeconds(now)}
+      icon={<Clock className="size-5" />}
+      accent="slate"
+      valueClassName="whitespace-nowrap"
+    />
+  );
+}
+
 export function SunTimesCard({
   snapshotTimestamp = null,
   forecastedTodayYieldKwh = null,
@@ -321,16 +329,11 @@ export function SunTimesCard({
   return (
     <Card data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
       <SwipeCarousel labels={["Heute", "Morgen", "Übermorgen"]} className="min-w-0 gap-3 pb-1">
-        <SunTimesDayCard date={todayDate} forecastedYieldKwh={yields.today} clockNow={now} />
-        <SunTimesDayCard
-          date={tomorrowDate}
-          forecastedYieldKwh={yields.tomorrow}
-          clockNow={null}
-        />
+        <SunTimesDayCard date={todayDate} forecastedYieldKwh={yields.today} />
+        <SunTimesDayCard date={tomorrowDate} forecastedYieldKwh={yields.tomorrow} />
         <SunTimesDayCard
           date={dayAfterTomorrowDate}
           forecastedYieldKwh={yields.dayAfterTomorrow}
-          clockNow={null}
         />
       </SwipeCarousel>
     </Card>

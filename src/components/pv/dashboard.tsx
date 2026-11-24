@@ -5,7 +5,7 @@ import { RefreshCcw } from "lucide-react";
 import { DashboardHeader } from "@/components/pv/header";
 import { KpiGrid } from "@/components/pv/kpi-grid";
 import { EnergyFlow } from "@/components/pv/energy-flow";
-import { SunTimesCard } from "@/components/pv/sun-times-card";
+import { ClockCard, SunTimesCard } from "@/components/pv/sun-times-card";
 import { InfoBanner } from "@/components/pv/info-banner";
 import { ServerPauseBanner } from "@/components/pv/server-pause-banner";
 import { ChartsSection } from "@/components/pv/charts-section";
@@ -150,6 +150,10 @@ export function Dashboard({ plantName }: { plantName: string }) {
           <DashboardSkeleton />
         ) : (
           <>
+            <div data-clock-card className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <ClockCard />
+            </div>
+
             <SunTimesCard
               className="min-w-0"
               snapshotTimestamp={snapshot.timestamp}
@@ -232,6 +236,9 @@ function ChartHistoryPlaceholder({ error }: { error: string | null }) {
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Skeleton className="h-[96px] rounded-2xl" />
+      </div>
       <Skeleton className="h-[120px] rounded-2xl" />
       <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
         <Skeleton className="h-52 rounded-2xl md:h-full md:min-h-64" />
