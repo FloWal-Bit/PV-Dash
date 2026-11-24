@@ -24,7 +24,6 @@ import {
   type SurplusAlertSettings,
 } from "@/lib/dev-settings-shared";
 import {
-  assertExtraCardsReady,
   normalizeMystromBaseUrl,
   normalizeMystromKind,
   normalizeMystromMac,
@@ -219,15 +218,6 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
     typeof update.spotifyUrl === "string"
       ? normalizeSpotifyUrl(update.spotifyUrl)
       : (current?.spotifyUrl ?? "");
-  assertExtraCardsReady({
-    mystromEnabled,
-    mystromBaseUrl,
-    mystromKind,
-    mystromMac,
-    mystromTokenSet: Boolean(mystromToken),
-    spotifyEnabled,
-    spotifyUrl,
-  });
 
   const next: PersistedDevSettings = {
     updatedAt: new Date().toISOString(),

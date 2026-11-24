@@ -1,4 +1,4 @@
-/** Zusatzkarten unter Card 3. Nur sichtbar, wenn sie in den Dev-Einstellungen an sind. */
+/** Zusatzkarten unter dem Verlauf. Sichtbar, sobald der Schalter in den Dev-Einstellungen an ist. */
 
 export type MystromKind = "bulb" | "switch";
 
@@ -116,16 +116,4 @@ export function normalizeSpotifyUrl(value: string): string {
   if (trimmed.length > 500) throw new Error("Spotify-Link ist zu lang.");
   if (!spotifyEmbedSrc(trimmed)) throw new Error("Spotify-Link ist ungültig.");
   return trimmed;
-}
-
-export function assertExtraCardsReady(settings: ExtraCardsSettings): void {
-  if (settings.mystromEnabled) {
-    if (!settings.mystromBaseUrl) throw new Error("myStrom-Adresse fehlt.");
-    if (settings.mystromKind === "bulb" && !settings.mystromMac) {
-      throw new Error("MAC der Lampe fehlt.");
-    }
-  }
-  if (settings.spotifyEnabled && !spotifyEmbedSrc(settings.spotifyUrl)) {
-    throw new Error("Spotify-Link fehlt oder ist ungültig.");
-  }
 }
