@@ -47,6 +47,11 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function temperatureOrNull(value: number | undefined): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return round1(value);
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, {
     headers: { Accept: "application/json", "User-Agent": "PV-Dash/1.0" },
@@ -103,7 +108,7 @@ export async function getWetterAlarmDailyWeather(options?: {
   const poiId = await resolveWetterAlarmPoiId(locationName);
   const date = options?.date ?? new Date();
 
-  const cacheKey = `${poiId}:${dateKeyInTimeZone("Europe/Zurich", date)}`;
+  const cacheKey = `${poiId}:${dateKeyInTimeZone("Europe/Zurich", date)}:temp`;
   const cached = forecastCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
@@ -130,6 +135,8 @@ export async function getWetterAlarmDailyWeather(options?: {
     sunriseAt: day.sunrise,
     sunsetAt: day.sunset,
     sunHours: round1(day.insolation ?? 0),
+    temperatureMin: temperatureOrNull(day.temperature_min),
+    temperatureMax: temperatureOrNull(day.temperature_max),
     source: "wetteralarm",
   };
 

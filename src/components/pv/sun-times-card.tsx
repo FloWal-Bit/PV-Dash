@@ -6,9 +6,8 @@ import {
   CloudDrizzle,
   Cloudy,
   Sun,
-  Sunrise,
-  Sunset,
   SunDim,
+  Thermometer,
   Timer,
   Zap,
 } from "lucide-react";
@@ -24,6 +23,12 @@ import {
   zurichDayKey,
 } from "@/lib/server-pause-window";
 import { APP_TIME_ZONE } from "@/lib/daily-checkpoint";
+
+function formatCelsius(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  const digits = Number.isInteger(rounded) ? 0 : 1;
+  return `${formatSwissNumber(rounded, digits)}°`;
+}
 
 function formatTimeWithSeconds(date: Date): string {
   return date.toLocaleTimeString("de-DE", {
@@ -189,6 +194,13 @@ function SunTimesDayCard({
   const weatherCategory = dayWeather?.weatherCategory ?? "sonnig";
   const sunriseDisplay = dayWeather?.sunrise ?? "–";
   const sunsetDisplay = dayWeather?.sunset ?? "–";
+  const temperatureDisplay =
+    typeof dayWeather?.temperatureMin === "number" &&
+    Number.isFinite(dayWeather.temperatureMin) &&
+    typeof dayWeather.temperatureMax === "number" &&
+    Number.isFinite(dayWeather.temperatureMax)
+      ? `${formatCelsius(dayWeather.temperatureMin)} / ${formatCelsius(dayWeather.temperatureMax)}`
+      : "–";
   const sunHoursDisplay =
     dayWeather?.sunHours != null ? dayWeather.sunHours : null;
 
@@ -223,15 +235,19 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<Sunrise className="size-4" />}
-          label="Sonnenaufgang"
-          value={waLoading && !dayWeather ? "…" : sunriseDisplay}
+          icon={<Sun className="size-4" />}
+          label="Sonnenverlauf"
+          value={
+            waLoading && !dayWeather ? "…" : `${sunriseDisplay} / ${sunsetDisplay}`
+          }
+          valueClassName="whitespace-nowrap text-[11px] sm:text-sm"
           accent="slate"
         />
         <SunStat
-          icon={<Sunset className="size-4" />}
-          label="Sonnenuntergang"
-          value={waLoading && !dayWeather ? "…" : sunsetDisplay}
+          icon={<Thermometer className="size-4" />}
+          label="Temperatur"
+          value={waLoading && !dayWeather ? "…" : temperatureDisplay}
+          valueClassName="whitespace-nowrap"
           accent="slate"
         />
         <SunStat

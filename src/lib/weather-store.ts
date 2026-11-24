@@ -14,6 +14,9 @@ export type WeatherPayload = {
   sunriseAt: string;
   sunsetAt: string;
   sunHours: number;
+  /** Tagesminimum und Tagesmaximum in °C. Fehlt in älteren Caches. */
+  temperatureMin?: number | null;
+  temperatureMax?: number | null;
   locationName: string;
   date: string;
   source: "wetteralarm";
@@ -57,7 +60,7 @@ let activeLocation: Pick<SiteLocation, "name" | "latitude" | "longitude"> = DEFA
 
 function locationKey(location: Pick<SiteLocation, "name" | "latitude" | "longitude">): string {
   const name = location.name.trim() || DEFAULT_SITE_LOCATION.name;
-  return `${name}|${location.latitude}|${location.longitude}|insolation`;
+  return `${name}|${location.latitude}|${location.longitude}|temperature`;
 }
 
 function emit() {
