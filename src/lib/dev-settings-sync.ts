@@ -1,6 +1,7 @@
 "use client";
 
 import type { DevSettingsUpdate, SharedDevSettings } from "@/lib/dev-settings-shared";
+import { extraCardsStore } from "@/lib/extra-cards-store";
 import { showSimulatedStore } from "@/lib/show-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
 import { pushAlertStore } from "@/lib/push-alert-settings";
@@ -22,6 +23,15 @@ export function applySharedDevSettings(data: SharedDevSettings): void {
   pushAlertStore.applyRemote({
     deviceIds: data.pushDeviceIds,
     surplus: data.surplusAlert,
+  });
+  extraCardsStore.applyRemote({
+    mystromEnabled: data.mystromEnabled,
+    mystromBaseUrl: data.mystromBaseUrl,
+    mystromKind: data.mystromKind,
+    mystromMac: data.mystromMac,
+    mystromTokenSet: data.mystromTokenSet,
+    spotifyEnabled: data.spotifyEnabled,
+    spotifyUrl: data.spotifyUrl,
   });
 }
 

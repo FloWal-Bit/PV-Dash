@@ -1,6 +1,7 @@
 /** Gemeinsame Entwicklereinstellungen ohne Standort und ohne Anlagenkoordinaten. */
 
 import { isDeviceId, MAX_TRACKED_DEVICES } from "@/lib/device-log-shared";
+import type { ExtraCardsSettings } from "@/lib/extra-cards-shared";
 
 export const MAX_INFO_BANNER_LENGTH = 2000;
 
@@ -57,7 +58,7 @@ export type InfoBannerSchedule = {
   visibleUntil: string | null;
 };
 
-export type SharedDevSettings = {
+export type SharedDevSettings = ExtraCardsSettings & {
   /** true = Ersatzkurve zeigen, wenn FusionSolar fehlt. Standard aus. */
   showSimulated: boolean;
   /** Hinweis oberhalb der Wetterkarte. Leer blendet das Banner aus. */
@@ -85,6 +86,14 @@ export type DevSettingsUpdate = {
   performanceRatio?: number;
   pushDeviceIds?: string[];
   surplusAlert?: SurplusAlertSettings;
+  mystromEnabled?: boolean;
+  mystromBaseUrl?: string;
+  mystromKind?: ExtraCardsSettings["mystromKind"];
+  mystromMac?: string;
+  /** null löscht den Token. Weglassen lässt ihn unverändert. */
+  mystromToken?: string | null;
+  spotifyEnabled?: boolean;
+  spotifyUrl?: string;
 };
 
 export function normalizeInfoBanner(value: string): string {

@@ -9,6 +9,7 @@ import { SunTimesCard } from "@/components/pv/sun-times-card";
 import { InfoBanner } from "@/components/pv/info-banner";
 import { ServerPauseBanner } from "@/components/pv/server-pause-banner";
 import { ChartsSection } from "@/components/pv/charts-section";
+import { ExtraCards } from "@/components/pv/extra-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { pvStore } from "@/lib/pv-store";
@@ -191,6 +192,8 @@ export function Dashboard({ plantName }: { plantName: string }) {
             ) : (
               <ChartHistoryPlaceholder error={historyError} />
             )}
+
+            <ExtraCards />
           </>
         )}
       </main>
