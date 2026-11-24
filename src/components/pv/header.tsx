@@ -134,7 +134,7 @@ export function DashboardHeader({
     <header className="safe-top bg-background landscape:py-1.5">
       <div className="dashboard-container flex items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-col pl-4">
-          <div className="flex min-w-0 items-baseline gap-2">
+          <div className="flex min-w-0 items-baseline">
             <button
               type="button"
               onClick={handleTitleTap}
@@ -144,10 +144,11 @@ export function DashboardHeader({
               PV Dash
             </button>
             <time
+              suppressHydrationWarning
               dateTime={now.toISOString()}
               className="shrink-0 text-base font-semibold tabular-nums leading-tight md:hidden"
             >
-              {formatTimeWithSeconds(now)}
+              {`, ${formatTimeWithSeconds(now)}`}
             </time>
           </div>
           <span className="truncate text-xs text-muted-foreground leading-tight">
