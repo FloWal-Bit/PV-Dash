@@ -46,7 +46,7 @@ function formatCelsius(value: number): string {
   return `${formatSwissNumber(rounded, digits)}°`;
 }
 
-function formatTimeWithSeconds(date: Date): string {
+export function formatTimeWithSeconds(date: Date): string {
   return date.toLocaleTimeString("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
@@ -58,7 +58,7 @@ function formatTimeWithSeconds(date: Date): string {
  * Aktuelle Uhrzeit. Nach dem Aufwachen (Bildschirm an, PWA aus dem Cache)
  * sofort nachziehen — ein eingefrorener Timer würde sonst den gestrigen Tag stehen lassen.
  */
-function useCurrentTime(): Date {
+export function useCurrentTime(): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const tick = () => setNow(new Date());

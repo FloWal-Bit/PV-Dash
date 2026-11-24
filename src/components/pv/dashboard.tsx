@@ -153,7 +153,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
             <div className="flex flex-col gap-4 md:grid md:grid-cols-4 md:items-stretch">
               <div
                 data-clock-card
-                className="grid grid-cols-2 gap-3 md:col-span-1 md:h-full md:grid-cols-1"
+                className="hidden md:grid md:col-span-1 md:h-full md:grid-cols-1"
               >
                 <ClockCard />
               </div>
@@ -242,7 +242,7 @@ function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4 md:grid md:grid-cols-4">
-        <div className="grid grid-cols-2 gap-3 md:col-span-1 md:grid-cols-1">
+        <div className="hidden md:grid md:col-span-1 md:grid-cols-1">
           <Skeleton className="h-[96px] rounded-2xl" />
         </div>
         <Skeleton className="h-[120px] rounded-2xl md:col-span-3" />
