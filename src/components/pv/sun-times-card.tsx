@@ -240,7 +240,7 @@ function SunTimesDayCard({
           value={
             waLoading && !dayWeather ? "…" : `${sunriseDisplay} / ${sunsetDisplay}`
           }
-          valueClassName="whitespace-nowrap text-[11px] sm:text-sm"
+          valueClassName="whitespace-nowrap"
           accent="slate"
         />
         <SunStat
