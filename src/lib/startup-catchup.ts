@@ -10,6 +10,7 @@
  * 5. Open-Meteo Ertragsprognose
  * 6. Wetter-Alarm Heute
  * 7. Wetter-Alarm Morgen
+ * 8. Wetter-Alarm Übermorgen
  *
  * Wetter-Alarm steckt bewusst im Warmup — nicht erst auf die Client-Marke
  * 06:00 warten (Card 1 ist dann sofort bedient).
@@ -32,9 +33,9 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function tomorrowDate(from = new Date()): Date {
+function datePlusDays(from: Date, days: number): Date {
   const next = new Date(from);
-  next.setDate(next.getDate() + 1);
+  next.setDate(next.getDate() + days);
   return next;
 }
 
@@ -84,7 +85,14 @@ export async function ensureStartupCatchup(): Promise<void> {
       console.info("[catchup] 7 Wetter-Alarm morgen…");
       await getWetterAlarmDailyWeather({
         locationName,
-        date: tomorrowDate(),
+        date: datePlusDays(new Date(), 1),
+      });
+      await delay(STEP_GAP_MS);
+
+      console.info("[catchup] 8 Wetter-Alarm übermorgen…");
+      await getWetterAlarmDailyWeather({
+        locationName,
+        date: datePlusDays(new Date(), 2),
       });
 
       warmedAt = Date.now();

@@ -22,6 +22,7 @@ export type PvStoreState = {
   gridSource: GridSource;
   forecastedTodayYieldKwh: number | null;
   forecastedTomorrowYieldKwh: number | null;
+  forecastedDayAfterTomorrowYieldKwh: number | null;
   forecastSolarError: string | null;
   warning: string | null;
   sourceWarning: string | null;
@@ -72,6 +73,7 @@ const INITIAL_STATE: PvStoreState = {
   gridSource: null,
   forecastedTodayYieldKwh: null,
   forecastedTomorrowYieldKwh: null,
+  forecastedDayAfterTomorrowYieldKwh: null,
   forecastSolarError: null,
   warning: null,
   sourceWarning: null,
@@ -92,6 +94,7 @@ type LiveResponse = {
   snapshot: PvSnapshot;
   forecastedTodayYieldKwh: number | null;
   forecastedTomorrowYieldKwh: number | null;
+  forecastedDayAfterTomorrowYieldKwh: number | null;
   forecastSolarError: string | null;
   warning: string | null;
   sourceWarning: string | null;
@@ -133,6 +136,7 @@ function hydrateFromOfflineCache(): PvStoreState {
     gridSource: cached.live.gridSource,
     forecastedTodayYieldKwh: cached.live.forecastedTodayYieldKwh,
     forecastedTomorrowYieldKwh: cached.live.forecastedTomorrowYieldKwh,
+    forecastedDayAfterTomorrowYieldKwh: cached.live.forecastedDayAfterTomorrowYieldKwh ?? null,
     forecastSolarError: cached.live.forecastSolarError,
     warning: cached.live.warning,
     sourceWarning: cached.live.sourceWarning,
@@ -197,6 +201,7 @@ class PvStore {
         snapshot: this.state.snapshot,
         forecastedTodayYieldKwh: this.state.forecastedTodayYieldKwh,
         forecastedTomorrowYieldKwh: this.state.forecastedTomorrowYieldKwh,
+        forecastedDayAfterTomorrowYieldKwh: this.state.forecastedDayAfterTomorrowYieldKwh,
         forecastSolarError: this.state.forecastSolarError,
         warning,
         sourceWarning: this.state.sourceWarning,
@@ -228,6 +233,7 @@ class PvStore {
           gridSource: payload.gridSource,
           forecastedTodayYieldKwh: payload.forecastedTodayYieldKwh ?? null,
           forecastedTomorrowYieldKwh: payload.forecastedTomorrowYieldKwh ?? null,
+          forecastedDayAfterTomorrowYieldKwh: payload.forecastedDayAfterTomorrowYieldKwh ?? null,
           forecastSolarError: payload.forecastSolarError ?? null,
           warning: payload.warning,
           sourceWarning: payload.sourceWarning ?? null,

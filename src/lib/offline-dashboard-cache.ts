@@ -16,6 +16,8 @@ export type OfflineDashboardCache = {
     snapshot: PvSnapshot;
     forecastedTodayYieldKwh: number | null;
     forecastedTomorrowYieldKwh: number | null;
+    /** Fehlt in Caches von vor dem Übermorgen-Tab. */
+    forecastedDayAfterTomorrowYieldKwh?: number | null;
     forecastSolarError: string | null;
     warning: string | null;
     sourceWarning: string | null;

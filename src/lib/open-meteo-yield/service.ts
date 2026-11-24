@@ -86,6 +86,7 @@ function buildForecastUrl(plant: YieldForecastPlant): string {
     tilt: String(plant.tiltDeg),
     azimuth: String(plant.azimuthDeg),
     timezone: OPEN_METEO_TIMEZONE,
+    forecast_days: "3",
   });
   return `${API_BASE}?${params.toString()}`;
 }
@@ -151,6 +152,7 @@ async function loadForecastHourly(plant: YieldForecastPlant): Promise<HourlyGti 
 export type OpenMeteoDayForecasts = {
   today: OpenMeteoYieldResult;
   tomorrow: OpenMeteoYieldResult;
+  dayAfterTomorrow: OpenMeteoYieldResult;
   error: string | null;
 };
 
@@ -161,6 +163,7 @@ export async function getOpenMeteoTodayAndTomorrowYieldKwh(
   const empty: OpenMeteoDayForecasts = {
     today: { kwh: null, error: null, meta: null },
     tomorrow: { kwh: null, error: null, meta: null },
+    dayAfterTomorrow: { kwh: null, error: null, meta: null },
     error: null,
   };
   const peakKwp = plant.peakKwp;
@@ -171,6 +174,7 @@ export async function getOpenMeteoTodayAndTomorrowYieldKwh(
 
   const todayKey = todayDateKeyInZurich(date);
   const tomorrowKey = dateKeyPlusDaysInZurich(date, 1);
+  const dayAfterKey = dateKeyPlusDaysInZurich(date, 2);
   const key = [
     todayKey,
     plant.latitude,
@@ -209,13 +213,17 @@ export async function getOpenMeteoTodayAndTomorrowYieldKwh(
 
   const today = yieldFromHourly(hourly, todayKey, peakKwp, performanceRatio);
   const tomorrow = yieldFromHourly(hourly, tomorrowKey, peakKwp, performanceRatio);
+  const dayAfterTomorrow = yieldFromHourly(hourly, dayAfterKey, peakKwp, performanceRatio);
   if (today.meta) logVerification(today.meta, today.kwh ?? 0);
   if (tomorrow.meta) logVerification(tomorrow.meta, tomorrow.kwh ?? 0);
+  if (dayAfterTomorrow.meta) logVerification(dayAfterTomorrow.meta, dayAfterTomorrow.kwh ?? 0);
 
   const error =
-    today.error && tomorrow.error ? OPEN_METEO_YIELD_UNAVAILABLE : null;
+    today.error && tomorrow.error && dayAfterTomorrow.error
+      ? OPEN_METEO_YIELD_UNAVAILABLE
+      : null;
 
-  return { today, tomorrow, error };
+  return { today, tomorrow, dayAfterTomorrow, error };
 }
 
 export async function getOpenMeteoForecastedTodayYieldKwh(

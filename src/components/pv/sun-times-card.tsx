@@ -89,27 +89,33 @@ function formatDayHeading(date: Date): string {
 }
 
 /**
- * Ertragsprognose der beiden Slides am Kalendertag ausrichten.
- * Liegt der letzte Snapshot noch auf gestern, ist dessen „Morgen“-Wert die Prognose für heute.
+ * Ertragsprognose der Slides am Kalendertag ausrichten.
+ * Liegt der letzte Snapshot noch auf gestern, rutschen die Werte um einen Tag nach vorn.
  */
 function yieldsForCalendarDay(
   now: Date,
   snapshotTimestamp: number | null,
   forecastedTodayYieldKwh: number | null,
   forecastedTomorrowYieldKwh: number | null,
-): { today: number | null; tomorrow: number | null } {
-  if (snapshotTimestamp == null) {
-    return { today: forecastedTodayYieldKwh, tomorrow: forecastedTomorrowYieldKwh };
-  }
+  forecastedDayAfterTomorrowYieldKwh: number | null,
+): { today: number | null; tomorrow: number | null; dayAfterTomorrow: number | null } {
+  const aligned = {
+    today: forecastedTodayYieldKwh,
+    tomorrow: forecastedTomorrowYieldKwh,
+    dayAfterTomorrow: forecastedDayAfterTomorrowYieldKwh,
+  };
+  if (snapshotTimestamp == null) return aligned;
   const todayKey = zurichDayKey(now.getTime());
   const snapshotKey = zurichDayKey(snapshotTimestamp);
-  if (snapshotKey === todayKey) {
-    return { today: forecastedTodayYieldKwh, tomorrow: forecastedTomorrowYieldKwh };
-  }
+  if (snapshotKey === todayKey) return aligned;
   if (addZurichDaysKey(snapshotKey, 1) === todayKey) {
-    return { today: forecastedTomorrowYieldKwh, tomorrow: null };
+    return {
+      today: forecastedTomorrowYieldKwh,
+      tomorrow: forecastedDayAfterTomorrowYieldKwh,
+      dayAfterTomorrow: null,
+    };
   }
-  return { today: null, tomorrow: null };
+  return { today: null, tomorrow: null, dayAfterTomorrow: null };
 }
 
 const WETTERALARM_URL = "https://app.wetteralarm.ch/V00A/m787crdw";
@@ -283,12 +289,14 @@ export function SunTimesCard({
   snapshotTimestamp = null,
   forecastedTodayYieldKwh = null,
   forecastedTomorrowYieldKwh = null,
+  forecastedDayAfterTomorrowYieldKwh = null,
   className,
 }: {
   /** Messzeitpunkt. Bestimmt nicht die Tagesüberschrift — die folgt der Uhr in Europe/Zurich. */
   snapshotTimestamp?: number | null;
   forecastedTodayYieldKwh?: number | null;
   forecastedTomorrowYieldKwh?: number | null;
+  forecastedDayAfterTomorrowYieldKwh?: number | null;
   className?: string;
 }) {
   const now = useCurrentTime();
@@ -298,20 +306,30 @@ export function SunTimesCard({
     () => dateForZurichDayKey(addZurichDaysKey(todayKey, 1)),
     [todayKey],
   );
+  const dayAfterTomorrowDate = useMemo(
+    () => dateForZurichDayKey(addZurichDaysKey(todayKey, 2)),
+    [todayKey],
+  );
   const yields = yieldsForCalendarDay(
     now,
     snapshotTimestamp,
     forecastedTodayYieldKwh,
     forecastedTomorrowYieldKwh,
+    forecastedDayAfterTomorrowYieldKwh,
   );
 
   return (
     <Card data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
-      <SwipeCarousel labels={["Heute", "Morgen"]} className="min-w-0 gap-3 pb-1">
+      <SwipeCarousel labels={["Heute", "Morgen", "Übermorgen"]} className="min-w-0 gap-3 pb-1">
         <SunTimesDayCard date={todayDate} forecastedYieldKwh={yields.today} clockNow={now} />
         <SunTimesDayCard
           date={tomorrowDate}
           forecastedYieldKwh={yields.tomorrow}
+          clockNow={null}
+        />
+        <SunTimesDayCard
+          date={dayAfterTomorrowDate}
+          forecastedYieldKwh={yields.dayAfterTomorrow}
           clockNow={null}
         />
       </SwipeCarousel>
