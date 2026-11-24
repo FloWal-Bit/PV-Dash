@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 const inputClassName =
   "flex h-10 w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60";
 
-/** Schalter für Lampe und Spotify. Sichtbar nur auf Geräten, die in der Geräteliste angehakt sind. */
+/** Schalter für Lampe und Sonos. Sichtbar nur auf Geräten, die in der Geräteliste angehakt sind. */
 export function ExtraCardsSettings() {
   const saved = useSyncExternalStore(
     extraCardsStore.subscribe,
@@ -25,7 +25,7 @@ export function ExtraCardsSettings() {
     saved.mystromKind,
     saved.mystromMac,
     saved.mystromTokenSet,
-    saved.spotifyUrl,
+    saved.sonosBaseUrl,
   ].join("|");
   return <ExtraCardsForm key={signature} saved={saved} />;
 }
@@ -41,8 +41,8 @@ function ExtraCardsForm({
   const [mac, setMac] = useState(saved.mystromMac);
   const [token, setToken] = useState("");
   const [clearToken, setClearToken] = useState(false);
-  const [spotifyEnabled, setSpotifyEnabled] = useState(saved.spotifyEnabled);
-  const [spotifyUrl, setSpotifyUrl] = useState(saved.spotifyUrl);
+  const [sonosEnabled, setSonosEnabled] = useState(saved.sonosEnabled);
+  const [sonosBaseUrl, setSonosBaseUrl] = useState(saved.sonosBaseUrl);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,14 +60,14 @@ function ExtraCardsForm({
     }
   }
 
-  async function setSpotifyEnabledFlag(enabled: boolean) {
-    setSpotifyEnabled(enabled);
+  async function setSonosEnabledFlag(enabled: boolean) {
+    setSonosEnabled(enabled);
     setSaving(true);
     setError(null);
     try {
-      await putDevSettings({ spotifyEnabled: enabled });
+      await putDevSettings({ sonosEnabled: enabled });
     } catch (err) {
-      setSpotifyEnabled(!enabled);
+      setSonosEnabled(!enabled);
       setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
     } finally {
       setSaving(false);
@@ -83,8 +83,8 @@ function ExtraCardsForm({
         mystromBaseUrl: baseUrl,
         mystromKind: kind,
         mystromMac: mac,
-        spotifyEnabled,
-        spotifyUrl,
+        sonosEnabled,
+        sonosBaseUrl,
         ...(clearToken ? { mystromToken: null } : token.trim() ? { mystromToken: token } : {}),
       });
       setToken("");
@@ -194,24 +194,24 @@ function ExtraCardsForm({
 
       <div className="flex items-start justify-between gap-3 border-t border-border/70 pt-3">
         <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-sm font-medium">Spotify</span>
+          <span className="text-sm font-medium">Sonos</span>
           <span className="text-xs leading-relaxed text-muted-foreground">
-            Erscheint auf dem Dashboard, sobald der Schalter an ist. Der Link kann danach folgen.
+            Erscheint auf dem Dashboard, sobald der Schalter an ist. Die Lautsprecher-Adresse kann danach folgen.
           </span>
         </div>
         <Switch
-          aria-label="Spotify-Player anzeigen"
-          checked={spotifyEnabled}
-          onCheckedChange={(checked) => void setSpotifyEnabledFlag(checked)}
+          aria-label="Sonos anzeigen"
+          checked={sonosEnabled}
+          onCheckedChange={(checked) => void setSonosEnabledFlag(checked)}
           className="data-checked:bg-chart-3"
         />
       </div>
       <input
         className={inputClassName}
-        value={spotifyUrl}
-        onChange={(event) => setSpotifyUrl(event.target.value)}
-        placeholder="https://open.spotify.com/playlist/…"
-        aria-label="Spotify-Link"
+        value={sonosBaseUrl}
+        onChange={(event) => setSonosBaseUrl(event.target.value)}
+        placeholder="192.168.1.40"
+        aria-label="Sonos-Adresse"
         inputMode="url"
         autoCapitalize="off"
         autoCorrect="off"

@@ -11,8 +11,9 @@ export type ExtraCardsSettings = {
   mystromMac: string;
   /** true, wenn serverseitig ein API-Token liegt. Der Token selbst geht nicht an den Client. */
   mystromTokenSet: boolean;
-  spotifyEnabled: boolean;
-  spotifyUrl: string;
+  sonosEnabled: boolean;
+  /** Origin des Lautsprechers, z. B. http://192.168.1.40:1400 */
+  sonosBaseUrl: string;
 };
 
 export const DEFAULT_EXTRA_CARDS: ExtraCardsSettings = {
@@ -21,11 +22,9 @@ export const DEFAULT_EXTRA_CARDS: ExtraCardsSettings = {
   mystromKind: "bulb",
   mystromMac: "",
   mystromTokenSet: false,
-  spotifyEnabled: false,
-  spotifyUrl: "",
+  sonosEnabled: false,
+  sonosBaseUrl: "",
 };
-
-const SPOTIFY_TYPES = ["track", "album", "playlist", "episode", "show", "artist"] as const;
 
 const BLOCKED_HOSTS = new Set(["metadata.google.internal", "metadata.google.com"]);
 
@@ -78,42 +77,31 @@ export function normalizeMystromToken(value: string): string {
   return token;
 }
 
-/** Spotify-Link oder -URI → Embed-Adresse. Ungültig → null. */
-export function spotifyEmbedSrc(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-
-  const uri = /^spotify:(track|album|playlist|episode|show|artist):([A-Za-z0-9]+)$/.exec(trimmed);
-  if (uri) {
-    return embedSrc(uri[1] ?? "", uri[2] ?? "");
-  }
-
-  let url: URL;
-  try {
-    url = new URL(trimmed);
-  } catch {
-    return null;
-  }
-  const host = url.hostname.toLowerCase();
-  if (host !== "open.spotify.com" && host !== "play.spotify.com" && host !== "spotify.com") {
-    return null;
-  }
-  const parts = url.pathname.split("/").filter(Boolean);
-  const withoutIntl = parts[0]?.startsWith("intl-") ? parts.slice(1) : parts;
-  const withoutEmbed = withoutIntl[0] === "embed" ? withoutIntl.slice(1) : withoutIntl;
-  return embedSrc(withoutEmbed[0] ?? "", withoutEmbed[1] ?? "");
-}
-
-function embedSrc(type: string, id: string): string | null {
-  if (!SPOTIFY_TYPES.includes(type as (typeof SPOTIFY_TYPES)[number])) return null;
-  if (!/^[A-Za-z0-9]+$/.test(id)) return null;
-  return `https://open.spotify.com/embed/${type}/${id}?utm_source=generator&theme=0`;
-}
-
-export function normalizeSpotifyUrl(value: string): string {
+/** Leere Eingabe bleibt leer. Sonst http-Origin des Lautsprechers auf Port 1400. */
+export function normalizeSonosBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
-  if (trimmed.length > 500) throw new Error("Spotify-Link ist zu lang.");
-  if (!spotifyEmbedSrc(trimmed)) throw new Error("Spotify-Link ist ungültig.");
-  return trimmed;
+  if (trimmed.length > 200) throw new Error("Sonos-Adresse ist zu lang.");
+  let url: URL;
+  try {
+    url = new URL(trimmed.includes("://") ? trimmed : `http://${trimmed}`);
+  } catch {
+    throw new Error("Sonos-Adresse ist ungültig.");
+  }
+  if (url.protocol !== "http:") {
+    throw new Error("Sonos-Adresse muss http sein.");
+  }
+  if (url.username || url.password) {
+    throw new Error("Sonos-Adresse darf kein Passwort enthalten.");
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (!host || BLOCKED_HOSTS.has(host) || host === "169.254.169.254") {
+    throw new Error("Diese Adresse ist nicht erlaubt.");
+  }
+  const explicitPort = /:(\d+)(?:[/?#]|$)/.exec(trimmed)?.[1];
+  if (explicitPort && explicitPort !== "1400") {
+    throw new Error("Sonos-Adresse muss Port 1400 verwenden.");
+  }
+  url.port = "1400";
+  return url.origin;
 }

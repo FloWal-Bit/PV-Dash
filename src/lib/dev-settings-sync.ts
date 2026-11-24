@@ -30,8 +30,8 @@ export function applySharedDevSettings(data: SharedDevSettings): void {
     mystromKind: data.mystromKind,
     mystromMac: data.mystromMac,
     mystromTokenSet: data.mystromTokenSet,
-    spotifyEnabled: data.spotifyEnabled,
-    spotifyUrl: data.spotifyUrl,
+    sonosEnabled: data.sonosEnabled,
+    sonosBaseUrl: data.sonosBaseUrl,
   });
   cardDeviceStore.applyRemote(data.cardDeviceIds);
 }

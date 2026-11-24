@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Lightbulb, LightbulbOff } from "lucide-react";
+import { Lightbulb, LightbulbOff, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { deviceIdStore, deviceRequestHeaders } from "@/lib/device-visit";
 import { cardDeviceStore, extraCardsStore } from "@/lib/extra-cards-store";
-import { spotifyEmbedSrc, type MystromKind } from "@/lib/extra-cards-shared";
+import type { MystromKind } from "@/lib/extra-cards-shared";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -125,33 +125,129 @@ function MystromLampCard({
   );
 }
 
-function SpotifyPlayerCard({ url }: { url: string }) {
-  const src = spotifyEmbedSrc(url);
+type SonosNow = {
+  room: string;
+  title: string;
+  artist: string;
+  playing: boolean;
+};
+
+function SonosCard({ baseUrl }: { baseUrl: string }) {
+  const [now, setNow] = useState<SonosNow | null>(null);
+  const [phase, setPhase] = useState<"loading" | "ready" | "saving">(baseUrl ? "loading" : "ready");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!baseUrl) return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const response = await fetch("/api/sonos", {
+          cache: "no-store",
+          headers: deviceRequestHeaders(),
+        });
+        const data = (await response.json()) as SonosNow & { error?: string };
+        if (!response.ok) throw new Error(data.error ?? "Sonos nicht erreichbar.");
+        if (!cancelled) {
+          setNow(data);
+          setError(null);
+          setPhase("ready");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Sonos nicht erreichbar.");
+          setPhase("ready");
+        }
+      }
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [baseUrl]);
+
+  async function send(action: "play" | "pause" | "next" | "previous") {
+    if (!baseUrl || phase === "saving") return;
+    triggerHaptic("selection");
+    setPhase("saving");
+    setError(null);
+    try {
+      const response = await fetch("/api/sonos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...deviceRequestHeaders() },
+        body: JSON.stringify({ action }),
+      });
+      const data = (await response.json()) as SonosNow & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Sonos nicht erreichbar.");
+      setNow(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sonos nicht erreichbar.");
+    } finally {
+      setPhase("ready");
+    }
+  }
+
+  const playing = now?.playing === true;
+  const title =
+    now?.title || (error ? "" : phase === "loading" ? "…" : baseUrl ? "Nichts läuft" : "");
+  const detail = [now?.room, now?.artist].filter(Boolean).join(" · ");
+
   return (
-    <Card data-spotify-card className="shadow-card rounded-2xl">
+    <Card data-sonos-card className="shadow-card rounded-2xl">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Spotify</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Sonos</CardTitle>
       </CardHeader>
-      <CardContent className="pb-4">
-        {src ? (
-          <iframe
-            title="Spotify"
-            src={src}
-            className="h-[152px] w-full rounded-xl border-0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-          />
+      <CardContent className="flex flex-col gap-3 pb-4">
+        {baseUrl ? (
+          <>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{title}</p>
+              {detail ? <p className="truncate text-xs text-muted-foreground">{detail}</p> : null}
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                aria-label="Vorheriger Titel"
+                disabled={phase === "saving"}
+                onClick={() => void send("previous")}
+                className="flex size-10 items-center justify-center rounded-full text-foreground/80 transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                <SkipBack className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label={playing ? "Pause" : "Wiedergabe"}
+                disabled={phase === "saving"}
+                onClick={() => void send(playing ? "pause" : "play")}
+                className="flex size-12 items-center justify-center rounded-full bg-foreground text-background disabled:opacity-50"
+              >
+                {playing ? <Pause className="size-5" /> : <Play className="size-5" />}
+              </button>
+              <button
+                type="button"
+                aria-label="Nächster Titel"
+                disabled={phase === "saving"}
+                onClick={() => void send("next")}
+                className="flex size-10 items-center justify-center rounded-full text-foreground/80 transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                <SkipForward className="size-4" />
+              </button>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Spotify-Link in den Dev-Einstellungen setzen.
+            Adresse in den Dev-Einstellungen setzen.
           </p>
         )}
+        {error ? <p className="text-center text-xs text-destructive">{error}</p> : null}
       </CardContent>
     </Card>
   );
 }
 
-/** Lampe und Spotify nur auf angehakten Geräten, und nur wenn der Schalter an ist. */
+/** Lampe und Sonos nur auf angehakten Geräten, und nur wenn der Schalter an ist. */
 export function ExtraCards() {
   const deviceId = useSyncExternalStore(
     deviceIdStore.subscribe,
@@ -171,7 +267,7 @@ export function ExtraCards() {
   const allowed =
     deviceId != null && cardDeviceIds.some((id) => id === deviceId.toLowerCase());
   if (!allowed) return null;
-  if (!settings.mystromEnabled && !settings.spotifyEnabled) return null;
+  if (!settings.mystromEnabled && !settings.sonosEnabled) return null;
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -183,7 +279,7 @@ export function ExtraCards() {
           mac={settings.mystromMac}
         />
       ) : null}
-      {settings.spotifyEnabled ? <SpotifyPlayerCard url={settings.spotifyUrl} /> : null}
+      {settings.sonosEnabled ? <SonosCard baseUrl={settings.sonosBaseUrl} /> : null}
     </div>
   );
 }

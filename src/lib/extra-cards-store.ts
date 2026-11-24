@@ -42,7 +42,7 @@ function emitDevices() {
   for (const listener of deviceListeners) listener();
 }
 
-/** Geräte, die Lampe und Spotify sehen. Standard leer, wie bei Push. */
+/** Geräte, die Lampe und Sonos sehen. Standard leer, wie bei Push. */
 export const cardDeviceStore = {
   subscribe(listener: Listener): () => void {
     deviceListeners.add(listener);
