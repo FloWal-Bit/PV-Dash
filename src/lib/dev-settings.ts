@@ -33,6 +33,7 @@ import {
   type ExtraCardsSettings,
   type MystromKind,
 } from "@/lib/extra-cards-shared";
+import { isDeviceId, DEVICE_ID_HEADER } from "@/lib/device-log-shared";
 import { resolveOpenMeteoPerformanceRatio } from "@/lib/open-meteo-yield/config";
 
 export type { DevSettingsUpdate, SharedDevSettings };
@@ -47,6 +48,7 @@ type PersistedDevSettings = {
   /** null = noch nicht gesetzt → Env/Default. */
   performanceRatio: number | null;
   pushDeviceIds: string[];
+  cardDeviceIds: string[];
   surplusAlert: SurplusAlertSettings;
   mystromEnabled: boolean;
   mystromBaseUrl: string;
@@ -55,8 +57,6 @@ type PersistedDevSettings = {
   mystromToken: string;
   spotifyEnabled: boolean;
   spotifyUrl: string;
-  /** SHA-256 des Geräte-Cookies. Leer = kein Gerät freigegeben. */
-  controlDeviceHash: string;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -79,6 +79,7 @@ function readFile(): PersistedDevSettings | null {
     const infoBannerVisibleUntil = readInfoBannerInstant(v.infoBannerVisibleUntil);
     const performanceRatio = readPerformanceRatio(v.performanceRatio);
     const pushDeviceIds = readPushDeviceIds(v.pushDeviceIds);
+    const cardDeviceIds = readPushDeviceIds(v.cardDeviceIds);
     const surplusAlert = readSurplusAlert(v.surplusAlert);
     const mystromEnabled = v.mystromEnabled === true;
     const mystromBaseUrl = typeof v.mystromBaseUrl === "string" ? v.mystromBaseUrl : "";
@@ -87,10 +88,6 @@ function readFile(): PersistedDevSettings | null {
     const mystromToken = typeof v.mystromToken === "string" ? v.mystromToken : "";
     const spotifyEnabled = v.spotifyEnabled === true;
     const spotifyUrl = typeof v.spotifyUrl === "string" ? v.spotifyUrl : "";
-    const controlDeviceHash =
-      typeof v.controlDeviceHash === "string" && /^[a-f0-9]{64}$/.test(v.controlDeviceHash)
-        ? v.controlDeviceHash
-        : "";
     const hadLegacy =
       "siteLocation" in v ||
       "yieldForecast" in v ||
@@ -106,6 +103,7 @@ function readFile(): PersistedDevSettings | null {
       infoBannerVisibleUntil,
       performanceRatio,
       pushDeviceIds,
+      cardDeviceIds,
       surplusAlert,
       mystromEnabled,
       mystromBaseUrl,
@@ -114,7 +112,6 @@ function readFile(): PersistedDevSettings | null {
       mystromToken,
       spotifyEnabled,
       spotifyUrl,
-      controlDeviceHash,
     };
     // Alte Standort-, Server-Pause- und hideSimulated-Felder beim nächsten Lesen streichen.
     if (hadLegacy) writeFile(file);
@@ -150,6 +147,7 @@ function resolve(file: PersistedDevSettings | null): SharedDevSettings {
     infoBannerVisibleUntil: file?.infoBannerVisibleUntil ?? null,
     performanceRatio: resolvePerformanceRatio(file?.performanceRatio),
     pushDeviceIds: file?.pushDeviceIds ?? [],
+    cardDeviceIds: file?.cardDeviceIds ?? [],
     surplusAlert: copySurplusAlert(file?.surplusAlert),
     configured: file != null,
     updatedAt: file?.updatedAt ?? null,
@@ -171,6 +169,14 @@ export function getMystromTarget(): {
     mac: file.mystromMac ? normalizeMystromMac(file.mystromMac) : "",
     token: file.mystromToken,
   };
+}
+
+/** Lampe nur, wenn diese Kennung in der Geräteliste bei Karten angehakt ist. */
+export function requestMayUseCards(request: Request): boolean {
+  const raw = request.headers.get(DEVICE_ID_HEADER);
+  if (!isDeviceId(raw)) return false;
+  const allowed = readFile()?.cardDeviceIds ?? [];
+  return allowed.includes(raw.toLowerCase());
 }
 
 function writeFile(next: PersistedDevSettings): void {
@@ -246,6 +252,10 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
       "pushDeviceIds" in update
         ? normalizePushDeviceIds(update.pushDeviceIds)
         : (current?.pushDeviceIds ?? []),
+    cardDeviceIds:
+      "cardDeviceIds" in update
+        ? normalizePushDeviceIds(update.cardDeviceIds)
+        : (current?.cardDeviceIds ?? []),
     surplusAlert:
       update.surplusAlert != null
         ? normalizeSurplusAlert(update.surplusAlert)
@@ -257,23 +267,7 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
     mystromToken,
     spotifyEnabled,
     spotifyUrl,
-    controlDeviceHash: current?.controlDeviceHash ?? "",
   };
   writeFile(next);
   return resolve(next);
-}
-
-export function getControlDeviceHash(): string {
-  return readFile()?.controlDeviceHash ?? "";
-}
-
-/** Bindet das eine Gerät. Ersetzt eine frühere Freigabe. */
-export function setControlDeviceHash(hash: string): void {
-  if (!/^[a-f0-9]{64}$/.test(hash)) {
-    throw new Error("Gerätekennung ist ungültig.");
-  }
-  if (!readFile()) updateSharedDevSettings({});
-  const file = readFile();
-  if (!file) throw new Error("Einstellungen konnten nicht gespeichert werden.");
-  writeFile({ ...file, controlDeviceHash: hash, updatedAt: new Date().toISOString() });
 }

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { presentDevSettings, requestHasControlDevice } from "@/lib/control-device";
 import { getLiveDashboardPayload } from "@/lib/pv-source";
 
 // Nie statisch cachen: Wir wollen bei jedem Aufruf durch unsere eigene,
@@ -7,10 +6,7 @@ import { getLiveDashboardPayload } from "@/lib/pv-source";
 // laufen, nicht durch Next.js' Route-Cache.
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function GET() {
   const payload = await getLiveDashboardPayload();
-  return NextResponse.json({
-    ...payload,
-    devSettings: presentDevSettings(payload.devSettings, requestHasControlDevice(request)),
-  });
+  return NextResponse.json(payload);
 }

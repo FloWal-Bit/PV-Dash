@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { getMystromTarget } from "@/lib/dev-settings";
-import { requestHasControlDevice } from "@/lib/control-device";
+import { getMystromTarget, requestMayUseCards } from "@/lib/dev-settings";
 import { readMystromState, setMystromState } from "@/lib/mystrom";
 
 export const dynamic = "force-dynamic";
 
 function locked() {
   return NextResponse.json(
-    { error: "Nur das freigegebene Gerät kann die Lampe schalten." },
+    { error: "Dieses Gerät ist für die Lampe nicht freigegeben." },
     { status: 401 },
   );
 }
@@ -25,7 +24,7 @@ function failure(error: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!requestHasControlDevice(request)) return locked();
+  if (!requestMayUseCards(request)) return locked();
   try {
     if (!getMystromTarget()) return disabled();
     return NextResponse.json(await readMystromState());
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!requestHasControlDevice(request)) return locked();
+  if (!requestMayUseCards(request)) return locked();
   try {
     if (!getMystromTarget()) return disabled();
   } catch (error) {

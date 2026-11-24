@@ -37,7 +37,6 @@ Im Panel → Node.js → **Umgebung / Variables** setzen:
 | `PROCESS_MANAGER` | `npm` oder `forever` / `pm2` | **Nicht** `supervisor` — der restartet bei Dateiänderungen (Restore schreibt viele Dateien) |
 | Start / `npm start` | `npm start` | Nutzt `start.sh` (Bind `0.0.0.0` + Restore-Fallback) |
 | `GITHUB_RELEASE_TOKEN` | Fine-grained PAT | **Pflicht bei privatem Repo** — Post-Hook lädt Release-Assets über die GitHub-API |
-| `PV_DASH_DEVICE_PASSWORD` | eigenes Passwort | Lampe und Spotify nur auf dem Gerät, das dieses Passwort einmal eingibt. Ohne die Variable bleiben beide Karten aus. |
 
 ### Privates GitHub-Repo — Reihenfolge (wichtig)
 

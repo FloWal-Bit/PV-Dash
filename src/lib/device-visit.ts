@@ -1,7 +1,7 @@
 "use client";
 
 import { isInstalledApp } from "@/lib/install-prompt";
-import { DEVICE_ID_PATTERN } from "@/lib/device-log-shared";
+import { DEVICE_ID_HEADER, DEVICE_ID_PATTERN } from "@/lib/device-log-shared";
 import { APP_VERSION } from "@/lib/version";
 
 const STORAGE_KEY = "pv-dash:device-id";
@@ -32,6 +32,13 @@ export const deviceIdStore = {
 type NavigatorUAData = {
   getHighEntropyValues: (hints: string[]) => Promise<{ model?: string }>;
 };
+
+/** Kennung für Anfragen, die nur freigegebene Geräte beantworten. */
+export function deviceRequestHeaders(): Record<string, string> {
+  const id = readDeviceId();
+  if (!id) return {};
+  return { [DEVICE_ID_HEADER]: id };
+}
 
 export function readDeviceId(): string | null {
   if (typeof window === "undefined") return null;

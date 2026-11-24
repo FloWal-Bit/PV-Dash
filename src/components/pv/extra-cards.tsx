@@ -3,8 +3,8 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Lightbulb, LightbulbOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { controlDeviceStore } from "@/lib/control-device-client";
-import { extraCardsStore } from "@/lib/extra-cards-store";
+import { deviceIdStore, deviceRequestHeaders } from "@/lib/device-visit";
+import { cardDeviceStore, extraCardsStore } from "@/lib/extra-cards-store";
 import { spotifyEmbedSrc, type MystromKind } from "@/lib/extra-cards-shared";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,10 @@ function MystromLampCard({
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch("/api/mystrom", { cache: "no-store" });
+        const response = await fetch("/api/mystrom", {
+          cache: "no-store",
+          headers: deviceRequestHeaders(),
+        });
         const body = (await response.json()) as { on?: boolean; error?: string };
         if (cancelled) return;
         if (!response.ok || typeof body.on !== "boolean") {
@@ -65,7 +68,7 @@ function MystromLampCard({
     try {
       const response = await fetch("/api/mystrom", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...deviceRequestHeaders() },
         body: JSON.stringify({ on: next }),
       });
       const body = (await response.json()) as { on?: boolean; error?: string };
@@ -148,19 +151,26 @@ function SpotifyPlayerCard({ url }: { url: string }) {
   );
 }
 
-/** Lampe und Spotify nur auf dem einen freigegebenen Gerät, und nur wenn der Schalter an ist. */
+/** Lampe und Spotify nur auf angehakten Geräten, und nur wenn der Schalter an ist. */
 export function ExtraCards() {
-  const access = useSyncExternalStore(
-    controlDeviceStore.subscribe,
-    controlDeviceStore.getSnapshot,
-    controlDeviceStore.getServerSnapshot,
+  const deviceId = useSyncExternalStore(
+    deviceIdStore.subscribe,
+    deviceIdStore.getSnapshot,
+    deviceIdStore.getServerSnapshot,
+  );
+  const cardDeviceIds = useSyncExternalStore(
+    cardDeviceStore.subscribe,
+    cardDeviceStore.getSnapshot,
+    cardDeviceStore.getServerSnapshot,
   );
   const settings = useSyncExternalStore(
     extraCardsStore.subscribe,
     extraCardsStore.getSnapshot,
     extraCardsStore.getServerSnapshot,
   );
-  if (!access.unlocked) return null;
+  const allowed =
+    deviceId != null && cardDeviceIds.some((id) => id === deviceId.toLowerCase());
+  if (!allowed) return null;
   if (!settings.mystromEnabled && !settings.spotifyEnabled) return null;
 
   return (
