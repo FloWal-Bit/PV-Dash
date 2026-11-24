@@ -142,7 +142,11 @@ export function ExtraCards() {
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {settings.mystromEnabled ? <MystromLampCard /> : null}
+      {settings.mystromEnabled ? (
+        <MystromLampCard
+          key={`${settings.mystromBaseUrl}\0${settings.mystromKind}\0${settings.mystromMac}\0${String(settings.mystromTokenSet)}`}
+        />
+      ) : null}
       {settings.spotifyEnabled ? <SpotifyPlayerCard url={settings.spotifyUrl} /> : null}
     </div>
   );

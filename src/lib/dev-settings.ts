@@ -204,12 +204,13 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
     typeof update.mystromMac === "string"
       ? normalizeMystromMac(update.mystromMac)
       : (current?.mystromMac ?? "");
-  const mystromToken =
-    update.mystromToken === null
-      ? ""
-      : typeof update.mystromToken === "string"
-        ? normalizeMystromToken(update.mystromToken)
-        : (current?.mystromToken ?? "");
+  // Leer oder weggelassen behält den Token. Nur null löscht ihn.
+  let mystromToken = current?.mystromToken ?? "";
+  if (update.mystromToken === null) {
+    mystromToken = "";
+  } else if (typeof update.mystromToken === "string" && update.mystromToken.trim()) {
+    mystromToken = normalizeMystromToken(update.mystromToken);
+  }
   const spotifyEnabled =
     typeof update.spotifyEnabled === "boolean"
       ? update.spotifyEnabled

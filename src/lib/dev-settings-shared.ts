@@ -90,7 +90,7 @@ export type DevSettingsUpdate = {
   mystromBaseUrl?: string;
   mystromKind?: ExtraCardsSettings["mystromKind"];
   mystromMac?: string;
-  /** null löscht den Token. Weglassen lässt ihn unverändert. */
+  /** null löscht den Token. Leer oder weglassen lässt ihn unverändert. */
   mystromToken?: string | null;
   spotifyEnabled?: boolean;
   spotifyUrl?: string;
