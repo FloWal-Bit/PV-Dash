@@ -27,7 +27,6 @@ const SunCourse = createLucideIcon("sun-course", [
   ["path", { d: "M16 18a4 4 0 0 0-8 0" }],
 ]);
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/pv/stat-card";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { cn } from "@/lib/utils";
 import { formatSwissNumber } from "@/lib/format";
@@ -278,18 +277,26 @@ function SunTimesDayCard({
   );
 }
 
-/** Aktuelle Uhrzeit, gleiche Kachel wie «Ertrag heute». */
+/** Aktuelle Uhrzeit. Icon und Text liegen auf derselben Höhe wie in der Wetterkarte. */
 export function ClockCard({ className }: { className?: string }) {
   const now = useCurrentTime();
   return (
-    <StatCard
-      className={className}
-      label="Uhrzeit"
-      value={formatTimeWithSeconds(now)}
-      icon={<Clock className="size-5" />}
-      accent="slate"
-      valueClassName="whitespace-nowrap"
-    />
+    <Card className={cn("shadow-card h-full justify-start gap-0 rounded-2xl py-4", className)}>
+      <div className="flex flex-col">
+        <CardHeader aria-hidden className="invisible">
+          <CardTitle className="text-sm font-medium capitalize">&nbsp;</CardTitle>
+        </CardHeader>
+        <CardContent className="grid px-4 py-3.5">
+          <SunStat
+            icon={<Clock className="size-4" />}
+            label="Uhrzeit"
+            value={formatTimeWithSeconds(now)}
+            valueClassName="whitespace-nowrap"
+            accent="slate"
+          />
+        </CardContent>
+      </div>
+    </Card>
   );
 }
 
