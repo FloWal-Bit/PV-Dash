@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
-  Clock,
   CloudDrizzle,
   Cloudy,
   Sun,
@@ -277,25 +276,21 @@ function SunTimesDayCard({
   );
 }
 
-/** Aktuelle Uhrzeit. Icon und Text liegen auf derselben Höhe wie in der Wetterkarte. */
+/** Aktuelle Uhrzeit, so gross wie die Werte bei Stromkonto heute und Stromkonto Total. */
 export function ClockCard({ className }: { className?: string }) {
   const now = useCurrentTime();
   return (
-    <Card className={cn("shadow-card h-full justify-start gap-0 rounded-2xl py-4", className)}>
-      <div className="flex flex-col">
-        <CardHeader aria-hidden className="invisible">
-          <CardTitle className="text-sm font-medium capitalize">&nbsp;</CardTitle>
-        </CardHeader>
-        <CardContent className="grid px-4 py-3.5">
-          <SunStat
-            icon={<Clock className="size-4" />}
-            label="Uhrzeit"
-            value={formatTimeWithSeconds(now)}
-            valueClassName="whitespace-nowrap"
-            accent="slate"
-          />
-        </CardContent>
-      </div>
+    <Card className={cn("shadow-card h-full justify-center rounded-2xl py-4", className)}>
+      <CardContent className="flex items-center justify-center px-4">
+        <time
+          suppressHydrationWarning
+          dateTime={now.toISOString()}
+          aria-label="Uhrzeit"
+          className="text-[1.75rem] font-semibold tracking-tight tabular-nums whitespace-nowrap text-card-foreground"
+        >
+          {formatTimeWithSeconds(now)}
+        </time>
+      </CardContent>
     </Card>
   );
 }
