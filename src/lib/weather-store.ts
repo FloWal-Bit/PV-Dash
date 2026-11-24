@@ -52,6 +52,8 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 let state: WeatherState = SERVER_STATE;
 let inflight: Promise<void> | null = null;
+/** Letzter Versuch, Temperaturen nachzuladen. Verhindert ein Dauer-Polling, wenn der Server sie noch nicht liefert. */
+let lastTemperatureGapFetchAt = 0;
 let dailyTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let dayWatchTimer: ReturnType<typeof globalThis.setInterval> | null = null;
 let visibilityBound = false;
@@ -117,9 +119,29 @@ function hydrateFromPersistence() {
   };
 }
 
+function hasTemperature(payload: WeatherPayload | null | undefined): boolean {
+  return (
+    typeof payload?.temperatureMin === "number" &&
+    Number.isFinite(payload.temperatureMin) &&
+    typeof payload.temperatureMax === "number" &&
+    Number.isFinite(payload.temperatureMax)
+  );
+}
+
+/** Cache aus der Zeit vor den Temperaturfeldern: Sonnenzeiten sind da, °C fehlen. */
+function cachedTemperatureGap(): boolean {
+  const today = state.byDate[weatherDateKey()] ?? null;
+  if (today != null && !hasTemperature(today)) return true;
+  const tomorrow = state.byDate[tomorrowDateKey()] ?? null;
+  return tomorrow != null && !hasTemperature(tomorrow);
+}
+
 function needsNetworkFetch(locationKey: string, force: boolean): boolean {
   if (force) return true;
   if (state.locationKey !== locationKey) return true;
+  if (cachedTemperatureGap() && Date.now() - lastTemperatureGapFetchAt > 10 * 60 * 1000) {
+    return true;
+  }
 
   const todayKey = weatherDateKey();
   const tomorrowKey = tomorrowDateKey();
@@ -231,7 +253,12 @@ function ensureScheduler() {
       const tomorrowMissing = state.byDate[tomorrowDateKey()] == null;
       const checkpointDue =
         state.lastFetchAt == null || state.lastFetchAt < lastDailyCheckpointMs();
-      if (!today || checkpointDue || (tomorrowMissing && !isScheduledServerPause())) {
+      if (
+        !today ||
+        checkpointDue ||
+        cachedTemperatureGap() ||
+        (tomorrowMissing && !isScheduledServerPause())
+      ) {
         void weatherStore.refresh(activeLocation);
       }
     }, 30_000);
@@ -272,6 +299,8 @@ export const weatherStore = {
       emit();
       return;
     }
+
+    if (cachedTemperatureGap()) lastTemperatureGapFetchAt = Date.now();
 
     const todayKey = weatherDateKey();
     const hasToday = state.byDate[todayKey] != null && state.locationKey === key;
