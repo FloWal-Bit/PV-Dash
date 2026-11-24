@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 
 type LampPhase = "loading" | "ready" | "saving";
 
+const setupHintClassName = "text-sm text-muted-foreground";
+
 function MystromLampCard({
   baseUrl,
   kind,
@@ -85,6 +87,19 @@ function MystromLampCard({
   const stateLabel =
     phase === "loading" || phase === "saving" ? "…" : lit ? "Ein" : on === false ? "Aus" : "–";
 
+  if (setupHint) {
+    return (
+      <Card data-mystrom-card className="shadow-card rounded-2xl">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Lampe</CardTitle>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <p className={setupHintClassName}>{setupHint}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card data-mystrom-card className="shadow-card rounded-2xl">
       <CardHeader className="pb-2">
@@ -95,7 +110,7 @@ function MystromLampCard({
           type="button"
           aria-pressed={lit}
           aria-label="myStrom-Lampe ein- oder ausschalten"
-          disabled={setupHint != null || phase === "loading" || phase === "saving"}
+          disabled={phase === "loading" || phase === "saving"}
           onClick={() => void toggle()}
           className="flex flex-col items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-70"
         >
@@ -112,9 +127,7 @@ function MystromLampCard({
           </span>
         </button>
         <span className={cn("text-center text-xs", error ? "text-destructive" : "text-muted-foreground")}>
-          {setupHint ??
-            error ??
-            (lit ? "Eingeschaltet" : on === false ? "Ausgeschaltet" : "Tippen zum Schalten")}
+          {error ?? (lit ? "Eingeschaltet" : on === false ? "Ausgeschaltet" : "Tippen zum Schalten")}
         </span>
       </CardContent>
     </Card>
@@ -138,9 +151,7 @@ function SpotifyPlayerCard({ url }: { url: string }) {
             loading="lazy"
           />
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Spotify-Link in den Dev-Einstellungen setzen.
-          </p>
+          <p className={setupHintClassName}>Spotify-Link in den Dev-Einstellungen setzen.</p>
         )}
       </CardContent>
     </Card>
