@@ -2,7 +2,7 @@
  * Haptisches Feedback über die Vibration API (Android Chrome / PWA).
  * iOS: No-Op. Auf Android in den Einstellungen abschaltbar.
  *
- * Hinweis: Impulse unter ~20 ms spüren viele Geräte nicht. Chrome verlangt
+ * Hinweis: Impulse unter ~20 ms spüren viele Geräte nicht. Chrome verlangt
  * zudem sticky user activation (mindestens ein Tipp seit dem Laden).
  */
 
@@ -10,14 +10,18 @@ export type HapticKind = "selection" | "tab" | "confirm";
 
 const STORAGE_KEY = "pv-dash:haptics-enabled";
 
-/** Dauer in ms — bewusst spürbar, nicht nur API-Mindestwert. */
+/**
+ * Dauer in ms. Die Vibration API kennt keine Stärke, nur die Länge.
+ * Kürzer bleibt auf Android schwächer, weil der Motor nicht voll hochdreht.
+ * Unter ~20 ms spüren viele Geräte den Impuls nicht mehr.
+ */
 const PATTERNS: Record<HapticKind, number | number[]> = {
-  /** Chart-Scrubben: kurzer Tick. */
-  selection: 28,
+  /** Chart-Scrubben: leichter Tick. */
+  selection: 20,
   /** Tab-Wechsel. */
-  tab: 45,
+  tab: 28,
   /** Testimpuls beim Einschalten in den Einstellungen. */
-  confirm: 60,
+  confirm: 36,
 };
 
 type Listener = () => void;
