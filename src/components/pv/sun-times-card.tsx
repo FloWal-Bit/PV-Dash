@@ -248,12 +248,12 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<SunCourse className="size-4" />}
-          label="Sonnenverlauf"
+          icon={<Zap className="size-4" />}
+          label="Ertragsprognose"
           value={
-            waLoading && !dayWeather ? "…" : `${sunriseDisplay} / ${sunsetDisplay}`
+            forecastedYieldKwh != null ? formatSwissNumber(forecastedYieldKwh, 1) : "–"
           }
-          valueClassName="whitespace-nowrap"
+          unit={forecastedYieldKwh != null ? "kWh" : undefined}
           accent="slate"
         />
         <SunStat
@@ -266,12 +266,12 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<Zap className="size-4" />}
-          label="Ertragsprognose"
+          icon={<SunCourse className="size-4" />}
+          label="Sonnenverlauf"
           value={
-            forecastedYieldKwh != null ? formatSwissNumber(forecastedYieldKwh, 1) : "–"
+            waLoading && !dayWeather ? "…" : `${sunriseDisplay} / ${sunsetDisplay}`
           }
-          unit={forecastedYieldKwh != null ? "kWh" : undefined}
+          valueClassName="whitespace-nowrap"
           accent="slate"
         />
       </CardContent>
