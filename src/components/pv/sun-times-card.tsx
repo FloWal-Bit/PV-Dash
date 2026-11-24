@@ -135,6 +135,7 @@ function SunStat({
   accent,
   valueClassName,
   href,
+  className,
 }: {
   icon: ReactNode;
   label: string;
@@ -143,6 +144,7 @@ function SunStat({
   accent: "amber" | "rose" | "green" | "slate";
   valueClassName?: string;
   href?: string;
+  className?: string;
 }) {
   const accentStyles: Record<typeof accent, string> = {
     amber: "from-chart-1/25 to-chart-1/5 text-chart-1",
@@ -151,7 +153,7 @@ function SunStat({
     slate: "from-muted to-muted/40 text-muted-foreground",
   };
   return (
-    <div className="flex flex-col items-center gap-1.5 text-center transition-opacity">
+    <div className={cn("flex flex-col items-center gap-1.5 text-center transition-opacity", className)}>
       {href ? (
         <a
           href={href}
@@ -230,8 +232,9 @@ function SunTimesDayCard({
           {formatDayHeading(date)}
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
+      <CardContent className="grid grid-cols-6 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
         <SunStat
+          className="col-span-2 sm:col-span-1"
           icon={weatherIcon[weatherCategory]}
           label="Wetter"
           href={WETTERALARM_URL}
@@ -239,6 +242,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
+          className="col-span-2 sm:col-span-1"
           icon={<Thermometer className="size-4" />}
           label="Temperatur"
           value={waLoading && !dayWeather ? "…" : temperatureDisplay}
@@ -246,6 +250,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
+          className="col-span-2 sm:col-span-1"
           icon={<Zap className="size-4" />}
           label="Ertragsprognose"
           value={
@@ -255,6 +260,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
+          className="col-span-2 col-start-2 sm:col-span-1 sm:col-start-auto"
           icon={<Timer className="size-4" />}
           label="Sonnenstunden"
           value={
@@ -264,6 +270,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
+          className="col-span-2 col-start-4 sm:col-span-1 sm:col-start-auto"
           icon={<SunCourse className="size-4" />}
           label="Sonnenverlauf"
           value={
