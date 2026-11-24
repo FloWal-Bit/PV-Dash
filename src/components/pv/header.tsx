@@ -5,6 +5,7 @@ import { Radio } from "lucide-react";
 import { ShareDashboardButton } from "@/components/pv/share-dashboard-button";
 import { BacklogDialog } from "@/components/pv/backlog-dialog";
 import { SettingsDialog } from "@/components/pv/settings-dialog";
+import { formatTimeWithSeconds, useCurrentTime } from "@/components/pv/sun-times-card";
 import { cn } from "@/lib/utils";
 import type { DataSource, GridSource } from "@/lib/pv-source";
 import { isWhatWattFirstMessageWarmup } from "@/lib/whatwatt-warmup";
@@ -69,6 +70,7 @@ export function DashboardHeader({
   gridWarning,
   serverUnreachable = false,
 }: HeaderProps) {
+  const now = useCurrentTime();
   const [backlogOpen, setBacklogOpen] = useState(false);
   const taps = useRef({ count: 0, last: 0 });
   const backlogOpenedAt = useRef(0);
@@ -132,14 +134,23 @@ export function DashboardHeader({
     <header className="safe-top bg-background landscape:py-1.5">
       <div className="dashboard-container flex items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-col pl-4">
-          <button
-            type="button"
-            onClick={handleTitleTap}
-            data-backlog-trigger=""
-            className="truncate text-left text-base font-semibold leading-tight"
-          >
-            PV Dash
-          </button>
+          <div className="flex min-w-0 items-baseline">
+            <button
+              type="button"
+              onClick={handleTitleTap}
+              data-backlog-trigger=""
+              className="truncate text-left text-base font-semibold leading-tight"
+            >
+              PV Dash
+            </button>
+            <time
+              suppressHydrationWarning
+              dateTime={now.toISOString()}
+              className="shrink-0 text-base font-semibold tabular-nums leading-tight md:hidden"
+            >
+              {`, ${formatTimeWithSeconds(now)}`}
+            </time>
+          </div>
           <span className="truncate text-xs text-muted-foreground leading-tight">
             {plantName}
           </span>

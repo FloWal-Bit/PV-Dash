@@ -9,7 +9,7 @@ type StatCardProps = {
   unit?: string;
   hint?: string;
   icon: ReactNode;
-  accent?: "amber" | "green" | "rose";
+  accent?: "amber" | "green" | "rose" | "slate";
   simulated?: boolean;
   valueClassName?: string;
   className?: string;
@@ -19,6 +19,7 @@ const accentStyles: Record<NonNullable<StatCardProps["accent"]>, string> = {
   amber: "from-chart-1/25 to-chart-1/5 text-chart-1",
   green: "from-chart-3/25 to-chart-3/5 text-chart-3",
   rose: "from-chart-5/25 to-chart-5/5 text-chart-5",
+  slate: "from-muted to-muted/40 text-muted-foreground",
 };
 
 export function StatCard({

@@ -45,7 +45,7 @@ function formatCelsius(value: number): string {
   return `${formatSwissNumber(rounded, digits)}°`;
 }
 
-function formatTimeWithSeconds(date: Date): string {
+export function formatTimeWithSeconds(date: Date): string {
   return date.toLocaleTimeString("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
@@ -57,7 +57,7 @@ function formatTimeWithSeconds(date: Date): string {
  * Aktuelle Uhrzeit. Nach dem Aufwachen (Bildschirm an, PWA aus dem Cache)
  * sofort nachziehen — ein eingefrorener Timer würde sonst den gestrigen Tag stehen lassen.
  */
-function useCurrentTime(): Date {
+export function useCurrentTime(): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -196,11 +196,9 @@ function SunStat({
 function SunTimesDayCard({
   date,
   forecastedYieldKwh,
-  clockNow,
 }: {
   date: Date;
   forecastedYieldKwh: number | null;
-  clockNow: Date | null;
 }) {
   const weatherState = useSyncExternalStore(
     weatherStore.subscribe,
@@ -232,13 +230,7 @@ function SunTimesDayCard({
           {formatDayHeading(date)}
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-6 sm:gap-x-2">
-        <SunStat
-          icon={<Clock className="size-4" />}
-          label="Uhrzeit"
-          value={clockNow ? formatTimeWithSeconds(clockNow) : "–"}
-          accent="slate"
-        />
+      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
         <SunStat
           icon={weatherIcon[weatherCategory]}
           label="Wetter"
@@ -285,6 +277,29 @@ function SunTimesDayCard({
   );
 }
 
+/** Aktuelle Uhrzeit. Icon und Text liegen auf derselben Höhe wie in der Wetterkarte. */
+export function ClockCard({ className }: { className?: string }) {
+  const now = useCurrentTime();
+  return (
+    <Card className={cn("shadow-card h-full justify-start gap-0 rounded-2xl py-4", className)}>
+      <div className="flex flex-col">
+        <CardHeader aria-hidden className="invisible">
+          <CardTitle className="text-sm font-medium capitalize">&nbsp;</CardTitle>
+        </CardHeader>
+        <CardContent className="grid px-4 py-3.5">
+          <SunStat
+            icon={<Clock className="size-4" />}
+            label="Uhrzeit"
+            value={formatTimeWithSeconds(now)}
+            valueClassName="whitespace-nowrap"
+            accent="slate"
+          />
+        </CardContent>
+      </div>
+    </Card>
+  );
+}
+
 export function SunTimesCard({
   snapshotTimestamp = null,
   forecastedTodayYieldKwh = null,
@@ -321,16 +336,11 @@ export function SunTimesCard({
   return (
     <Card data-sun-times-card className={cn("shadow-card rounded-2xl", className)}>
       <SwipeCarousel labels={["Heute", "Morgen", "Übermorgen"]} className="min-w-0 gap-3 pb-1">
-        <SunTimesDayCard date={todayDate} forecastedYieldKwh={yields.today} clockNow={now} />
-        <SunTimesDayCard
-          date={tomorrowDate}
-          forecastedYieldKwh={yields.tomorrow}
-          clockNow={null}
-        />
+        <SunTimesDayCard date={todayDate} forecastedYieldKwh={yields.today} />
+        <SunTimesDayCard date={tomorrowDate} forecastedYieldKwh={yields.tomorrow} />
         <SunTimesDayCard
           date={dayAfterTomorrowDate}
           forecastedYieldKwh={yields.dayAfterTomorrow}
-          clockNow={null}
         />
       </SwipeCarousel>
     </Card>

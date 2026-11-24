@@ -5,7 +5,7 @@ import { RefreshCcw } from "lucide-react";
 import { DashboardHeader } from "@/components/pv/header";
 import { KpiGrid } from "@/components/pv/kpi-grid";
 import { EnergyFlow } from "@/components/pv/energy-flow";
-import { SunTimesCard } from "@/components/pv/sun-times-card";
+import { ClockCard, SunTimesCard } from "@/components/pv/sun-times-card";
 import { InfoBanner } from "@/components/pv/info-banner";
 import { ServerPauseBanner } from "@/components/pv/server-pause-banner";
 import { ChartsSection } from "@/components/pv/charts-section";
@@ -150,13 +150,22 @@ export function Dashboard({ plantName }: { plantName: string }) {
           <DashboardSkeleton />
         ) : (
           <>
-            <SunTimesCard
-              className="min-w-0"
-              snapshotTimestamp={snapshot.timestamp}
-              forecastedTodayYieldKwh={forecastedTodayYieldKwh}
-              forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
-              forecastedDayAfterTomorrowYieldKwh={forecastedDayAfterTomorrowYieldKwh}
-            />
+            <div className="flex flex-col gap-4 md:grid md:grid-cols-4 md:items-stretch">
+              <div
+                data-clock-card
+                className="hidden md:grid md:col-span-1 md:h-full md:grid-cols-1"
+              >
+                <ClockCard />
+              </div>
+
+              <SunTimesCard
+                className="min-w-0 md:col-span-3"
+                snapshotTimestamp={snapshot.timestamp}
+                forecastedTodayYieldKwh={forecastedTodayYieldKwh}
+                forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
+                forecastedDayAfterTomorrowYieldKwh={forecastedDayAfterTomorrowYieldKwh}
+              />
+            </div>
 
             <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
               <EnergyFlow
@@ -232,7 +241,12 @@ function ChartHistoryPlaceholder({ error }: { error: string | null }) {
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4">
-      <Skeleton className="h-[120px] rounded-2xl" />
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-4">
+        <div className="hidden md:grid md:col-span-1 md:grid-cols-1">
+          <Skeleton className="h-[96px] rounded-2xl" />
+        </div>
+        <Skeleton className="h-[120px] rounded-2xl md:col-span-3" />
+      </div>
       <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
         <Skeleton className="h-52 rounded-2xl md:h-full md:min-h-64" />
         <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-2">
