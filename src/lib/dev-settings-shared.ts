@@ -72,7 +72,7 @@ export type SharedDevSettings = ExtraCardsSettings & {
   performanceRatio: number;
   /** Gerätekennungen, die Push-Mitteilungen erhalten dürfen. */
   pushDeviceIds: string[];
-  /** Gerätekennungen, die Lampe und Spotify sehen dürfen. Standard leer. */
+  /** Gerätekennungen, die Lampe und Sonos sehen dürfen. Standard leer. */
   cardDeviceIds: string[];
   /** Wann bei Stromüberschuss eine Mitteilung kommt. */
   surplusAlert: SurplusAlertSettings;
@@ -95,8 +95,8 @@ export type DevSettingsUpdate = {
   mystromMac?: string;
   /** null löscht den Token. Leer oder weglassen lässt ihn unverändert. */
   mystromToken?: string | null;
-  spotifyEnabled?: boolean;
-  spotifyUrl?: string;
+  sonosEnabled?: boolean;
+  sonosBaseUrl?: string;
 };
 
 export function normalizeInfoBanner(value: string): string {

@@ -28,7 +28,7 @@ import {
   normalizeMystromKind,
   normalizeMystromMac,
   normalizeMystromToken,
-  normalizeSpotifyUrl,
+  normalizeSonosBaseUrl,
   readMystromKind,
   type ExtraCardsSettings,
   type MystromKind,
@@ -55,8 +55,8 @@ type PersistedDevSettings = {
   mystromKind: MystromKind;
   mystromMac: string;
   mystromToken: string;
-  spotifyEnabled: boolean;
-  spotifyUrl: string;
+  sonosEnabled: boolean;
+  sonosBaseUrl: string;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -86,15 +86,18 @@ function readFile(): PersistedDevSettings | null {
     const mystromKind = readMystromKind(v.mystromKind);
     const mystromMac = typeof v.mystromMac === "string" ? v.mystromMac : "";
     const mystromToken = typeof v.mystromToken === "string" ? v.mystromToken : "";
-    const spotifyEnabled = v.spotifyEnabled === true;
-    const spotifyUrl = typeof v.spotifyUrl === "string" ? v.spotifyUrl : "";
+    const sonosEnabled =
+      typeof v.sonosEnabled === "boolean" ? v.sonosEnabled === true : v.spotifyEnabled === true;
+    const sonosBaseUrl = typeof v.sonosBaseUrl === "string" ? v.sonosBaseUrl : "";
     const hadLegacy =
       "siteLocation" in v ||
       "yieldForecast" in v ||
       "serverPauseEnabled" in v ||
       "serverPauseStopAt" in v ||
       "serverPauseResumeAt" in v ||
-      "hideSimulated" in v;
+      "hideSimulated" in v ||
+      "spotifyEnabled" in v ||
+      "spotifyUrl" in v;
     const file: PersistedDevSettings = {
       updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : new Date(0).toISOString(),
       showSimulated,
@@ -110,10 +113,10 @@ function readFile(): PersistedDevSettings | null {
       mystromKind,
       mystromMac,
       mystromToken,
-      spotifyEnabled,
-      spotifyUrl,
+      sonosEnabled,
+      sonosBaseUrl,
     };
-    // Alte Standort-, Server-Pause- und hideSimulated-Felder beim nächsten Lesen streichen.
+    // Alte Standort-, Server-Pause-, hideSimulated- und Spotify-Felder beim nächsten Lesen streichen.
     if (hadLegacy) writeFile(file);
     return file;
   } catch {
@@ -133,8 +136,8 @@ function extraFromFile(file: PersistedDevSettings | null): ExtraCardsSettings {
     mystromKind: file?.mystromKind ?? "bulb",
     mystromMac: file?.mystromMac ?? "",
     mystromTokenSet: Boolean(file?.mystromToken),
-    spotifyEnabled: file?.spotifyEnabled ?? false,
-    spotifyUrl: file?.spotifyUrl ?? "",
+    sonosEnabled: file?.sonosEnabled ?? false,
+    sonosBaseUrl: file?.sonosBaseUrl ?? "",
   };
 }
 
@@ -169,6 +172,13 @@ export function getMystromTarget(): {
     mac: file.mystromMac ? normalizeMystromMac(file.mystromMac) : "",
     token: file.mystromToken,
   };
+}
+
+/** Ziel für den Sonos-Lautsprecher. */
+export function getSonosTarget(): { baseUrl: string } | null {
+  const file = readFile();
+  if (!file?.sonosEnabled) return null;
+  return { baseUrl: file.sonosBaseUrl ? normalizeSonosBaseUrl(file.sonosBaseUrl) : "" };
 }
 
 /** Lampe nur, wenn diese Kennung in der Geräteliste bei Karten angehakt ist. */
@@ -223,14 +233,14 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
   } else if (typeof update.mystromToken === "string" && update.mystromToken.trim()) {
     mystromToken = normalizeMystromToken(update.mystromToken);
   }
-  const spotifyEnabled =
-    typeof update.spotifyEnabled === "boolean"
-      ? update.spotifyEnabled
-      : (current?.spotifyEnabled ?? false);
-  const spotifyUrl =
-    typeof update.spotifyUrl === "string"
-      ? normalizeSpotifyUrl(update.spotifyUrl)
-      : (current?.spotifyUrl ?? "");
+  const sonosEnabled =
+    typeof update.sonosEnabled === "boolean"
+      ? update.sonosEnabled
+      : (current?.sonosEnabled ?? false);
+  const sonosBaseUrl =
+    typeof update.sonosBaseUrl === "string"
+      ? normalizeSonosBaseUrl(update.sonosBaseUrl)
+      : (current?.sonosBaseUrl ?? "");
 
   const next: PersistedDevSettings = {
     updatedAt: new Date().toISOString(),
@@ -265,8 +275,8 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
     mystromKind,
     mystromMac,
     mystromToken,
-    spotifyEnabled,
-    spotifyUrl,
+    sonosEnabled,
+    sonosBaseUrl,
   };
   writeFile(next);
   return resolve(next);

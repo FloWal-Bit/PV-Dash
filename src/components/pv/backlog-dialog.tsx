@@ -388,7 +388,7 @@ function DeviceLogSection({ open }: { open: boolean }) {
       title="Geräte"
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Standard aus. Nur angehakte Geräte erhalten Mitteilungen oder sehen Lampe und Spotify.
+        Standard aus. Nur angehakte Geräte erhalten Mitteilungen oder sehen Lampe und Sonos.
         Die Mitteilungen stehen unter Benachrichtigungen, die Karten unter «Karten unter dem Verlauf».
       </p>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
