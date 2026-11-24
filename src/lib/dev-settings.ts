@@ -55,6 +55,8 @@ type PersistedDevSettings = {
   mystromToken: string;
   spotifyEnabled: boolean;
   spotifyUrl: string;
+  /** SHA-256 des Geräte-Cookies. Leer = kein Gerät freigegeben. */
+  controlDeviceHash: string;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -85,6 +87,10 @@ function readFile(): PersistedDevSettings | null {
     const mystromToken = typeof v.mystromToken === "string" ? v.mystromToken : "";
     const spotifyEnabled = v.spotifyEnabled === true;
     const spotifyUrl = typeof v.spotifyUrl === "string" ? v.spotifyUrl : "";
+    const controlDeviceHash =
+      typeof v.controlDeviceHash === "string" && /^[a-f0-9]{64}$/.test(v.controlDeviceHash)
+        ? v.controlDeviceHash
+        : "";
     const hadLegacy =
       "siteLocation" in v ||
       "yieldForecast" in v ||
@@ -108,6 +114,7 @@ function readFile(): PersistedDevSettings | null {
       mystromToken,
       spotifyEnabled,
       spotifyUrl,
+      controlDeviceHash,
     };
     // Alte Standort-, Server-Pause- und hideSimulated-Felder beim nächsten Lesen streichen.
     if (hadLegacy) writeFile(file);
@@ -250,7 +257,23 @@ export function updateSharedDevSettings(update: DevSettingsUpdate): SharedDevSet
     mystromToken,
     spotifyEnabled,
     spotifyUrl,
+    controlDeviceHash: current?.controlDeviceHash ?? "",
   };
   writeFile(next);
   return resolve(next);
+}
+
+export function getControlDeviceHash(): string {
+  return readFile()?.controlDeviceHash ?? "";
+}
+
+/** Bindet das eine Gerät. Ersetzt eine frühere Freigabe. */
+export function setControlDeviceHash(hash: string): void {
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    throw new Error("Gerätekennung ist ungültig.");
+  }
+  if (!readFile()) updateSharedDevSettings({});
+  const file = readFile();
+  if (!file) throw new Error("Einstellungen konnten nicht gespeichert werden.");
+  writeFile({ ...file, controlDeviceHash: hash, updatedAt: new Date().toISOString() });
 }

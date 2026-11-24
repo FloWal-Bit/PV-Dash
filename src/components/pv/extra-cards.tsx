@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Lightbulb, LightbulbOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { controlDeviceStore } from "@/lib/control-device-client";
 import { extraCardsStore } from "@/lib/extra-cards-store";
 import { spotifyEmbedSrc, type MystromKind } from "@/lib/extra-cards-shared";
 import { triggerHaptic } from "@/lib/haptics";
@@ -147,13 +148,19 @@ function SpotifyPlayerCard({ url }: { url: string }) {
   );
 }
 
-/** Zwei kleine Karten unter dem Verlauf. Jede nur, wenn sie in den Dev-Einstellungen an ist. */
+/** Lampe und Spotify nur auf dem einen freigegebenen Gerät, und nur wenn der Schalter an ist. */
 export function ExtraCards() {
+  const access = useSyncExternalStore(
+    controlDeviceStore.subscribe,
+    controlDeviceStore.getSnapshot,
+    controlDeviceStore.getServerSnapshot,
+  );
   const settings = useSyncExternalStore(
     extraCardsStore.subscribe,
     extraCardsStore.getSnapshot,
     extraCardsStore.getServerSnapshot,
   );
+  if (!access.unlocked) return null;
   if (!settings.mystromEnabled && !settings.spotifyEnabled) return null;
 
   return (

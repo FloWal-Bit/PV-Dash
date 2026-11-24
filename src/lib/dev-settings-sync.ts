@@ -6,6 +6,7 @@ import { showSimulatedStore } from "@/lib/show-simulated";
 import { infoBannerStore } from "@/lib/info-banner";
 import { pushAlertStore } from "@/lib/push-alert-settings";
 import { yieldForecastStore } from "@/lib/yield-forecast-settings";
+import { pullControlDevice } from "@/lib/control-device-client";
 
 let inflightSaves = 0;
 let lastUpdatedAt: string | null = null;
@@ -94,7 +95,7 @@ export async function pullDevSettings(): Promise<void> {
 /** Einmal die lokale Anzeige-Wahl hochladen, danach gilt die Serverdatei. */
 export async function ensureDevSettingsReady(): Promise<void> {
   if (ready) return;
-  await pullDevSettings();
+  await Promise.all([pullDevSettings(), pullControlDevice()]);
   ready = true;
 }
 

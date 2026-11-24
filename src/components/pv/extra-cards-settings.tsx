@@ -5,7 +5,8 @@ import { Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { SettingsSection } from "@/components/pv/settings-dialog";
-import { putDevSettings } from "@/lib/dev-settings-sync";
+import { controlDeviceStore, unlockControlDevice } from "@/lib/control-device-client";
+import { pullDevSettings, putDevSettings } from "@/lib/dev-settings-sync";
 import { extraCardsStore } from "@/lib/extra-cards-store";
 import type { MystromKind } from "@/lib/extra-cards-shared";
 import { cn } from "@/lib/utils";
@@ -13,13 +14,21 @@ import { cn } from "@/lib/utils";
 const inputClassName =
   "flex h-10 w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-chart-3 focus-visible:ring-[3px] focus-visible:ring-chart-3/25 disabled:cursor-not-allowed disabled:opacity-60";
 
-/** Schalter für Lampe und Spotify. An heisst: die Karte ist auf dem Dashboard, auch ohne Adresse oder Link. */
+/** Lampe und Spotify nur nach einmaliger Freigabe auf diesem Gerät. */
 export function ExtraCardsSettings() {
+  const access = useSyncExternalStore(
+    controlDeviceStore.subscribe,
+    controlDeviceStore.getSnapshot,
+    controlDeviceStore.getServerSnapshot,
+  );
   const saved = useSyncExternalStore(
     extraCardsStore.subscribe,
     extraCardsStore.getSnapshot,
     extraCardsStore.getServerSnapshot,
   );
+  if (!access.configured || !access.unlocked) {
+    return <DeviceGate configured={access.configured} />;
+  }
   const signature = [
     saved.mystromBaseUrl,
     saved.mystromKind,
@@ -28,6 +37,70 @@ export function ExtraCardsSettings() {
     saved.spotifyUrl,
   ].join("|");
   return <ExtraCardsForm key={signature} saved={saved} />;
+}
+
+function DeviceGate({ configured }: { configured: boolean }) {
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function unlock() {
+    setSaving(true);
+    setError(null);
+    try {
+      await unlockControlDevice(password);
+      setPassword("");
+      await pullDevSettings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Freigabe fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <SettingsSection
+      icon={<Lightbulb className="size-4" />}
+      iconClassName="bg-muted text-foreground/70"
+      title="Karten unter dem Verlauf"
+    >
+      {configured ? (
+        <>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Lampe und Spotify gibt es nur auf einem Gerät. Das Passwort einmal eingeben gibt dieses
+            Gerät frei. Eine Freigabe auf einem anderen Gerät löst diese ab.
+          </p>
+          <input
+            className={inputClassName}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            type="password"
+            autoComplete="off"
+            aria-label="Gerätepasswort"
+            placeholder="Gerätepasswort"
+          />
+          <div className="flex items-center justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={saving || !password.trim()}
+              onClick={() => void unlock()}
+            >
+              {saving ? "…" : "Dieses Gerät freigeben"}
+            </Button>
+          </div>
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        </>
+      ) : (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Lampe und Spotify bleiben aus, bis auf dem Server die Variable PV_DASH_DEVICE_PASSWORD
+          gesetzt ist. Danach gibst du das Passwort einmal auf dem Gerät ein, das die Karten zeigen
+          soll.
+        </p>
+      )}
+    </SettingsSection>
+  );
 }
 
 function ExtraCardsForm({
@@ -102,6 +175,9 @@ function ExtraCardsForm({
       iconClassName="bg-muted text-foreground/70"
       title="Karten unter dem Verlauf"
     >
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Nur dieses Gerät zeigt Lampe und Spotify.
+      </p>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-sm font-medium">myStrom-Lampe</span>
