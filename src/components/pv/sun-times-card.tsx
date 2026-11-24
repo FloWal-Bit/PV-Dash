@@ -10,7 +10,22 @@ import {
   Thermometer,
   Timer,
   Zap,
+  createLucideIcon,
 } from "lucide-react";
+
+/**
+ * Sonnenaufgang-Icon ohne den Pfeil. An seiner Stelle ein Strahl,
+ * gleich lang wie die übrigen Strahlen (Länge 2 im 24er-Raster).
+ */
+const SunCourse = createLucideIcon("sun-course", [
+  ["path", { d: "M12 8v2" }],
+  ["path", { d: "m4.93 10.93 1.41 1.41" }],
+  ["path", { d: "M2 18h2" }],
+  ["path", { d: "M20 18h2" }],
+  ["path", { d: "m19.07 10.93-1.41 1.41" }],
+  ["path", { d: "M22 22H2" }],
+  ["path", { d: "M16 18a4 4 0 0 0-8 0" }],
+]);
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SwipeCarousel } from "@/components/pv/swipe-carousel";
 import { cn } from "@/lib/utils";
@@ -235,7 +250,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<Sun className="size-4" />}
+          icon={<SunCourse className="size-4" />}
           label="Sonnenverlauf"
           value={
             waLoading && !dayWeather ? "…" : `${sunriseDisplay} / ${sunsetDisplay}`
