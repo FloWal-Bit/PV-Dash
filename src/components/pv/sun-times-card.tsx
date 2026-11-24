@@ -6,7 +6,9 @@ import {
   CloudDrizzle,
   Cloudy,
   Sun,
+  Sunrise,
   SunDim,
+  Thermometer,
   Timer,
   Zap,
 } from "lucide-react";
@@ -23,28 +25,10 @@ import {
 } from "@/lib/server-pause-window";
 import { APP_TIME_ZONE } from "@/lib/daily-checkpoint";
 
-/** Horizont und Sonne wie beim Auf- und Untergang, ohne den Pfeil darüber. */
-function SunHorizonIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 8 24 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      className={className}
-    >
-      <path d="m4.93 10.93 1.41 1.41" />
-      <path d="M2 18h2" />
-      <path d="M20 18h2" />
-      <path d="m19.07 10.93-1.41 1.41" />
-      <path d="M22 22H2" />
-      <path d="M16 18a4 4 0 0 0-8 0" />
-    </svg>
-  );
+function formatCelsius(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  const digits = Number.isInteger(rounded) ? 0 : 1;
+  return `${formatSwissNumber(rounded, digits)}°`;
 }
 
 function formatTimeWithSeconds(date: Date): string {
@@ -210,7 +194,13 @@ function SunTimesDayCard({
   const weatherLabel = dayWeather?.weatherLabel ?? "–";
   const weatherCategory = dayWeather?.weatherCategory ?? "sonnig";
   const sunriseDisplay = dayWeather?.sunrise ?? "–";
-  const sunsetDisplay = dayWeather?.sunset ?? "–";
+  const temperatureDisplay =
+    typeof dayWeather?.temperatureMin === "number" &&
+    Number.isFinite(dayWeather.temperatureMin) &&
+    typeof dayWeather.temperatureMax === "number" &&
+    Number.isFinite(dayWeather.temperatureMax)
+      ? `${formatCelsius(dayWeather.temperatureMin)} / ${formatCelsius(dayWeather.temperatureMax)}`
+      : "–";
   const sunHoursDisplay =
     dayWeather?.sunHours != null ? dayWeather.sunHours : null;
 
@@ -221,7 +211,7 @@ function SunTimesDayCard({
           {formatDayHeading(date)}
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
+      <CardContent className="grid grid-cols-3 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-6 sm:gap-x-2">
         <SunStat
           icon={<Clock className="size-4" />}
           label="Uhrzeit"
@@ -244,17 +234,19 @@ function SunTimesDayCard({
           unit={!waLoading && sunHoursDisplay != null ? "h" : undefined}
           accent="slate"
         />
-        <div className="col-span-2 sm:col-span-1">
-          <SunStat
-            icon={<SunHorizonIcon className="size-4" />}
-            label="Auf / Untergang"
-            value={
-              waLoading && !dayWeather ? "…" : `${sunriseDisplay} / ${sunsetDisplay}`
-            }
-            valueClassName="whitespace-nowrap text-[11px] sm:text-sm"
-            accent="slate"
-          />
-        </div>
+        <SunStat
+          icon={<Sunrise className="size-4" />}
+          label="Sonnenaufgang"
+          value={waLoading && !dayWeather ? "…" : sunriseDisplay}
+          accent="slate"
+        />
+        <SunStat
+          icon={<Thermometer className="size-4" />}
+          label="Temperatur"
+          value={waLoading && !dayWeather ? "…" : temperatureDisplay}
+          valueClassName="whitespace-nowrap"
+          accent="slate"
+        />
         <SunStat
           icon={<Zap className="size-4" />}
           label="Ertragsprognose"

@@ -45,5 +45,8 @@ export type WetterAlarmDailyWeather = {
   sunriseAt: string;
   sunsetAt: string;
   sunHours: number;
+  /** Tagesminimum und Tagesmaximum in °C. */
+  temperatureMin: number | null;
+  temperatureMax: number | null;
   source: "wetteralarm";
 };
