@@ -555,8 +555,13 @@ export async function loadFusionSolarFresh(): Promise<{
   };
 }
 
+/** Live-Cache gilt nur für denselben Zurich-Kalendertag — sonst bleibt Card 1 am Morgen auf gestern. */
+function freshLiveSnapshot(cache: Cache<PvSnapshot> | null): cache is Cache<PvSnapshot> {
+  return fresh(cache) && zurichDayKey(new Date(cache.value.timestamp)) === zurichDayKey();
+}
+
 export async function getFusionSolarLiveSnapshot(): Promise<PvSnapshot> {
-  if (fresh(liveCache)) return liveCache.value;
+  if (freshLiveSnapshot(liveCache)) return liveCache.value;
   if (fresh(liveFailure)) throw liveFailure.value;
   if (!liveInFlight) {
     liveInFlight = fetchLiveSnapshot()

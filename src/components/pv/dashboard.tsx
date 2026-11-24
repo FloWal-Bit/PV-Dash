@@ -150,7 +150,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
           <>
             <SunTimesCard
               className="min-w-0"
-              referenceDate={new Date(snapshot.timestamp)}
+              snapshotTimestamp={snapshot.timestamp}
               forecastedTodayYieldKwh={forecastedTodayYieldKwh}
               forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
             />

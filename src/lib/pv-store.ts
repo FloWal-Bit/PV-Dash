@@ -55,6 +55,8 @@ const PAUSE_PROBE_INTERVAL_MS = 20 * 60_000;
 const SLEEP_SNAPSHOT_LEAD_MS = 3 * 60_000;
 /** Nach whatwatt-Warmup (erste MQTT-Nachricht fehlt) einmal nachziehen. */
 const WHATWATT_WARMUP_RETRY_MS = 8_000;
+/** Vortags-Stand: Live + History erneut, aber nicht im 15-s-Takt. */
+const PREVIOUS_DAY_RETRY_MS = 60_000;
 
 function nextLiveDelayMs(nowMs = Date.now()): number {
   if (!isScheduledServerPause(nowMs)) return LIVE_INTERVAL_MS;
@@ -172,8 +174,9 @@ class PvStore {
   private liveInflight: Promise<void> | null = null;
   private historyInflight: Promise<void> | null = null;
   private lastHistoryAt: number | null = null;
-  /** Zurich-Tag, für den zuletzt ein Vortags-Zwangsrefresh lief (Dedupe). */
-  private previousDayRefreshFor: string | null = null;
+  /** Letzter Versuch, Vortagsdaten zu ersetzen. Wiederholung frühestens nach einer Minute. */
+  private lastPreviousDayAttemptAt: number | null = null;
+  private afterPauseTimerId: ReturnType<typeof setTimeout> | null = null;
 
   private emit() {
     for (const listener of [...this.listeners]) listener();
@@ -338,20 +341,42 @@ class PvStore {
   /**
    * Offline-Cache / offener Tab vom Vortag: ausserhalb der Pause sofort
    * Live + History neu laden (nicht auf 15‑Min-History-Intervall warten).
+   * Schlägt der erste Versuch fehl (Node startet noch), wird er minütlich wiederholt.
+   * Mitternacht liegt in der Nachtpause — dann erst zum Pause-Ende (06:00) planen.
    */
   private refreshIfPreviousZurichDay() {
     if (typeof document !== "undefined" && document.hidden) return;
-    if (isScheduledServerPause()) return;
-    if (!isPreviousZurichDayData(this.state)) {
-      this.previousDayRefreshFor = null;
+    if (isScheduledServerPause()) {
+      this.armAfterPauseCatchup();
       return;
     }
-    const today = zurichDayKey();
-    if (this.previousDayRefreshFor === today) return;
-    this.previousDayRefreshFor = today;
+    if (!isPreviousZurichDayData(this.state)) {
+      this.lastPreviousDayAttemptAt = null;
+      return;
+    }
+    const now = Date.now();
+    if (
+      this.lastPreviousDayAttemptAt != null &&
+      now - this.lastPreviousDayAttemptAt < PREVIOUS_DAY_RETRY_MS
+    ) {
+      return;
+    }
+    this.lastPreviousDayAttemptAt = now;
     this.lastHistoryAt = null;
     void this.tickLive();
     void this.tickHistory();
+  }
+
+  /** Einmal zum Ende der Nachtpause: Vortags-Cache durch den neuen Tag ersetzen. */
+  private armAfterPauseCatchup() {
+    if (this.afterPauseTimerId) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const delay = Math.max(2_000, msUntilScheduledPauseEnd() + 2_000);
+    this.afterPauseTimerId = setTimeout(() => {
+      this.afterPauseTimerId = null;
+      this.lastPreviousDayAttemptAt = null;
+      this.refreshIfPreviousZurichDay();
+    }, delay);
   }
 
   /** whatwatt noch ohne erste MQTT-Nachricht: still nachziehen statt Banner. */
@@ -387,6 +412,10 @@ class PvStore {
     if (this.dayRolloverTimeoutId) {
       clearTimeout(this.dayRolloverTimeoutId);
       this.dayRolloverTimeoutId = null;
+    }
+    if (this.afterPauseTimerId) {
+      clearTimeout(this.afterPauseTimerId);
+      this.afterPauseTimerId = null;
     }
     if (this.whatwattWarmupRetryId) {
       clearTimeout(this.whatwattWarmupRetryId);
@@ -470,7 +499,7 @@ class PvStore {
     const delay = msUntilNextZurichMidnight();
     this.dayRolloverTimeoutId = setTimeout(() => {
       this.dayRolloverTimeoutId = null;
-      this.previousDayRefreshFor = null;
+      this.lastPreviousDayAttemptAt = null;
       this.refreshIfPreviousZurichDay();
       this.armDayRolloverTimer();
     }, delay);
@@ -483,7 +512,9 @@ class PvStore {
       this.refreshIfPreviousZurichDay();
     } else {
       void this.tickLive();
-      if (!isScheduledServerPause()) {
+      if (isScheduledServerPause() && isPreviousZurichDayData(this.state)) {
+        this.armAfterPauseCatchup();
+      } else if (!isScheduledServerPause()) {
         this.refreshHistoryIfStale(HISTORY_INTERVAL_MS);
       }
     }
