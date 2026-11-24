@@ -24,31 +24,6 @@ import {
 } from "@/lib/server-pause-window";
 import { APP_TIME_ZONE } from "@/lib/daily-checkpoint";
 
-/** Sonne am Horizont mit einem Strahl oben, ohne Pfeil. */
-function SunCourseIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 7 24 17"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      className={className}
-    >
-      <path d="M12 8v5" />
-      <path d="m4.93 10.93 1.41 1.41" />
-      <path d="M2 18h2" />
-      <path d="M20 18h2" />
-      <path d="m19.07 10.93-1.41 1.41" />
-      <path d="M22 22H2" />
-      <path d="M16 18a4 4 0 0 0-8 0" />
-    </svg>
-  );
-}
-
 function formatCelsius(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   const digits = Number.isInteger(rounded) ? 0 : 1;
@@ -260,7 +235,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          icon={<SunCourseIcon className="size-4" />}
+          icon={<Sun className="size-4" />}
           label="Sonnenverlauf"
           value={
             waLoading && !dayWeather ? "…" : `${sunriseDisplay} / ${sunsetDisplay}`
