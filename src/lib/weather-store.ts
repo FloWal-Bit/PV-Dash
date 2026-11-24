@@ -77,6 +77,10 @@ function tomorrowDateKey(from = new Date()): string {
   return addZurichDaysKey(weatherDateKey(from), 1);
 }
 
+function dayAfterTomorrowDateKey(from = new Date()): string {
+  return addZurichDaysKey(weatherDateKey(from), 2);
+}
+
 function readPersistedCache(): PersistedWeatherCache | null {
   if (typeof window === "undefined") return null;
   try {
@@ -130,10 +134,11 @@ function hasTemperature(payload: WeatherPayload | null | undefined): boolean {
 
 /** Cache aus der Zeit vor den Temperaturfeldern: Sonnenzeiten sind da, °C fehlen. */
 function cachedTemperatureGap(): boolean {
-  const today = state.byDate[weatherDateKey()] ?? null;
-  if (today != null && !hasTemperature(today)) return true;
-  const tomorrow = state.byDate[tomorrowDateKey()] ?? null;
-  return tomorrow != null && !hasTemperature(tomorrow);
+  for (const key of [weatherDateKey(), tomorrowDateKey(), dayAfterTomorrowDateKey()]) {
+    const day = state.byDate[key] ?? null;
+    if (day != null && !hasTemperature(day)) return true;
+  }
+  return false;
 }
 
 function needsNetworkFetch(locationKey: string, force: boolean): boolean {
@@ -145,12 +150,14 @@ function needsNetworkFetch(locationKey: string, force: boolean): boolean {
 
   const todayKey = weatherDateKey();
   const tomorrowKey = tomorrowDateKey();
+  const dayAfterKey = dayAfterTomorrowDateKey();
   const hasToday = state.byDate[todayKey] != null;
   const hasTomorrow = state.byDate[tomorrowKey] != null;
+  const hasDayAfter = state.byDate[dayAfterKey] != null;
   if (!hasToday) return true;
   // Nachts ist der Node aus. Heute liegt meist schon als gestrige „Morgen“-Prognose im Cache.
-  // Der Folgetag kann bis zur 06:00-Marke warten, sonst scheitert der Abruf und setzt einen Fehler.
-  if (!hasTomorrow && !isScheduledServerPause()) return true;
+  // Die Folgetage können bis zur 06:00-Marke warten, sonst scheitert der Abruf und setzt einen Fehler.
+  if ((!hasTomorrow || !hasDayAfter) && !isScheduledServerPause()) return true;
 
   if (state.lastFetchAt == null) return true;
   return state.lastFetchAt < lastDailyCheckpointMs();
@@ -174,14 +181,14 @@ async function fetchWeatherDay(
   return body as WeatherPayload;
 }
 
-async function fetchTodayAndTomorrow(
+async function fetchForecastDays(
   location: Pick<SiteLocation, "name" | "latitude" | "longitude">,
 ): Promise<void> {
   const todayKey = weatherDateKey();
-  const tomorrowKey = tomorrowDateKey();
   const results = await Promise.allSettled([
     fetchWeatherDay(location, todayKey),
-    fetchWeatherDay(location, tomorrowKey),
+    fetchWeatherDay(location, tomorrowDateKey()),
+    fetchWeatherDay(location, dayAfterTomorrowDateKey()),
   ]);
 
   const byDate = { ...state.byDate };
@@ -250,7 +257,9 @@ function ensureScheduler() {
       const todayKey = weatherDateKey();
       const today = state.byDate[todayKey] ?? null;
       if (state.data !== today) realignTodayPointer();
-      const tomorrowMissing = state.byDate[tomorrowDateKey()] == null;
+      const tomorrowMissing =
+        state.byDate[tomorrowDateKey()] == null ||
+        state.byDate[dayAfterTomorrowDateKey()] == null;
       const checkpointDue =
         state.lastFetchAt == null || state.lastFetchAt < lastDailyCheckpointMs();
       if (
@@ -312,7 +321,7 @@ export const weatherStore = {
     };
     emit();
 
-    inflight = fetchTodayAndTomorrow(location)
+    inflight = fetchForecastDays(location)
       .catch(() => {
         state = {
           ...state,

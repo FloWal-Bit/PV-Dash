@@ -92,6 +92,9 @@ export type LiveDashboardPayload = {
   forecastYieldMeta: OpenMeteoYieldMeta | null;
   forecastedTomorrowYieldKwh: number | null;
   forecastTomorrowYieldMeta: OpenMeteoYieldMeta | null;
+  /** Prognose für übermorgen, gleicher Bezugstag wie die beiden anderen Werte. */
+  forecastedDayAfterTomorrowYieldKwh: number | null;
+  forecastDayAfterTomorrowYieldMeta: OpenMeteoYieldMeta | null;
   /** Nutzerfreundliche Meldung, z. B. wenn FusionSolar konfiguriert, aber gerade nicht erreichbar ist. */
   warning: string | null;
   sourceWarning: string | null;
@@ -254,6 +257,8 @@ export async function getLiveDashboardPayload(): Promise<LiveDashboardPayload> {
     forecastYieldMeta: yieldForecast.today.meta,
     forecastedTomorrowYieldKwh: yieldForecast.tomorrow.kwh,
     forecastTomorrowYieldMeta: yieldForecast.tomorrow.meta,
+    forecastedDayAfterTomorrowYieldKwh: yieldForecast.dayAfterTomorrow.kwh,
+    forecastDayAfterTomorrowYieldMeta: yieldForecast.dayAfterTomorrow.meta,
     warning: base.warning ?? overlay.warning,
     sourceWarning: base.warning,
     gridWarning: overlay.warning,

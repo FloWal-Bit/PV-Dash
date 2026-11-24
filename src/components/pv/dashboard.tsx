@@ -28,6 +28,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
     gridSource,
     forecastedTodayYieldKwh,
     forecastedTomorrowYieldKwh,
+    forecastedDayAfterTomorrowYieldKwh,
     forecastSolarError,
     warning,
     sourceWarning,
@@ -154,6 +155,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
               snapshotTimestamp={snapshot.timestamp}
               forecastedTodayYieldKwh={forecastedTodayYieldKwh}
               forecastedTomorrowYieldKwh={forecastedTomorrowYieldKwh}
+              forecastedDayAfterTomorrowYieldKwh={forecastedDayAfterTomorrowYieldKwh}
             />
 
             <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
