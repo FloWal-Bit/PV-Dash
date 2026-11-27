@@ -471,7 +471,10 @@ function StromkontoFocus({
                 : cn(ACCENT_RING[accent], ACCENT_BG[accent]),
             )}
           >
-            <StromkontoBattery direction={direction} className="size-11" />
+            {/* 5 % grösser, 5 % der Kreishöhe nach oben, wie in den Energiefluss-Kreisen. */}
+            <span className="relative -top-[5%] inline-flex scale-105">
+              <StromkontoBattery direction={direction} className="size-11" />
+            </span>
             <span className="flex items-baseline gap-x-1 whitespace-nowrap">
               <span
                 className={cn(
