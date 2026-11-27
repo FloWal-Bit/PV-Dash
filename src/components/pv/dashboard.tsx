@@ -129,14 +129,14 @@ export function Dashboard({ plantName }: { plantName: string }) {
         ) : null}
 
         {!error && !serverUnreachable && warning && !isWhatWattFirstMessageWarmup(warning) ? (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
             {warning}
           </div>
         ) : null}
 
         {externalServiceErrors.length > 0 ? (
           <div
-            className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
+            className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
             role="status"
           >
             <ul className="flex list-disc flex-col gap-1 pl-4">

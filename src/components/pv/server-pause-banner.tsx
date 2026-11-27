@@ -69,7 +69,7 @@ export function ServerPauseBanner({
 
   return (
     <div
-      className="flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
+      className="flex items-start gap-2 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
       role="status"
     >
       <p className="min-w-0 flex-1 leading-relaxed">{message}</p>
