@@ -1242,6 +1242,9 @@ export function SettingsDialog() {
               <AboutOpenMeteoSource />
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
+              Die App verwendet keine Cookies.
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
               Florian Walther, Herbst 2026.
             </p>
           </SettingsSection>
