@@ -233,7 +233,7 @@ function SunTimesDayCard({
       </CardHeader>
       <CardContent className="grid grid-cols-6 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
         <SunStat
-          className="col-span-2 sm:col-span-1"
+          className="col-span-2 col-start-2 sm:col-span-1 sm:col-start-auto"
           icon={weatherIcon[weatherCategory]}
           label="Wetter"
           href={WETTERALARM_URL}
@@ -241,7 +241,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          className="col-span-2 sm:col-span-1"
+          className="col-span-2 col-start-4 sm:col-span-1 sm:col-start-auto"
           icon={<Thermometer className="size-4" />}
           label="Temperatur"
           value={waLoading && !dayWeather ? "…" : temperatureDisplay}
@@ -249,7 +249,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          className="col-span-2 sm:col-span-1"
+          className="col-span-2 col-start-1 sm:col-span-1 sm:col-start-auto"
           icon={<Zap className="size-4" />}
           label="Ertragsprognose"
           value={
@@ -259,7 +259,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          className="col-span-2 col-start-2 sm:col-span-1 sm:col-start-auto"
+          className="col-span-2 col-start-3 sm:col-span-1 sm:col-start-auto"
           icon={<Timer className="size-4" />}
           label="Sonnenstunden"
           value={
@@ -269,7 +269,7 @@ function SunTimesDayCard({
           accent="slate"
         />
         <SunStat
-          className="col-span-2 col-start-4 sm:col-span-1 sm:col-start-auto"
+          className="col-span-2 col-start-5 sm:col-span-1 sm:col-start-auto"
           icon={<SunCourse className="size-4" />}
           label="Sonnenverlauf"
           value={
