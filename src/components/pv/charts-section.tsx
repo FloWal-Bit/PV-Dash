@@ -1157,9 +1157,8 @@ function formatRangeTotal(
       (sum, point) => sum + (point.productionKw ?? 0) * hours,
       0,
     );
-    // Live-Tagesertrag, wenn die Kurve noch leer/lückenhaft ist (z. B. 5‑Min-Ausfall).
-    const yieldKwh =
-      chartYieldKwh > 0 ? chartYieldKwh : (liveToday?.yieldKwh ?? chartYieldKwh);
+    // Dieselbe Quelle wie «Ertrag heute». Die 5-Minuten-Kurve hinkt dem Zähler hinterher.
+    const yieldKwh = liveToday != null ? liveToday.yieldKwh : chartYieldKwh;
     const measured = todayChartData.filter((point) => point.consumptionKw != null);
     const summedKwh = measured.reduce((sum, point) => sum + (point.consumptionKw ?? 0) * hours, 0);
     const consumptionKwh = liveToday?.consumptionKwh ?? (measured.length > 0 ? summedKwh : null);
