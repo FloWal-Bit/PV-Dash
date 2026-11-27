@@ -135,6 +135,7 @@ function SunStat({
   valueClassName,
   href,
   className,
+  clampValue,
 }: {
   icon: ReactNode;
   label: string;
@@ -144,6 +145,8 @@ function SunStat({
   valueClassName?: string;
   href?: string;
   className?: string;
+  /** Wettertext bleibt bei höchstens zwei Zeilen. */
+  clampValue?: boolean;
 }) {
   const accentStyles: Record<typeof accent, string> = {
     amber: "from-chart-1/25 to-chart-1/5 text-chart-1",
@@ -177,10 +180,11 @@ function SunStat({
         </div>
       )}
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="flex items-baseline justify-center gap-1">
+      <span className="flex max-w-full items-baseline justify-center gap-1">
         <span
           className={cn(
             "text-sm font-semibold tabular-nums text-card-foreground",
+            clampValue && "line-clamp-2",
             valueClassName,
           )}
         >
@@ -231,13 +235,14 @@ function SunTimesDayCard({
           {formatDayHeading(date)}
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-6 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
+      <CardContent className="mt-(--sun-icon-shift) grid grid-cols-6 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
         <SunStat
           className="col-span-2 col-start-2 sm:col-span-1 sm:col-start-auto"
           icon={weatherIcon[weatherCategory]}
           label="Wetter"
           href={WETTERALARM_URL}
           value={waLoading && !dayWeather ? "…" : weatherLabel}
+          clampValue
           accent="slate"
         />
         <SunStat
@@ -336,19 +341,24 @@ export function SunTimesCard({
   );
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Alle Inhalte um 5 % der Kartenhöhe nach unten.
+  // Datum 5 % der Kartenhöhe nach unten, die Icons noch einmal 10 %.
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!card) return;
 
     const apply = () => {
-      const extra = Number(card.dataset.shiftPx ?? "0");
+      const padExtra = Number(card.dataset.shiftPx ?? "0");
+      const iconExtra = Number(card.dataset.iconShiftPx ?? "0");
       const height = card.getBoundingClientRect().height;
-      const next = (height - extra) * 0.05;
-      if (Math.abs(next - extra) < 0.5) return;
+      const base = height - padExtra - iconExtra;
+      const nextPad = base * 0.05;
+      const nextIcon = base * 0.1;
+      if (Math.abs(nextPad - padExtra) < 0.5 && Math.abs(nextIcon - iconExtra) < 0.5) return;
       const pad = parseFloat(getComputedStyle(card).paddingTop);
-      card.style.paddingTop = `${pad - extra + next}px`;
-      card.dataset.shiftPx = String(next);
+      card.style.paddingTop = `${pad - padExtra + nextPad}px`;
+      card.style.setProperty("--sun-icon-shift", `${nextIcon}px`);
+      card.dataset.shiftPx = String(nextPad);
+      card.dataset.iconShiftPx = String(nextIcon);
     };
 
     apply();
@@ -357,7 +367,9 @@ export function SunTimesCard({
     return () => {
       observer.disconnect();
       card.style.paddingTop = "";
+      card.style.removeProperty("--sun-icon-shift");
       delete card.dataset.shiftPx;
+      delete card.dataset.iconShiftPx;
     };
   }, []);
 
