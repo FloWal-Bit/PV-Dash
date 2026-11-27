@@ -125,7 +125,8 @@ function FlowNode({
             : cn(ACCENT_RING[accent], ACCENT_BG[accent]),
         )}
       >
-        {icon}
+        {/* 5 % grösser, 5 % der Kreishöhe nach oben. */}
+        <span className="relative -top-[5%] inline-flex scale-105">{icon}</span>
         <span
           className={cn(
             "text-xs font-semibold tabular-nums leading-none sm:text-sm",
