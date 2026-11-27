@@ -235,7 +235,7 @@ function SunTimesDayCard({
           {formatDayHeading(date)}
         </CardTitle>
       </CardHeader>
-      <CardContent className="mt-(--sun-icon-shift) grid grid-cols-6 gap-y-3 gap-x-1 px-4 py-3.5 sm:grid-cols-5 sm:gap-x-2">
+      <CardContent className="grid grid-cols-6 gap-x-1 gap-y-[calc(0.75rem+var(--sun-icon-shift,0px))] px-4 py-3.5 sm:mt-(--sun-icon-shift) sm:grid-cols-5 sm:gap-x-2 sm:gap-y-3">
         <SunStat
           className="col-span-2 col-start-2 sm:col-span-1 sm:col-start-auto"
           icon={weatherIcon[weatherCategory]}
@@ -341,7 +341,7 @@ export function SunTimesCard({
   );
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Datum 5 % der Kartenhöhe nach unten, die Icons noch einmal 10 %.
+  // Datum 5 % der Kartenhöhe nach unten. Die untere Icon-Zeile noch 10 %, die obere bleibt darüber.
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!card) return;
