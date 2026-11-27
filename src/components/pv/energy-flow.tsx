@@ -32,6 +32,8 @@ type EnergyFlowProps = {
   source: DataSource;
   gridSource: GridSource;
   className?: string;
+  /** Gelber Pausen-Banner ist sichtbar: keine Leistungszahlen und keine Flüsse. */
+  blank?: boolean;
 };
 
 type Accent = "green" | "rose" | "amber";
@@ -489,7 +491,7 @@ function StromkontoFocus({
   );
 }
 
-export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFlowProps) {
+export function EnergyFlow({ snapshot, source, gridSource, className, blank = false }: EnergyFlowProps) {
   const pvSimulated = isPvSimulated(source);
   const gridSimulated = isGridSimulated(gridSource);
   const showSimulated = useSyncExternalStore(
@@ -502,13 +504,13 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   const hideGrid = gridSimulated && !showSimulated;
   const gridKw = snapshot.gridKw;
   const hasGrid = gridKw != null;
-  const isProducing = snapshot.productionKw > LIVE_POWER_IDLE_KW;
-  const isConsuming = (snapshot.consumptionKw ?? 0) > LIVE_POWER_IDLE_KW;
+  const isProducing = !blank && snapshot.productionKw > LIVE_POWER_IDLE_KW;
+  const isConsuming = !blank && (snapshot.consumptionKw ?? 0) > LIVE_POWER_IDLE_KW;
   const gridMeasured = gridSource === "whatwatt" || source === "fusionsolar";
-  const isGridImport = gridMeasured && hasGrid && gridKw > LIVE_POWER_IDLE_KW;
-  const isGridExport = gridMeasured && hasGrid && gridKw < -LIVE_POWER_IDLE_KW;
+  const isGridImport = !blank && gridMeasured && hasGrid && gridKw > LIVE_POWER_IDLE_KW;
+  const isGridExport = !blank && gridMeasured && hasGrid && gridKw < -LIVE_POWER_IDLE_KW;
   const stromkontoKw = gridMeasured && hasGrid ? Math.abs(gridKw) : null;
-  const stromkontoShownKw = hideGrid || stromkontoKw == null ? null : stromkontoKw;
+  const stromkontoShownKw = blank || hideGrid || stromkontoKw == null ? null : stromkontoKw;
   const flowDigits = flowKwFractionDigits([
     hidePv ? null : snapshot.productionKw,
     hideConsumption || snapshot.consumptionKw == null ? null : snapshot.consumptionKw,
@@ -521,9 +523,9 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
     gridKw: hideGrid || !hasGrid ? null : gridKw,
     fractionDigits: flowDigits,
   });
-  const displayProductionKw = hidePv ? null : balanced.productionKw;
-  const displayConsumptionKw = balanced.consumptionKw;
-  const displayStromkontoKw = balanced.gridAbsKw;
+  const displayProductionKw = blank || hidePv ? null : balanced.productionKw;
+  const displayConsumptionKw = blank ? null : balanced.consumptionKw;
+  const displayStromkontoKw = blank ? null : balanced.gridAbsKw;
   const stromkontoNegative =
     snapshot.stromkontoBalanceKwh != null && snapshot.stromkontoBalanceKwh < 0;
   const stromkontoAccent: Accent = isGridExport
@@ -617,8 +619,8 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
   );
 
   const consumptionKw = snapshot.consumptionKw ?? 0;
-  const directSolarKw = hidePv ? 0 : Math.min(snapshot.productionKw, consumptionKw);
-  const pvSurplusKw = hidePv ? 0 : Math.max(0, snapshot.productionKw - consumptionKw);
+  const directSolarKw = blank || hidePv ? 0 : Math.min(snapshot.productionKw, consumptionKw);
+  const pvSurplusKw = blank || hidePv ? 0 : Math.max(0, snapshot.productionKw - consumptionKw);
   const isPvToVerbrauch = directSolarKw > LIVE_POWER_IDLE_KW;
   const isPvToStromkonto = pvSurplusKw > LIVE_POWER_IDLE_KW || (!hidePv && isGridExport);
 
@@ -677,7 +679,7 @@ export function EnergyFlow({ snapshot, source, gridSource, className }: EnergyFl
           ref={containerRef}
           className="energy-flow-diagram relative mx-auto h-64 w-full max-w-sm sm:h-72 md:h-52 md:max-w-none lg:h-56"
         >
-          {paths ? (
+          {paths && !blank ? (
             <svg
               viewBox={`0 0 ${geometry!.width} ${geometry!.height}`}
               className="absolute inset-0 h-full w-full"

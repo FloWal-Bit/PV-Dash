@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { RefreshCcw } from "lucide-react";
 import { DashboardHeader } from "@/components/pv/header";
 import { KpiGrid } from "@/components/pv/kpi-grid";
@@ -54,6 +54,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
     weatherStore.getServerSnapshot,
   );
   const lastUpdated = lastFetchedAt != null ? new Date(lastFetchedAt) : null;
+  const [pauseBannerVisible, setPauseBannerVisible] = useState(false);
   const dataSource = source ?? "simulation";
   // Bei fehlender Serververbindung reicht der Server-Pause-Banner —
   // Wetter-/Prognose-Ausfälle nicht zusätzlich anzeigen (oft dieselbe Ursache).
@@ -110,7 +111,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
       </div>
 
       <main className="dashboard-container safe-bottom flex w-full flex-1 flex-col gap-4 pb-4 sm:pb-6">
-        <ServerPauseBanner />
+        <ServerPauseBanner onVisibleChange={setPauseBannerVisible} />
 
         {error ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -173,6 +174,7 @@ export function Dashboard({ plantName }: { plantName: string }) {
                 snapshot={snapshot}
                 source={dataSource}
                 gridSource={gridSource}
+                blank={pauseBannerVisible}
               />
               <KpiGrid
                 className="min-w-0 md:h-full md:grid-cols-2 md:grid-rows-2"

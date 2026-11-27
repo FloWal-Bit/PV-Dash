@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { pvStore } from "@/lib/pv-store";
@@ -30,7 +30,11 @@ function formatUnreachableMessage(
 }
 
 /** Hinweis wenn der Node unerreichbar ist (Pause, Offline, Flugmodus) — nutzt gespeicherte Werte. */
-export function ServerPauseBanner() {
+export function ServerPauseBanner({
+  onVisibleChange,
+}: {
+  onVisibleChange?: (visible: boolean) => void;
+}) {
   const { serverUnreachable, lastFetchedAt, liveProbeDone } = useSyncExternalStore(
     pvStore.subscribe,
     pvStore.getSnapshot,
@@ -53,7 +57,13 @@ export function ServerPauseBanner() {
 
   // Erst nach dem ersten Live-Versuch anzeigen — sonst blitzt der Banner
   // bei jedem Refresh aus dem Offline-Cache auf, obwohl der Server erreichbar ist.
-  if (!liveProbeDone || !serverUnreachable || dismissed) return null;
+  const visible = liveProbeDone && serverUnreachable && !dismissed;
+
+  useLayoutEffect(() => {
+    onVisibleChange?.(visible);
+  }, [visible, onVisibleChange]);
+
+  if (!visible) return null;
 
   const message = formatUnreachableMessage(lastFetchedAt, nowMs);
 
