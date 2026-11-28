@@ -94,33 +94,38 @@ function MystromLampCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">Lampe</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col items-center gap-2 pb-4">
-        <button
-          type="button"
-          aria-pressed={lit}
-          aria-label="myStrom-Lampe ein- oder ausschalten"
-          disabled={setupHint != null || phase === "loading" || phase === "saving"}
-          onClick={() => void toggle()}
-          className="flex flex-col items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-70"
-        >
-          <span
-            className={cn(
-              "flex size-16 flex-col items-center justify-center gap-0.5 rounded-full border-[3px] bg-gradient-to-br shadow-inner",
-              lit
-                ? "border-chart-1 from-chart-1/20 to-chart-1/5 text-chart-1"
-                : "border-border text-muted-foreground/60",
-            )}
+      {setupHint ? (
+        <CardContent className="flex flex-col gap-3 pb-4">
+          <p className="text-sm text-muted-foreground">{setupHint}</p>
+        </CardContent>
+      ) : (
+        <CardContent className="flex flex-col items-center gap-2 pb-4">
+          <button
+            type="button"
+            aria-pressed={lit}
+            aria-label="myStrom-Lampe ein- oder ausschalten"
+            disabled={phase === "loading" || phase === "saving"}
+            onClick={() => void toggle()}
+            className="flex flex-col items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-70"
           >
-            {lit ? <Lightbulb className="size-5" /> : <LightbulbOff className="size-5" />}
-            <span className="text-xs font-semibold leading-none">{stateLabel}</span>
+            <span
+              className={cn(
+                "flex size-16 flex-col items-center justify-center gap-0.5 rounded-full border-[3px] bg-gradient-to-br shadow-inner",
+                lit
+                  ? "border-chart-1 from-chart-1/20 to-chart-1/5 text-chart-1"
+                  : "border-border text-muted-foreground/60",
+              )}
+            >
+              {lit ? <Lightbulb className="size-5" /> : <LightbulbOff className="size-5" />}
+              <span className="text-xs font-semibold leading-none">{stateLabel}</span>
+            </span>
+          </button>
+          <span className={cn("text-center text-xs", error ? "text-destructive" : "text-muted-foreground")}>
+            {error ??
+              (lit ? "Eingeschaltet" : on === false ? "Ausgeschaltet" : "Tippen zum Schalten")}
           </span>
-        </button>
-        <span className={cn("text-center text-xs", error ? "text-destructive" : "text-muted-foreground")}>
-          {setupHint ??
-            error ??
-            (lit ? "Eingeschaltet" : on === false ? "Ausgeschaltet" : "Tippen zum Schalten")}
-        </span>
-      </CardContent>
+        </CardContent>
+      )}
     </Card>
   );
 }
